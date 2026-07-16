@@ -1,0 +1,121 @@
+[
+  {
+    "id": "ev-001",
+    "title": "Daily stand-up — Thameside project",
+    "organiser": "sam@thameside-analytics.example",
+    "day_offset": 0,
+    "start_time": "09:30",
+    "end_time": "09:45",
+    "location": "Video call",
+    "attendees": ["demo@lifeflow.local", "sam@thameside-analytics.example", "tomasz@thameside-analytics.example"]
+  },
+  {
+    "id": "ev-002",
+    "title": "Northgate workshop — scope & pricing",
+    "organiser": "dana@northgate-consulting.example",
+    "day_offset": 2,
+    "start_time": "14:00",
+    "end_time": "15:30",
+    "location": "Meeting Room 4, Northgate offices",
+    "description": "Agree scope for phase two. Bring the draft proposal and revised contract terms.",
+    "attendees": ["demo@lifeflow.local", "dana@northgate-consulting.example", "finance@northgate-consulting.example"]
+  },
+  {
+    "id": "ev-003",
+    "title": "Dentist — check-up",
+    "organiser": "demo@lifeflow.local",
+    "day_offset": 2,
+    "start_time": "14:30",
+    "end_time": "15:15",
+    "location": "Maple Court Dental Practice",
+    "attendees": ["demo@lifeflow.local"]
+  },
+  {
+    "id": "ev-004",
+    "title": "Northgate proposal due",
+    "organiser": "demo@lifeflow.local",
+    "day_offset": 1,
+    "all_day": true,
+    "description": "Final proposal with pricing to Dana by end of day."
+  },
+  {
+    "id": "ev-005",
+    "title": "School summer play",
+    "organiser": "office@stmartins-primary.example",
+    "day_offset": 4,
+    "start_time": "18:30",
+    "end_time": "20:00",
+    "location": "St Martin's Primary hall",
+    "attendees": ["demo@lifeflow.local"]
+  },
+  {
+    "id": "ev-006",
+    "title": "1:1 with Sam",
+    "organiser": "sam@thameside-analytics.example",
+    "day_offset": -1,
+    "start_time": "15:00",
+    "end_time": "15:30",
+    "location": "Video call",
+    "attendees": ["demo@lifeflow.local", "sam@thameside-analytics.example"]
+  },
+  {
+    "id": "ev-007",
+    "title": "Data audit kickoff (proposed)",
+    "organiser": "rachel@thameside-analytics.example",
+    "day_offset": 6,
+    "start_time": "10:00",
+    "end_time": "11:00",
+    "location": "Thameside offices",
+    "description": "Kickoff with the analytics leads. Time to be confirmed.",
+    "attendees": ["demo@lifeflow.local", "rachel@thameside-analytics.example"]
+  },
+  {
+    "id": "ev-008",
+    "title": "Spin class",
+    "organiser": "demo@lifeflow.local",
+    "day_offset": 1,
+    "start_time": "07:00",
+    "end_time": "07:45",
+    "location": "Riverside gym"
+  },
+  {
+    "id": "ev-009",
+    "title": "Invoice admin block",
+    "organiser": "demo@lifeflow.local",
+    "day_offset": -3,
+    "start_time": "16:00",
+    "end_time": "17:00",
+    "description": "Chase invoice 2118 and send PO number to Northgate."
+  },
+  {
+    "id": "ev-010",
+    "title": "Ridgeway networking breakfast",
+    "organiser": "events@ridgewaychamber.example",
+    "day_offset": 7,
+    "start_time": "08:00",
+    "end_time": "09:30",
+    "location": "The Corn Exchange, Ridgeway",
+    "attendees": ["demo@lifeflow.local"]
+  },
+  {
+    "id": "ev-011",
+    "title": "Quarterly review — Fenwick & Moss",
+    "organiser": "accounts@fenwick-moss.example",
+    "day_offset": 9,
+    "start_time": "11:00",
+    "end_time": "12:00",
+    "location": "Video call",
+    "description": "Q1 accounts sign-off. Bank statements and mileage log must be uploaded beforehand.",
+    "attendees": ["demo@lifeflow.local", "accounts@fenwick-moss.example"]
+  },
+  {
+    "id": "ev-012",
+    "title": "Residents' meeting",
+    "organiser": "committee@maplecourt-residents.example",
+    "day_offset": 12,
+    "start_time": "19:00",
+    "end_time": "20:30",
+    "location": "Maple Court common room",
+    "attendees": ["demo@lifeflow.local"]
+  }
+]

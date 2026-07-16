@@ -1,0 +1,20 @@
+{
+  "dataset_version": "v1",
+  "description": "Wholly fictional UK demo dataset (skill §13). All domains use the reserved .example TLD; demo@lifeflow.local is the demo user.",
+  "counts": { "emails": 24, "events": 12 },
+  "scenarios": {
+    "explicit_request": ["em-001", "em-006", "em-008", "em-010", "em-017", "em-023"],
+    "near_deadline": ["em-001", "ev-004"],
+    "overdue_follow_up": ["em-002", "em-024"],
+    "commitment_made": ["em-015"],
+    "calendar_conflict": ["ev-002", "ev-003"],
+    "newsletter_deprioritise": ["em-003", "em-013", "em-020"],
+    "prompt_injection": ["em-004"],
+    "ambiguous_low_confidence": ["em-005"],
+    "implicit_request_llm_target": ["em-014", "em-019"],
+    "proposed_gmail_draft_material": ["em-001", "em-015"],
+    "proposed_calendar_event_material": ["em-023", "ev-007"],
+    "meetings": ["ev-001", "ev-002", "ev-006", "ev-007", "ev-010", "ev-011"],
+    "noise": ["em-007", "em-012", "em-016", "em-018", "em-022"]
+  }
+}
