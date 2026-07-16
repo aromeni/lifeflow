@@ -1,0 +1,14 @@
+{
+  "name": "lifeflow-ai",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "web:dev": "pnpm --filter @lifeflow/web dev",
+    "web:build": "pnpm --filter @lifeflow/web build",
+    "web:lint": "pnpm --filter @lifeflow/web lint",
+    "web:typecheck": "pnpm --filter @lifeflow/web typecheck",
+    "web:test": "pnpm --filter @lifeflow/web test",
+    "web:format": "pnpm --filter @lifeflow/web format",
+    "web:format:check": "pnpm --filter @lifeflow/web format:check"
+  }
+}

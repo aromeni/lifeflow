@@ -1,0 +1,20 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: lifeflow
+      POSTGRES_PASSWORD: lifeflow # development-only credentials; production uses managed secrets # pragma: allowlist secret
+      POSTGRES_DB: lifeflow
+    ports:
+      # 5433 by default: many machines already run a Postgres on 5432.
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - lifeflow-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lifeflow -d lifeflow"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  lifeflow-db-data:
