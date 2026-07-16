@@ -1,0 +1,29 @@
+{
+  "description": "Fixture response for the mock LLM provider. Emulates a plausible model pass over dataset v1: one genuine recovery the deterministic rules miss (em-019 as a request), one duplicate of a known signal (dedupe must absorb it), and one fabricated-evidence signal (validation must reject it). Used for plumbing metrics only — never presented as real model quality.",
+  "signals": [
+    {
+      "signal_type": "request",
+      "title": "Book the follow-up coaching session",
+      "summary": "James assigned one action in his session notes: book the follow-up before the end of the month while the discount applies.",
+      "evidence_refs": ["em-019"],
+      "due_at": "2026-07-31T22:59:00+00:00",
+      "confidence": 0.75
+    },
+    {
+      "signal_type": "request",
+      "title": "Confirm contract terms for Dana",
+      "summary": "Dana asked for confirmation of the revised terms by Wednesday.",
+      "evidence_refs": ["em-001"],
+      "due_at": "2026-07-15T22:59:00+00:00",
+      "confidence": 0.9
+    },
+    {
+      "signal_type": "deadline",
+      "title": "Quarterly filing due",
+      "summary": "A filing deadline mentioned in a message.",
+      "evidence_refs": ["em-999"],
+      "due_at": null,
+      "confidence": 0.8
+    }
+  ]
+}
