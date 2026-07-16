@@ -59,6 +59,66 @@ jobs:
       - run: pnpm web:test
       - run: pnpm web:build
 
+  contracts:
+    name: Contracts — generated types are current
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: cd apps/api && uv sync --locked
+      - run: ./scripts/generate-contracts.sh
+      - name: Fail if committed contracts are stale
+        run: |
+          git diff --exit-code packages/contracts \
+            || { echo "::error::packages/contracts is stale — run ./scripts/generate-contracts.sh and commit the result."; exit 1; }
+
+  e2e:
+    name: E2E — demo journey (Playwright)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: lifeflow
+          POSTGRES_PASSWORD: lifeflow # pragma: allowlist secret
+          POSTGRES_DB: lifeflow
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U lifeflow -d lifeflow"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+asyncpg://lifeflow:lifeflow@localhost:5433/lifeflow # pragma: allowlist secret
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: cd apps/api && uv sync --locked
+      - run: cd apps/api && uv run alembic upgrade head
+      - run: pnpm --filter @lifeflow/web exec playwright install chromium --with-deps
+      - run: pnpm web:e2e
+
   secrets:
     name: Secret scanning
     runs-on: ubuntu-latest

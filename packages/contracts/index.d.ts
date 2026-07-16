@@ -38,6 +38,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/briefs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Brief Versions */
+        get: operations["list_brief_versions_briefs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/briefs/generate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Generate Brief */
+        post: operations["generate_brief_briefs_generate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/briefs/latest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Latest Brief */
+        get: operations["get_latest_brief_briefs_latest_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/briefs/{brief_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Brief */
+        get: operations["get_brief_briefs__brief_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/demo/start": {
         parameters: {
             query?: never;
@@ -162,6 +230,144 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** BriefEvidence */
+        BriefEvidence: {
+            /** Excerpt */
+            excerpt: string;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+            /** Sender Or Organiser */
+            sender_or_organiser: string | null;
+            /** Source Item Id */
+            source_item_id: string | null;
+            /** Source Ref */
+            source_ref: string;
+            /** Source Type */
+            source_type: string;
+            /** Title */
+            title: string;
+        };
+        /** BriefItem */
+        BriefItem: {
+            /** Actionable */
+            actionable: boolean;
+            /** Confidence */
+            confidence: number;
+            /** Due At */
+            due_at: string | null;
+            /** Evidence */
+            evidence: components["schemas"]["BriefEvidence"][];
+            /** Priority Band */
+            priority_band: string;
+            /** Priority Score */
+            priority_score: number;
+            /** Reason Codes */
+            reason_codes: string[];
+            /** Signal Id */
+            signal_id: string;
+            /** Signal Type */
+            signal_type: string;
+            /** Suggested Action */
+            suggested_action: string | null;
+            /** Summary */
+            summary: string;
+            /** Title */
+            title: string;
+        };
+        /** BriefNotice */
+        BriefNotice: {
+            /** Code */
+            code: string;
+            /** Message */
+            message: string;
+        };
+        /** BriefResponse */
+        BriefResponse: {
+            /**
+             * Briefing Date
+             * Format: date-time
+             */
+            briefing_date: string;
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
+            /** Generation Metadata */
+            generation_metadata: {
+                [key: string]: unknown;
+            };
+            /** Id */
+            id: string;
+            /** Notices */
+            notices: components["schemas"]["BriefNotice"][];
+            /** Prompt Version */
+            prompt_version: string | null;
+            /** Sections */
+            sections: components["schemas"]["BriefSection"][];
+            /** Source Window */
+            source_window: string;
+            status: components["schemas"]["BriefStatus"];
+            /** Summary */
+            summary: string;
+            /** Version */
+            version: number;
+        };
+        /** BriefSection */
+        BriefSection: {
+            /** Items */
+            items: components["schemas"]["BriefItem"][];
+            key: components["schemas"]["BriefSectionKey"];
+            /** Label */
+            label: string;
+        };
+        /**
+         * BriefSectionKey
+         * @enum {string}
+         */
+        BriefSectionKey: "needs_attention" | "today_upcoming" | "waiting_for" | "suggested_actions" | "low_confidence_review";
+        /**
+         * BriefStatus
+         * @description Honest generation states surfaced to the user (skill §12).
+         *
+         *     complete — sections composed from persisted signals.
+         *     empty — generation ran but there were no signals to report.
+         *     degraded — optional LLM prose failed or was rejected; the deterministic
+         *     fallback summary is shown. Facts are unaffected (they never come from
+         *     the LLM).
+         *     partial — one or more configured sources are unavailable, or a persisted
+         *     signal was omitted because its source evidence could not be resolved.
+         * @enum {string}
+         */
+        BriefStatus: "complete" | "empty" | "degraded" | "partial";
+        /** BriefVersionListResponse */
+        BriefVersionListResponse: {
+            /** Briefs */
+            briefs: components["schemas"]["BriefVersionResponse"][];
+            /** Count */
+            count: number;
+        };
+        /** BriefVersionResponse */
+        BriefVersionResponse: {
+            /**
+             * Briefing Date
+             * Format: date-time
+             */
+            briefing_date: string;
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
+            /** Id */
+            id: string;
+            status: components["schemas"]["BriefStatus"];
+            /** Version */
+            version: number;
+        };
         /** DemoStartResponse */
         DemoStartResponse: {
             /** Imported */
@@ -199,6 +405,8 @@ export interface components {
             llm_used: boolean;
             /** Persisted New */
             persisted_new: number;
+            /** Persisted Unchanged */
+            persisted_unchanged: number;
             /** Persisted Updated */
             persisted_updated: number;
         };
@@ -383,6 +591,108 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    list_brief_versions_briefs_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BriefVersionListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    generate_brief_briefs_generate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BriefResponse"];
+                };
+            };
+        };
+    };
+    get_latest_brief_briefs_latest_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BriefResponse"];
+                };
+            };
+        };
+    };
+    get_brief_briefs__brief_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                brief_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BriefResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
             };
         };
     };

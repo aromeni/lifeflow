@@ -7,6 +7,7 @@ lifeflow-ai/
 ├── apps/
 │   ├── web/                 # Next.js frontend: all screens, routes, and UI components.
 │   │                        # Client code only — no business logic; talks to the API via generated contracts.
+│   │                        # e2e/ holds Playwright journeys (run via scripts/e2e.sh); unit tests sit beside components.
 │   └── api/                 # FastAPI backend: domain models, services, policy engine, executors, audit.
 │                            # ALL business logic lives here, behind connector/LLM interfaces.
 ├── packages/

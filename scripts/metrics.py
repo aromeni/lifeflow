@@ -87,6 +87,9 @@ def main() -> int:
     )
     api_tests, api_coverage = backend_tests_and_coverage()
     web = web_tests()
+    e2e_specs = len(
+        re.findall(r"^test\(", (ROOT / "apps/web/e2e/demo-brief.spec.ts").read_text(), re.M)
+    ) if (ROOT / "apps/web/e2e").exists() else 0
     current_stage, completed = stage_progress()
 
     doc = f"""# Repository Metrics
@@ -102,7 +105,8 @@ def main() -> int:
 | Backend tests | {api_tests} |
 | Backend coverage | {api_coverage} |
 | Frontend tests | {web} |
-| Frontend coverage | not yet measured — arrives with the E2E/Playwright setup (Stage 5) |
+| E2E journeys (Playwright) | {e2e_specs} |
+| Frontend coverage | not yet measured — coverage reporter deferred until the UI stabilises |
 | CI | not yet connected — activates on first GitHub push |
 | Current stage | {current_stage} |
 | Approved stages | {completed} |

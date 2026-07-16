@@ -180,8 +180,31 @@ class Signal(Base):
     dedupe_key: Mapped[str] = mapped_column(String(64))
 
 
+class BriefStatus(StrEnum):
+    """Honest generation states surfaced to the user (skill §12).
+
+    complete — sections composed from persisted signals.
+    empty — generation ran but there were no signals to report.
+    degraded — optional LLM prose failed or was rejected; the deterministic
+    fallback summary is shown. Facts are unaffected (they never come from
+    the LLM).
+    partial — one or more configured sources are unavailable, or a persisted
+    signal was omitted because its source evidence could not be resolved.
+    """
+
+    complete = "complete"
+    empty = "empty"
+    degraded = "degraded"
+    partial = "partial"
+
+
 class Brief(Base):
     __tablename__ = "briefs"
+    __table_args__ = (
+        # Regeneration creates a new version; earlier versions are kept so the
+        # user can always inspect what the system said before.
+        UniqueConstraint("user_id", "briefing_date", "version", name="uq_briefs_user_date_version"),
+    )
 
     id: Mapped[uuid.UUID] = _uuid_pk()
     user_id: Mapped[uuid.UUID] = _user_fk()
@@ -189,6 +212,8 @@ class Brief(Base):
     generated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+    version: Mapped[int] = mapped_column(default=1)
+    status: Mapped[str] = mapped_column(String(20), default=BriefStatus.complete)
     summary: Mapped[str] = mapped_column(Text)
     sections_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     source_window: Mapped[str] = mapped_column(String(64))

@@ -1,6 +1,356 @@
 {
   "components": {
     "schemas": {
+      "BriefEvidence": {
+        "additionalProperties": false,
+        "properties": {
+          "excerpt": {
+            "title": "Excerpt",
+            "type": "string"
+          },
+          "occurred_at": {
+            "format": "date-time",
+            "title": "Occurred At",
+            "type": "string"
+          },
+          "sender_or_organiser": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sender Or Organiser"
+          },
+          "source_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Item Id"
+          },
+          "source_ref": {
+            "title": "Source Ref",
+            "type": "string"
+          },
+          "source_type": {
+            "title": "Source Type",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_item_id",
+          "source_ref",
+          "source_type",
+          "title",
+          "sender_or_organiser",
+          "occurred_at",
+          "excerpt"
+        ],
+        "title": "BriefEvidence",
+        "type": "object"
+      },
+      "BriefItem": {
+        "additionalProperties": false,
+        "properties": {
+          "actionable": {
+            "title": "Actionable",
+            "type": "boolean"
+          },
+          "confidence": {
+            "title": "Confidence",
+            "type": "number"
+          },
+          "due_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due At"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/BriefEvidence"
+            },
+            "minItems": 1,
+            "title": "Evidence",
+            "type": "array"
+          },
+          "priority_band": {
+            "title": "Priority Band",
+            "type": "string"
+          },
+          "priority_score": {
+            "title": "Priority Score",
+            "type": "number"
+          },
+          "reason_codes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reason Codes",
+            "type": "array"
+          },
+          "signal_id": {
+            "title": "Signal Id",
+            "type": "string"
+          },
+          "signal_type": {
+            "title": "Signal Type",
+            "type": "string"
+          },
+          "suggested_action": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suggested Action"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "signal_id",
+          "signal_type",
+          "title",
+          "summary",
+          "due_at",
+          "confidence",
+          "priority_score",
+          "priority_band",
+          "reason_codes",
+          "actionable",
+          "suggested_action",
+          "evidence"
+        ],
+        "title": "BriefItem",
+        "type": "object"
+      },
+      "BriefNotice": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "BriefNotice",
+        "type": "object"
+      },
+      "BriefResponse": {
+        "properties": {
+          "briefing_date": {
+            "format": "date-time",
+            "title": "Briefing Date",
+            "type": "string"
+          },
+          "generated_at": {
+            "format": "date-time",
+            "title": "Generated At",
+            "type": "string"
+          },
+          "generation_metadata": {
+            "additionalProperties": true,
+            "title": "Generation Metadata",
+            "type": "object"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "notices": {
+            "items": {
+              "$ref": "#/components/schemas/BriefNotice"
+            },
+            "title": "Notices",
+            "type": "array"
+          },
+          "prompt_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt Version"
+          },
+          "sections": {
+            "items": {
+              "$ref": "#/components/schemas/BriefSection"
+            },
+            "title": "Sections",
+            "type": "array"
+          },
+          "source_window": {
+            "title": "Source Window",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/BriefStatus"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "briefing_date",
+          "generated_at",
+          "version",
+          "status",
+          "summary",
+          "sections",
+          "notices",
+          "source_window",
+          "prompt_version",
+          "generation_metadata"
+        ],
+        "title": "BriefResponse",
+        "type": "object"
+      },
+      "BriefSection": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/BriefItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "key": {
+            "$ref": "#/components/schemas/BriefSectionKey"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "items"
+        ],
+        "title": "BriefSection",
+        "type": "object"
+      },
+      "BriefSectionKey": {
+        "enum": [
+          "needs_attention",
+          "today_upcoming",
+          "waiting_for",
+          "suggested_actions",
+          "low_confidence_review"
+        ],
+        "title": "BriefSectionKey",
+        "type": "string"
+      },
+      "BriefStatus": {
+        "description": "Honest generation states surfaced to the user (skill \u00a712).\n\ncomplete \u2014 sections composed from persisted signals.\nempty \u2014 generation ran but there were no signals to report.\ndegraded \u2014 optional LLM prose failed or was rejected; the deterministic\nfallback summary is shown. Facts are unaffected (they never come from\nthe LLM).\npartial \u2014 one or more configured sources are unavailable, or a persisted\nsignal was omitted because its source evidence could not be resolved.",
+        "enum": [
+          "complete",
+          "empty",
+          "degraded",
+          "partial"
+        ],
+        "title": "BriefStatus",
+        "type": "string"
+      },
+      "BriefVersionListResponse": {
+        "properties": {
+          "briefs": {
+            "items": {
+              "$ref": "#/components/schemas/BriefVersionResponse"
+            },
+            "title": "Briefs",
+            "type": "array"
+          },
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "briefs",
+          "count"
+        ],
+        "title": "BriefVersionListResponse",
+        "type": "object"
+      },
+      "BriefVersionResponse": {
+        "properties": {
+          "briefing_date": {
+            "format": "date-time",
+            "title": "Briefing Date",
+            "type": "string"
+          },
+          "generated_at": {
+            "format": "date-time",
+            "title": "Generated At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/BriefStatus"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "briefing_date",
+          "generated_at",
+          "version",
+          "status"
+        ],
+        "title": "BriefVersionResponse",
+        "type": "object"
+      },
       "DemoStartResponse": {
         "properties": {
           "imported": {
@@ -67,6 +417,10 @@
             "title": "Persisted New",
             "type": "integer"
           },
+          "persisted_unchanged": {
+            "title": "Persisted Unchanged",
+            "type": "integer"
+          },
           "persisted_updated": {
             "title": "Persisted Updated",
             "type": "integer"
@@ -79,7 +433,8 @@
           "llm_rejected",
           "llm_failed",
           "persisted_new",
-          "persisted_updated"
+          "persisted_updated",
+          "persisted_unchanged"
         ],
         "title": "ExtractionResponse",
         "type": "object"
@@ -502,6 +857,124 @@
           }
         },
         "summary": "Logout"
+      }
+    },
+    "/briefs": {
+      "get": {
+        "operationId": "list_brief_versions_briefs_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 30,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BriefVersionListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Brief Versions"
+      }
+    },
+    "/briefs/generate": {
+      "post": {
+        "operationId": "generate_brief_briefs_generate_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BriefResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Generate Brief"
+      }
+    },
+    "/briefs/latest": {
+      "get": {
+        "operationId": "get_latest_brief_briefs_latest_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BriefResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Latest Brief"
+      }
+    },
+    "/briefs/{brief_id}": {
+      "get": {
+        "operationId": "get_brief_briefs__brief_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brief_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Brief Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BriefResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Brief"
       }
     },
     "/demo/start": {

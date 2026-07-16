@@ -3,34 +3,51 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
-import { SourceItemList } from "@/components/SourceItemList";
+import { BriefSectionView } from "@/components/BriefSectionView";
 import { api, ApiError } from "@/lib/api";
-import type { Me, SourceItem, SourceItemList as ItemList } from "@/lib/types";
+import type { Brief, Me } from "@/lib/types";
 
-type LoadState = "loading" | "ready" | "unauthenticated" | "error";
+type LoadState = "loading" | "generating" | "ready" | "no-brief" | "unauthenticated" | "error";
+
+const STATUS_MESSAGES: Record<string, string> = {
+  partial:
+    "Some information could be incomplete: a source was unavailable or evidence could not be resolved. Details below.",
+  degraded:
+    "Optional model assistance was unavailable. This brief was composed entirely from deterministic rules — every fact is still evidence-backed.",
+  empty: "There is nothing to report yet. Import sources and generate again.",
+};
+
+function formatGeneratedAt(iso: string, timezone: string): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: timezone,
+  }).format(new Date(iso));
+}
 
 export default function TodayPage() {
   const [state, setState] = useState<LoadState>("loading");
   const [me, setMe] = useState<Me | null>(null);
-  const [events, setEvents] = useState<SourceItem[]>([]);
-  const [emails, setEmails] = useState<SourceItem[]>([]);
+  const [brief, setBrief] = useState<Brief | null>(null);
 
   const load = useCallback(async () => {
     try {
       const profile = await api<Me>("/me");
-      const nowIso = new Date().toISOString();
-      const [upcoming, recent] = await Promise.all([
-        api<ItemList>(
-          `/source-items?source_type=calendar_event&occurring_after=${encodeURIComponent(nowIso)}&limit=12`,
-        ),
-        api<ItemList>("/source-items?source_type=email&limit=12"),
-      ]);
       setMe(profile);
-      setEvents([...upcoming.items].reverse()); // soonest first
-      setEmails(recent.items);
+      const latest = await api<Brief>("/briefs/latest");
+      setBrief(latest);
       setState("ready");
     } catch (error) {
-      setState(error instanceof ApiError && error.status === 401 ? "unauthenticated" : "error");
+      if (error instanceof ApiError && error.status === 401) {
+        setState("unauthenticated");
+      } else if (error instanceof ApiError && error.status === 404) {
+        setState("no-brief");
+      } else {
+        setState("error");
+      }
     }
   }, []);
 
@@ -41,10 +58,16 @@ export default function TodayPage() {
     void load();
   }, [load]);
 
-  function refresh() {
-    setState("loading");
-    void load();
-  }
+  const generate = useCallback(async () => {
+    setState("generating");
+    try {
+      const fresh = await api<Brief>("/briefs/generate", { method: "POST" });
+      setBrief(fresh);
+      setState("ready");
+    } catch (error) {
+      setState(error instanceof ApiError && error.status === 401 ? "unauthenticated" : "error");
+    }
+  }, []);
 
   if (state === "unauthenticated") {
     return (
@@ -61,47 +84,83 @@ export default function TodayPage() {
   }
 
   const timezone = me?.timezone ?? "Europe/London";
+  const statusMessage = brief ? STATUS_MESSAGES[brief.status] : undefined;
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col gap-8 px-6 py-12">
-      <header className="flex flex-col gap-1">
+      <header className="flex flex-col gap-2">
         <div className="flex items-baseline justify-between gap-4">
           <h1 className="text-3xl font-semibold tracking-tight">Today</h1>
-          <button type="button" onClick={refresh} className="text-sm underline">
-            Refresh
+          <button
+            type="button"
+            onClick={generate}
+            disabled={state === "generating"}
+            className="rounded border border-current/40 px-3 py-1 text-sm disabled:opacity-50"
+          >
+            {state === "generating" ? "Generating…" : "Generate brief"}
           </button>
         </div>
         <p aria-live="polite" className="text-sm opacity-70">
-          {state === "loading" && "Loading your information…"}
+          {state === "loading" && "Loading your brief…"}
+          {state === "generating" && "Generating a fresh brief from your sources…"}
           {state === "ready" &&
-            `${events.length} upcoming events · ${emails.length} recent messages · timezone ${timezone}`}
-          {state === "error" && "Could not load your information. Is the API running?"}
-        </p>
-        <p className="text-sm opacity-70">
-          This is the dashboard shell: normalised information only. Signals, priorities, and the
-          daily brief arrive in the next stages.
+            brief &&
+            `Generated ${formatGeneratedAt(brief.generated_at, timezone)} · version ${brief.version} · ${brief.status}`}
+          {state === "no-brief" && "No brief yet."}
+          {state === "error" && "Could not load your brief. Is the API running?"}
         </p>
       </header>
 
-      <section aria-labelledby="upcoming-heading" className="flex flex-col gap-2">
-        <h2 id="upcoming-heading" className="text-xl font-medium">
-          Today &amp; upcoming
-        </h2>
-        <SourceItemList items={events} timezone={timezone} emptyMessage="No upcoming events." />
-      </section>
+      {state === "no-brief" && (
+        <section className="flex flex-col gap-3">
+          <p>
+            Generate your first daily brief. It is composed from your imported information, every
+            item carries its source evidence, and nothing is actioned without your approval.
+          </p>
+        </section>
+      )}
 
-      <section aria-labelledby="recent-heading" className="flex flex-col gap-2">
-        <h2 id="recent-heading" className="text-xl font-medium">
-          Recent messages
-        </h2>
-        <SourceItemList items={emails} timezone={timezone} emptyMessage="No recent messages." />
-      </section>
+      {state === "ready" && brief && (
+        <>
+          <section aria-labelledby="summary-heading" className="flex flex-col gap-2">
+            <h2 id="summary-heading" className="sr-only">
+              Summary
+            </h2>
+            <p className="text-lg">{brief.summary}</p>
+            {statusMessage ? (
+              <p role="status" className="rounded border border-current/30 px-3 py-2 text-sm">
+                Note: {statusMessage}
+              </p>
+            ) : null}
+            {brief.notices.map((notice) => (
+              <p
+                key={notice.code}
+                role="status"
+                className="rounded border border-current/30 px-3 py-2 text-sm"
+              >
+                {notice.message}
+              </p>
+            ))}
+          </section>
 
-      <footer className="text-sm opacity-70">
-        <Link href="/debug/source-items" className="underline">
-          Developer view: raw normalised items
-        </Link>
-      </footer>
+          {brief.sections.map((section) => (
+            <BriefSectionView key={section.key} section={section} timezone={timezone} />
+          ))}
+
+          <footer className="flex flex-col gap-1 text-sm opacity-70">
+            <span>
+              Source window: {brief.source_window} · composed deterministically
+              {brief.generation_metadata &&
+              (brief.generation_metadata as Record<string, unknown>).llm_summary_used === true
+                ? " · summary sentences selected by the model from evidence-backed text"
+                : ""}
+            </span>
+            <Link href="/debug/source-items" className="underline">
+              Developer view: raw normalised items
+            </Link>
+          </footer>
+        </>
+      )}
     </main>
   );
 }

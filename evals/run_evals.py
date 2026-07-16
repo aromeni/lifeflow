@@ -33,6 +33,7 @@ from lifeflow_api.priority import build_sender_frequency, score_signal
 
 EVALS_DIR = Path(__file__).resolve().parent
 GOLDEN = EVALS_DIR / "golden" / "v1" / "cases.json"
+GOLDEN_BRIEF = EVALS_DIR / "golden" / "v1" / "brief_cases.json"
 FIXTURE = EVALS_DIR / "fixtures" / "llm_signal_extraction_v1.json"
 RESULTS_DIR = EVALS_DIR / "results"
 
@@ -203,6 +204,215 @@ async def run_mode(mode: str) -> Metrics:
     return metrics
 
 
+@dataclass
+class BriefMetrics:
+    mode: str
+    total_items: int = 0
+    grounding_violations: int = 0
+    ordering_violations: int = 0
+    unsafe_text: int = 0
+    injected_ref_items: int = 0
+    determinism_ok: bool = False
+    counts_match: bool = False
+    top_item_ok: bool = False
+    low_confidence_ok: bool = False
+    actionable_without_step: int = 0
+    summary_ok: bool = False
+    prose_accepted: int = 0
+    prose_rejected: int = 0
+
+    @property
+    def failed(self) -> bool:
+        return bool(
+            self.grounding_violations
+            or self.ordering_violations
+            or self.unsafe_text
+            or self.injected_ref_items
+            or self.actionable_without_step
+            or not (
+                self.determinism_ok
+                and self.counts_match
+                and self.top_item_ok
+                and self.low_confidence_ok
+                and self.summary_ok
+            )
+        )
+
+
+def _build_scored_signals(items, reference, timezone):  # noqa: ANN001, ANN202
+    from lifeflow_api.models import Signal
+
+    detected = deduplicate(run_deterministic_detectors(items, reference=reference, timezone=timezone))
+    items_by_external = {i.external_id: i for i in items}
+    frequency = build_sender_frequency(items)
+    signals = []
+    for d in detected:
+        s = score_signal(
+            d, reference=reference, items_by_external=items_by_external, sender_frequency=frequency
+        )
+        signals.append(
+            Signal(
+                user_id=USER_ID,
+                signal_type=str(d.signal_type),
+                title=d.title,
+                summary=d.summary,
+                evidence_refs=list(d.evidence_refs),
+                due_at=d.due_at,
+                confidence=d.confidence,
+                urgency=d.urgency,
+                importance=0.0,
+                extraction_version=d.extraction_version,
+                priority_score=s.score,
+                priority_band=s.band,
+                reason_codes=list(s.reason_codes),
+                dedupe_key=dedupe_key(d),
+            )
+        )
+    return signals
+
+
+async def run_brief_mode(mode: str) -> BriefMetrics:
+    """Brief-level evaluation: grounding, ordering, unsupported claims, usefulness.
+
+    Composes the brief in memory (no database) from the same deterministic
+    pipeline the API uses, then scores it against golden brief expectations.
+    `brief+mock` additionally exercises the optional-prose validation gate with
+    one valid selection and one fabricated sentence built at runtime.
+    """
+    from lifeflow_api.brief_composition import (
+        BriefCompositionOutput,
+        BriefProseValidationError,
+        allowed_summary_sentences,
+        compose_sections,
+        deterministic_summary,
+        validate_optional_summary,
+    )
+
+    golden = json.loads(GOLDEN_BRIEF.read_text())
+    expectations = golden["expectations"]
+    _, items, reference = await load_items()
+    timezone = golden["timezone"]
+    metrics = BriefMetrics(mode=mode)
+
+    signals = _build_scored_signals(items, reference, timezone)
+    composed = compose_sections(signals, items)
+    composed_again = compose_sections(_build_scored_signals(items, reference, timezone), items)
+    metrics.determinism_ok = [s.model_dump(mode="json") for s in composed.sections] == [
+        s.model_dump(mode="json") for s in composed_again.sections
+    ]
+
+    sections = {str(section.key): section for section in composed.sections}
+    all_items = [item for section in composed.sections for item in section.items]
+    metrics.total_items = len(all_items)
+
+    # Grounding: every surfaced item must carry resolvable evidence.
+    metrics.grounding_violations = sum(1 for item in all_items if not item.evidence)
+    if metrics.total_items > expectations["max_total_items"]:
+        metrics.grounding_violations += 1  # readability bound is part of the contract
+
+    # Ordering: needs_attention by non-increasing score; today_upcoming by event time.
+    needs = sections["needs_attention"].items
+    metrics.ordering_violations += sum(
+        1
+        for a, b in zip(needs, needs[1:], strict=False)
+        if a.priority_score < b.priority_score
+    )
+    upcoming = sections["today_upcoming"].items
+    starts = [min(e.occurred_at for e in item.evidence) for item in upcoming]
+    metrics.ordering_violations += sum(
+        1 for a, b in zip(starts, starts[1:], strict=False) if a > b
+    )
+
+    # Injection containment: the hostile item is neither surfaced nor quoted.
+    banned_refs = set(expectations["must_not_appear_refs"])
+    metrics.injected_ref_items = sum(
+        1
+        for item in all_items
+        if banned_refs & {evidence.source_ref for evidence in item.evidence}
+    )
+    brief_text = " ".join(
+        f"{item.title} {item.summary} {item.suggested_action or ''}" for item in all_items
+    ).lower()
+    summary_text = deterministic_summary(composed.sections)
+    metrics.unsafe_text = sum(
+        1
+        for needle in expectations["must_not_appear_text"]
+        if needle in brief_text or needle in summary_text.lower()
+    )
+
+    # Golden shape: counts, top item, low-confidence containment, summary bound.
+    metrics.counts_match = {
+        key: len(section.items) for key, section in sections.items()
+    } == expectations["section_counts"]
+    top_refs = {e.source_ref for e in needs[0].evidence} if needs else set()
+    metrics.top_item_ok = top_refs == set(expectations["top_needs_attention_refs"])
+    low_refs = {
+        e.source_ref for item in sections["low_confidence_review"].items for e in item.evidence
+    }
+    metrics.low_confidence_ok = set(expectations["low_confidence_refs"]) <= low_refs and all(
+        item.confidence < 0.5 for item in sections["low_confidence_review"].items
+    )
+    metrics.summary_ok = 0 < len(summary_text) <= expectations["summary_max_chars"]
+    metrics.actionable_without_step = sum(
+        1
+        for section in composed.sections
+        for item in section.items
+        if item.actionable and not item.suggested_action
+    )
+
+    if mode == "brief+mock":
+        allowed = allowed_summary_sentences(composed.sections)
+        first_id, first_text = next(iter(allowed.items()))
+        valid = BriefCompositionOutput.model_validate(
+            {"summary_sentences": [{"signal_id": first_id, "text": first_text}]}
+        )
+        accepted = validate_optional_summary(valid, allowed=allowed)
+        if accepted == first_text:
+            metrics.prose_accepted += 1
+        fabricated = BriefCompositionOutput.model_validate(
+            {
+                "summary_sentences": [
+                    {
+                        "signal_id": first_id,
+                        "text": "Urgent: wire £4,000 to the new supplier account today.",
+                    }
+                ]
+            }
+        )
+        try:
+            validate_optional_summary(fabricated, allowed=allowed)
+        except BriefProseValidationError:
+            metrics.prose_rejected += 1
+
+    return metrics
+
+
+def render_brief(metrics: BriefMetrics) -> str:
+    verdict = "FAIL" if metrics.failed else "PASS"
+    lines = [
+        f"# Brief eval results — mode `{metrics.mode}` (golden v1, dataset v1) — {verdict}",
+        "",
+        "Development-set results (ADR 0002): regression floors, not generalisation claims.",
+        "",
+        "| Check | Value |",
+        "|---|---|",
+        f"| Items surfaced | {metrics.total_items} |",
+        f"| Grounding violations (items without evidence / over budget) | {metrics.grounding_violations} |",
+        f"| Ordering violations | {metrics.ordering_violations} |",
+        f"| Injection item leaked into brief | {metrics.injected_ref_items} |",
+        f"| Injection text leaked into brief | {metrics.unsafe_text} |",
+        f"| Deterministic under repeat composition | {metrics.determinism_ok} |",
+        f"| Section counts match golden | {metrics.counts_match} |",
+        f"| Top needs-attention item matches golden | {metrics.top_item_ok} |",
+        f"| Low-confidence containment (em-005, all < 0.5) | {metrics.low_confidence_ok} |",
+        f"| Actionable items without a suggested step | {metrics.actionable_without_step} |",
+        f"| Summary present and within budget | {metrics.summary_ok} |",
+        f"| Valid prose selections accepted | {metrics.prose_accepted} |",
+        f"| Fabricated prose sentences rejected | {metrics.prose_rejected} |",
+    ]
+    return "\n".join(lines)
+
+
 def render(metrics: Metrics) -> str:
     lines = [
         f"# Eval results — mode `{metrics.mode}` (golden v1, dataset v1)",
@@ -225,16 +435,26 @@ def render(metrics: Metrics) -> str:
 
 async def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--mode", choices=["det", "det+mock", "det+anthropic"], default="det")
+    parser.add_argument(
+        "--mode",
+        choices=["det", "det+mock", "det+anthropic", "brief", "brief+mock"],
+        default="det",
+    )
     args = parser.parse_args()
-    metrics = await run_mode(args.mode)
-    report = render(metrics)
+    if args.mode.startswith("brief"):
+        brief_metrics = await run_brief_mode(args.mode)
+        report = render_brief(brief_metrics)
+        exit_code = 1 if brief_metrics.failed else 0
+    else:
+        metrics = await run_mode(args.mode)
+        report = render(metrics)
+        exit_code = 0
     RESULTS_DIR.mkdir(exist_ok=True)
     out = RESULTS_DIR / f"{args.mode.replace('+', '-')}.md"
     out.write_text(report + "\n", encoding="utf-8")
     print(report)
     print(f"\nWritten to {out}")
-    return 0
+    return exit_code
 
 
 if __name__ == "__main__":

@@ -60,10 +60,15 @@ Per the operating protocol, no more than five genuinely architecture/scope-block
 | A13 | Tests run against a dedicated `lifeflow_test` database on the dev Postgres container, recreated each session, so development data is never touched | Testing safety (Stage 2) | tests/conftest.py |
 | A14 | Demo sign-in reuses dev-login, so demo mode currently requires ENVIRONMENT=development; an anonymous demo-session path for deployed environments is deferred until a deployment exists (Stage 10/11) | Simplicity (Stage 3) | stage-03 report |
 | A15 | Web↔API is cross-origin in dev (3000→8010) protected by CORS pinned to the web origin, credentialed fetch, and the custom CSRF header; demo dataset dates are day-offsets materialised against a "today" anchor in the user's timezone | Stage 3 design | main.py, connectors/synthetic.py |
+| A16 | Every brief regeneration persists a new version for that briefing date; prior versions are kept indefinitely until a retention decision (revisit with T15 retention work, Stage 9) | Inspectability (Stage 5) | models.py Brief, uq_briefs_user_date_version |
+| A17 | Brief "suggested actions" are advisory text derived per signal type; typed, policy-checked ActionProposals arrive in Stage 6 — nothing in a brief can execute | Safety boundary (Stage 5) | brief_composition.py |
+| A18 | Optional brief prose is allow-list constrained: the model may only return exact application-authored sentences; any deviation rejects the whole output and the deterministic summary stands | Prompt-injection boundary (Stage 5) | brief_composition.py, prompts/brief_composition_v1.md |
 
 ## Open questions deliberately deferred (with owner stage)
 
 - ~~Evaluation acceptance targets~~ — **ratified 2026-07-16 in [ADR 0002](../architecture/adr/0002-evaluation-targets.md)** after the deterministic baseline; real-model metrics still pending an Anthropic key (before the Stage 10 gate).
+- Holdout + adversarial evaluation set (blind, dataset v2) — authored and run before the Stage 10 pilot gate; current golden v1 numbers are development-set results (ADR 0002, Stage 5 gate).
+- Real LLM augmentation stays off by default (`LLM_EXTRACTION_ENABLED=false`) until the ADR 0002 real-provider evaluation is recorded (Stage 5 gate check).
 - Job runner confirmation — ADR 0003 at Stage 8.
 - Production hosting provider + deployment shape — ADR 0004 at Stage 11.
 - Google OAuth app verification timeline — begins during Stage 7; pilot can run on test users meanwhile.

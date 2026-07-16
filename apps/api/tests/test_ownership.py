@@ -21,9 +21,10 @@ from tests.conftest import TEST_DB_URL
 
 import lifeflow_api.repositories as repositories_module
 from lifeflow_api.db import Base
-from lifeflow_api.models import ConnectedAccount, Preference, User
+from lifeflow_api.models import Brief, ConnectedAccount, Preference, User
 from lifeflow_api.repositories import (
     AuditEventRepository,
+    BriefRepository,
     ConnectedAccountRepository,
     PreferenceRepository,
 )
@@ -140,3 +141,38 @@ async def test_audit_events_are_isolated(
 
     assert await AuditEventRepository(session, alice.id).list() == []
     assert len(await AuditEventRepository(session, bob.id).list()) == 1
+
+
+@pytest.mark.integration
+async def test_briefs_are_isolated(session: AsyncSession, two_users: tuple[User, User]) -> None:
+    from datetime import UTC, datetime
+
+    alice, bob = two_users
+    bob_brief = Brief(
+        user_id=bob.id,
+        briefing_date=datetime(2026, 7, 15, tzinfo=UTC),
+        version=1,
+        status="complete",
+        summary="Bob's private summary",
+        sections_json={"sections": [], "notices": []},
+        source_window="test",
+        model_metadata={},
+    )
+    session.add(bob_brief)
+    await session.flush()
+
+    alice_repo = BriefRepository(session, alice.id)
+    assert await alice_repo.get(bob_brief.id) is None
+    assert await alice_repo.latest() is None
+    assert await alice_repo.list_recent() == []
+    with pytest.raises(ValueError, match="does not belong"):
+        alice_repo.add(
+            Brief(
+                user_id=bob.id,
+                briefing_date=datetime(2026, 7, 16, tzinfo=UTC),
+                summary="not allowed",
+                sections_json={"sections": [], "notices": []},
+                source_window="test",
+                model_metadata={},
+            )
+        )

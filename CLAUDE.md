@@ -2,7 +2,7 @@
 
 LifeFlow AI is a permissioned, inspectable, human-in-the-loop personal operations agent. Before making product or architecture decisions, read the North Star: [docs/project/project-foundation.md](docs/project/project-foundation.md). The build follows a stage-gated protocol ([docs/delivery/stage-plan.md](docs/delivery/stage-plan.md)); work only within the active stage.
 
-**Current stage: 4 (signal extraction and priority engine) — complete, awaiting gate approval for Stage 5.**
+**Current stage: 5 (daily brief generation) — complete, awaiting gate approval for Stage 6.**
 
 ## Commands
 
@@ -24,6 +24,8 @@ uv run ruff format . && uv run ruff check . && uv run mypy
 pnpm install
 pnpm web:dev                    # http://localhost:3000
 pnpm web:test && pnpm web:lint && pnpm web:typecheck && pnpm web:build
+./scripts/e2e.sh                # Playwright E2E (starts db, api, web itself)
+./scripts/run-evals.sh brief    # golden evals: det|det+mock|det+anthropic|brief|brief+mock
 
 # Demo mode (db + migrations + api + web in one command)
 ./scripts/demo.sh

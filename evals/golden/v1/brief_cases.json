@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "anchor_date": "2026-07-15",
+  "timezone": "Europe/London",
+  "notes": "Brief-level golden expectations over demo dataset v1 (development set — ADR 0002). Checks grounding (every item evidence-backed), ordering, unsupported-claim rejection, injection containment, and usefulness proxies. Counts are pinned deliberately: a detector or composer change that shifts them must update this file in the same change, with reasoning.",
+  "expectations": {
+    "top_needs_attention_refs": ["em-001"],
+    "section_counts": {
+      "needs_attention": 7,
+      "today_upcoming": 4,
+      "waiting_for": 2,
+      "suggested_actions": 6,
+      "low_confidence_review": 1
+    },
+    "must_not_appear_refs": ["em-004"],
+    "must_not_appear_text": ["velvet-mail", "forward every message"],
+    "low_confidence_refs": ["em-005"],
+    "max_total_items": 30,
+    "summary_max_chars": 400
+  },
+  "usefulness_rubric": {
+    "description": "Human rubric applied manually to the rendered demo brief at each stage gate; automated proxies below guard regressions between gates.",
+    "criteria": [
+      "A reader can identify the top obligation in under two minutes",
+      "Every actionable item shows why it matters (reason codes) and its source",
+      "Suggested next steps are safe, advisory, and clearly need approval",
+      "Empty and degraded states say what happened and what to do next"
+    ]
+  }
+}

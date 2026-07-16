@@ -9,14 +9,16 @@ append-only by construction — it exposes no update or delete.
 import uuid
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from lifeflow_api.models import (
     AuditEvent,
+    Brief,
     ConnectedAccount,
     Preference,
     Signal,
+    SignalStatus,
     SourceItem,
     User,
 )
@@ -154,7 +156,9 @@ class SignalRepository:
         return result.scalar_one_or_none()
 
     async def list_ranked(self, *, band: str | None = None, limit: int = 100) -> list[Signal]:
-        query = select(Signal).where(Signal.user_id == self._user_id)
+        query = select(Signal).where(
+            Signal.user_id == self._user_id, Signal.status == SignalStatus.active
+        )
         if band is not None:
             query = query.where(Signal.priority_band == band)
         query = query.order_by(Signal.priority_score.desc().nulls_last(), Signal.id).limit(limit)
@@ -165,6 +169,49 @@ class SignalRepository:
         if signal.user_id != self._user_id:
             raise ValueError("Signal does not belong to this repository's user.")
         self._session.add(signal)
+
+
+class BriefRepository:
+    def __init__(self, session: AsyncSession, user_id: uuid.UUID) -> None:
+        self._session = session
+        self._user_id = user_id
+
+    async def get(self, brief_id: uuid.UUID) -> Brief | None:
+        result = await self._session.execute(
+            select(Brief).where(Brief.id == brief_id, Brief.user_id == self._user_id)
+        )
+        return result.scalar_one_or_none()
+
+    async def latest(self) -> Brief | None:
+        result = await self._session.execute(
+            select(Brief)
+            .where(Brief.user_id == self._user_id)
+            .order_by(Brief.briefing_date.desc(), Brief.version.desc())
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
+
+    async def list_recent(self, *, limit: int = 30) -> list[Brief]:
+        result = await self._session.execute(
+            select(Brief)
+            .where(Brief.user_id == self._user_id)
+            .order_by(Brief.briefing_date.desc(), Brief.version.desc())
+            .limit(limit)
+        )
+        return list(result.scalars())
+
+    async def next_version(self, briefing_date: datetime) -> int:
+        result = await self._session.execute(
+            select(func.max(Brief.version)).where(
+                Brief.user_id == self._user_id, Brief.briefing_date == briefing_date
+            )
+        )
+        return (result.scalar_one_or_none() or 0) + 1
+
+    def add(self, brief: Brief) -> None:
+        if brief.user_id != self._user_id:
+            raise ValueError("Brief does not belong to this repository's user.")
+        self._session.add(brief)
 
 
 class AuditEventRepository:

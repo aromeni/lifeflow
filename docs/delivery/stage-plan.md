@@ -1,8 +1,8 @@
 # Delivery Stage Plan
 
-**Status:** Stage 4 complete pending approval (Stages 0–3 approved) · **Date:** 2026-07-16
+**Status:** Stage 5 complete pending approval (Stages 0–4 approved) · **Date:** 2026-07-16
 
-**Active stage: 4.** No stage begins without explicit human approval of the previous stage's completion report. Silence is never approval. Commits are made only when explicitly requested.
+**Active stage: 5.** No stage begins without explicit human approval of the previous stage's completion report. Silence is never approval. Commits are made only when explicitly requested.
 
 Guiding rule: *build one trustworthy end-to-end loop, prove it with tests and evidence, then expand deliberately.* The first end-to-end path is:
 
@@ -20,8 +20,8 @@ Gmail + Calendar → Daily Brief → Proposed Action → Approval → Execution 
 | 1 — Scaffold & foundations (approved) | Reproducible monorepo runs locally | Clean clone → configure → run → test → stop, predictably | 0 |
 | 2 — Domain model, auth, isolation (approved) | Secure data foundation | Cross-user isolation proven; migrations stable; token encryption path exists | 1 |
 | 3 — Demo mode & synthetic connectors (approved) | First vertical slice, no credentials | Demo user sees coherent normalised information | 2 |
-| **4 — Signals & priority engine** (current, complete pending approval) | Defensible prioritised signals | Requests/deadlines/follow-ups/conflicts ranked with evidence; injection fixtures safe | 3 |
-| 5 — Daily brief | First genuinely useful outcome | Brief understandable in < 2 min; every actionable statement evidenced | 4 |
+| 4 — Signals & priority engine (approved) | Defensible prioritised signals | Requests/deadlines/follow-ups/conflicts ranked with evidence; injection fixtures safe | 3 |
+| **5 — Daily brief** (current, complete pending approval) | First genuinely useful outcome | Brief understandable in < 2 min; every actionable statement evidenced | 4 |
 | 6 — Proposals & approval inbox | Safe, editable next steps | Inspect/edit/approve/reject/trace with zero hidden side effects | 5 |
 | 7 — Real Google integration | Proven workflow on real data | Test user connects Google, gets brief, approves draft/event, sees audit | 6 |
 | 8 — Preferences, memory, schedule | Transparent adaptation | Scheduled brief at configured time reflecting visible preferences | 7 |
