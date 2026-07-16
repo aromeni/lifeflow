@@ -52,6 +52,7 @@ class ExtractionSummary:
     llm_failed: bool = False
     persisted_new: int = 0
     persisted_updated: int = 0
+    persisted_unchanged: int = 0
 
 
 class SignalExtractionService:
@@ -111,8 +112,10 @@ class SignalExtractionService:
             outcome = await self._upsert(scored)
             if outcome == "new":
                 summary.persisted_new += 1
-            else:
+            elif outcome == "updated":
                 summary.persisted_updated += 1
+            else:
+                summary.persisted_unchanged += 1
 
         await self._session.flush()
         record_audit_event(
@@ -129,6 +132,8 @@ class SignalExtractionService:
                 "llm_rejected": summary.llm_rejected,
                 "llm_failed": summary.llm_failed,
                 "persisted_new": summary.persisted_new,
+                "persisted_updated": summary.persisted_updated,
+                "persisted_unchanged": summary.persisted_unchanged,
             },
         )
         await self._session.flush()
@@ -158,13 +163,21 @@ class SignalExtractionService:
                 )
             )
             return "new"
-        existing.title = signal.title
-        existing.summary = signal.summary
-        existing.due_at = signal.due_at
-        existing.confidence = signal.confidence
-        existing.urgency = signal.urgency
-        existing.extraction_version = signal.extraction_version
-        existing.priority_score = scored.score
-        existing.priority_band = scored.band
-        existing.reason_codes = list(scored.reason_codes)
+        # Change-aware update: identical re-runs must not rewrite rows. Only
+        # the meaningful persisted fields below participate in the comparison.
+        fields = {
+            "title": signal.title,
+            "summary": signal.summary,
+            "due_at": signal.due_at,
+            "confidence": signal.confidence,
+            "urgency": signal.urgency,
+            "extraction_version": signal.extraction_version,
+            "priority_score": scored.score,
+            "priority_band": scored.band,
+            "reason_codes": list(scored.reason_codes),
+        }
+        if all(getattr(existing, name) == value for name, value in fields.items()):
+            return "unchanged"
+        for name, value in fields.items():
+            setattr(existing, name, value)
         return "updated"

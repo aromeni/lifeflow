@@ -30,6 +30,10 @@ class Settings(BaseSettings):
     # Browser origin allowed to call this API with credentials (CORS).
     web_origin: str = "http://localhost:3000"
     # LLM-assisted extraction (optional — mock/deterministic paths never need it).
+    # A key alone is NOT enough: real-provider calls stay disabled until
+    # LLM_EXTRACTION_ENABLED=true is set explicitly. ADR 0002 requires a
+    # real-provider evaluation before this is enabled outside evals.
+    llm_extraction_enabled: bool = False
     anthropic_api_key: str = ""
     anthropic_model: str = "claude-opus-4-8"
 

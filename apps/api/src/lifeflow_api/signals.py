@@ -21,6 +21,7 @@ class ExtractionResponse(BaseModel):
     llm_failed: bool
     persisted_new: int
     persisted_updated: int
+    persisted_unchanged: int
 
 
 class SignalResponse(BaseModel):
@@ -74,6 +75,7 @@ async def extract_signals(
         llm_failed=summary.llm_failed,
         persisted_new=summary.persisted_new,
         persisted_updated=summary.persisted_updated,
+        persisted_unchanged=summary.persisted_unchanged,
     )
 
 

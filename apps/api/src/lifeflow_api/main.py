@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 from starlette.middleware.sessions import SessionMiddleware
 
 from lifeflow_api.auth import router as auth_router
+from lifeflow_api.briefs import router as briefs_router
 from lifeflow_api.config import Settings, get_settings
 from lifeflow_api.correlation import CORRELATION_HEADER, CorrelationIdMiddleware
 from lifeflow_api.db import create_engine
@@ -57,10 +58,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         docs_url="/docs" if settings.environment != "production" else None,
     )
     app.state.settings = settings
-    # LLM provider is optional: without a key the pipeline runs the
-    # deterministic baseline only (ADR 0001 D4 — mock/none is the default).
+    # LLM provider is off by default (ADR 0001 D4, ADR 0002): a key alone must
+    # not enable real model calls — LLM_EXTRACTION_ENABLED=true is required too,
+    # and stays false until a real-provider evaluation satisfies ADR 0002.
     app.state.llm_provider = None
-    if settings.anthropic_api_key:
+    if settings.llm_extraction_enabled:
+        if not settings.anthropic_api_key:
+            raise RuntimeError("LLM_EXTRACTION_ENABLED=true requires ANTHROPIC_API_KEY to be set.")
         from lifeflow_api.llm.anthropic_provider import AnthropicProvider
 
         app.state.llm_provider = AnthropicProvider(
@@ -94,6 +98,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(demo_router)
     app.include_router(source_items_router)
     app.include_router(signals_router)
+    app.include_router(briefs_router)
     return app
 
 

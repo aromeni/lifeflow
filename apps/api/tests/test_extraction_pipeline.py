@@ -1,6 +1,7 @@
 """End-to-end extraction pipeline: dedupe, idempotency, degraded mode, API."""
 
 from collections.abc import AsyncIterator
+from datetime import timedelta
 
 import pytest
 from httpx import AsyncClient
@@ -76,11 +77,40 @@ async def test_extraction_persists_and_is_idempotent(
     assert first.deterministic > 0
     assert first.persisted_new == first.deterministic
     assert not first.llm_used
+    before_versions = dict(
+        (await session.execute(text("SELECT id::text, xmin::text FROM signals ORDER BY id"))).all()
+    )
 
     second = await service.extract(timezone=TIMEZONE, reference=REFERENCE)
-    assert second.persisted_new == 0  # re-extraction updates, never duplicates
+    assert second.persisted_new == 0  # re-extraction never duplicates
+    # Change-aware: identical sources, versions, and scores → nothing rewritten.
+    assert second.persisted_updated == 0
+    assert second.persisted_unchanged == first.persisted_new
+    await session.flush()
+    after_versions = dict(
+        (await session.execute(text("SELECT id::text, xmin::text FROM signals ORDER BY id"))).all()
+    )
+    assert after_versions == before_versions  # PostgreSQL confirms no signal row was rewritten.
     count = (await session.execute(text("SELECT count(*) FROM signals"))).scalar()
     assert count == first.persisted_new
+
+
+async def test_reextraction_updates_only_meaningfully_changed_signals(
+    session: AsyncSession, user_with_items: User
+) -> None:
+    service = SignalExtractionService(session, user_with_items.id)
+    await service.extract(timezone=TIMEZONE, reference=REFERENCE)
+
+    # A day later, deadline proximity shifts some scores/reason codes: those
+    # rows update; signals whose persisted fields are identical stay untouched.
+    later = REFERENCE + timedelta(days=1)
+    second = await service.extract(timezone=TIMEZONE, reference=later)
+    assert second.persisted_new == 0
+    assert second.persisted_updated > 0
+    assert second.persisted_unchanged > 0
+    # Every signal detected on the second run already existed; each was either
+    # meaningfully changed (scores/reason codes shifted with the clock) or left alone.
+    assert second.persisted_updated + second.persisted_unchanged == second.deterministic
 
 
 async def test_llm_augments_without_replacing(session: AsyncSession, user_with_items: User) -> None:
@@ -141,6 +171,7 @@ async def test_signals_api_extract_and_list(dev_client: AsyncClient) -> None:
     assert extract.status_code == 200
     body = extract.json()
     assert body["deterministic"] > 0 and body["llm_used"] is False
+    assert body["persisted_unchanged"] >= 0
 
     listing = (await dev_client.get("/signals", params={"limit": 500})).json()
     assert listing["count"] == body["persisted_new"]

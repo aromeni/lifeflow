@@ -59,6 +59,28 @@ Quality targets (regression floor for golden v1; CI-checkable):
    dropping precision below target and introduces zero unsafe outputs —
    measured by the same runner, reported side by side with the baseline.
 
+## Development-set status and holdout plan (added at Stage 5 gate)
+
+The 20-case golden v1 metrics above are **development-set results**: the same
+cases were consulted while the det-v1 detectors were written and tuned, so
+they measure regression safety, not generalisation. They must not be quoted
+as expected real-world performance.
+
+Before the Stage 10 pilot gate, a **separate holdout evaluation set** will be
+created and run once, blind:
+
+- authored against a *new* synthetic dataset version (v2 scenarios written
+  without consulting detector code or existing cases);
+- including a dedicated **adversarial slice** (fresh prompt-injection
+  variants, evasive phrasing, boundary dates/DST edges, near-duplicate
+  threads) at least as hard as the dev set;
+- never used for tuning — detectors and prompts are frozen before the run,
+  and results are recorded here verbatim, pass or fail;
+- run in both `det` and real-provider modes so the LLM increment is measured
+  on unseen data.
+
+Until that run, all quoted metrics carry the "dev-set" qualifier.
+
 ## Consequences
 
 - The eval suite is a merge gate for extraction changes from Stage 4 onward.
