@@ -19,6 +19,7 @@ htmlcov/
 # Node
 node_modules/
 .next/
+.next-dev/
 out/
 dist/
 coverage/

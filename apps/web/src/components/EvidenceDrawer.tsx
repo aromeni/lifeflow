@@ -1,4 +1,6 @@
-import type { BriefEvidence } from "@/lib/types";
+import type { BriefEvidence, ProposalEvidence } from "@/lib/types";
+
+type Evidence = BriefEvidence | ProposalEvidence;
 
 function formatWhen(iso: string, timezone: string): string {
   return new Intl.DateTimeFormat("en-GB", {
@@ -13,13 +15,7 @@ function formatWhen(iso: string, timezone: string): string {
 
 // Native <details> keeps the disclosure fully keyboard-operable and announced
 // without custom ARIA wiring (WCAG 2.2).
-export function EvidenceDrawer({
-  evidence,
-  timezone,
-}: {
-  evidence: BriefEvidence[];
-  timezone: string;
-}) {
+export function EvidenceDrawer({ evidence, timezone }: { evidence: Evidence[]; timezone: string }) {
   return (
     <details className="text-sm">
       <summary className="cursor-pointer underline opacity-80">

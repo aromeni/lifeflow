@@ -13,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from starlette.middleware.sessions import SessionMiddleware
 
+from lifeflow_api.action_proposals import router as action_proposals_router
 from lifeflow_api.auth import router as auth_router
 from lifeflow_api.briefs import router as briefs_router
 from lifeflow_api.config import Settings, get_settings
@@ -99,6 +100,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(source_items_router)
     app.include_router(signals_router)
     app.include_router(briefs_router)
+    app.include_router(action_proposals_router)
     return app
 
 

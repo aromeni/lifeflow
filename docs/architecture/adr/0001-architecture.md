@@ -40,6 +40,8 @@ Mock provider first (demo mode and all CI); Anthropic as the first real implemen
 
 LLM output never invokes actions. The only path to a side effect is: typed `ActionProposal` → schema validation → deterministic policy engine (ownership, state, expiry, scope, payload-hash match, idempotency, risk level) → explicit human approval → idempotent executor → audit event. High-risk actions (send email, delete event, purchase) are not representable as action types — prohibition by construction, not by prompt.
 
+**Stage 6 implementation note:** approval is an immutable snapshot of the closed action type, canonical complete payload, proposal version, and their binding hash. Every executor field is required and shown before approval; editing atomically clears the snapshot and increments the version. Proposal generation is change-aware through a stable origin fingerprint, and execution is one-record-per-proposal with replay returning the original result. Stage 6 executors are synthetic only.
+
 ### D6 — Connector interfaces with synthetic adapters first
 
 `EmailConnector` / `CalendarConnector` / `TaskConnector` protocols; synthetic adapters + fictional UK dataset (Stage 3) precede Google adapters (Stage 7). Domain services never import Google SDK types. Google adapters use minimal scopes (`gmail.readonly`, `gmail.compose` for drafts, `calendar.readonly`, `calendar.events`), OAuth state + PKCE, bounded pagination, and sync cursors.

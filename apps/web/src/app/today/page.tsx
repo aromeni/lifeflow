@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { BriefSectionView } from "@/components/BriefSectionView";
 import { api, ApiError } from "@/lib/api";
@@ -32,6 +32,7 @@ export default function TodayPage() {
   const [state, setState] = useState<LoadState>("loading");
   const [me, setMe] = useState<Me | null>(null);
   const [brief, setBrief] = useState<Brief | null>(null);
+  const generationInFlight = useRef(false);
 
   const load = useCallback(async () => {
     try {
@@ -59,6 +60,10 @@ export default function TodayPage() {
   }, [load]);
 
   const generate = useCallback(async () => {
+    // State-driven disabling happens on the next render. This synchronous
+    // guard also prevents same-frame double clicks from issuing a second POST.
+    if (generationInFlight.current) return;
+    generationInFlight.current = true;
     setState("generating");
     try {
       const fresh = await api<Brief>("/briefs/generate", { method: "POST" });
@@ -66,6 +71,8 @@ export default function TodayPage() {
       setState("ready");
     } catch (error) {
       setState(error instanceof ApiError && error.status === 401 ? "unauthenticated" : "error");
+    } finally {
+      generationInFlight.current = false;
     }
   }, []);
 
@@ -91,16 +98,22 @@ export default function TodayPage() {
       <header className="flex flex-col gap-2">
         <div className="flex items-baseline justify-between gap-4">
           <h1 className="text-3xl font-semibold tracking-tight">Today</h1>
-          <button
-            type="button"
-            onClick={generate}
-            disabled={state === "generating"}
-            className="rounded border border-current/40 px-3 py-1 text-sm disabled:opacity-50"
-          >
-            {state === "generating" ? "Generating…" : "Generate brief"}
-          </button>
+          <div className="flex items-center gap-3">
+            <Link href="/approvals" data-testid="approval-inbox-link" className="text-sm underline">
+              Review approvals
+            </Link>
+            <button
+              data-testid="generate-brief"
+              type="button"
+              onClick={generate}
+              disabled={state === "generating"}
+              className="rounded border border-current/40 px-3 py-1 text-sm disabled:opacity-50"
+            >
+              {state === "generating" ? "Generating…" : "Generate brief"}
+            </button>
+          </div>
         </div>
-        <p aria-live="polite" className="text-sm opacity-70">
+        <p data-testid="brief-status" aria-live="polite" className="text-sm opacity-70">
           {state === "loading" && "Loading your brief…"}
           {state === "generating" && "Generating a fresh brief from your sources…"}
           {state === "ready" &&

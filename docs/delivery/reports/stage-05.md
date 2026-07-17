@@ -1,6 +1,6 @@
 # Stage 5 Completion Report
 
-**Date:** 2026-07-16 · **Approved:** pending
+**Date:** 2026-07-16 · **Approved:** 2026-07-16
 
 ## Outcome
 
@@ -60,4 +60,4 @@ Live run: dev-login → demo/start (36 items) → `POST /briefs/generate` → st
 
 ## Gate
 
-Stage 5 is complete. Stop here and wait for explicit approval to begin Stage 6.
+Stage 5 is complete and approved. Stage 6 is active under its own gate.

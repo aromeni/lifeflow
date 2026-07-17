@@ -63,6 +63,18 @@ Per the operating protocol, no more than five genuinely architecture/scope-block
 | A16 | Every brief regeneration persists a new version for that briefing date; prior versions are kept indefinitely until a retention decision (revisit with T15 retention work, Stage 9) | Inspectability (Stage 5) | models.py Brief, uq_briefs_user_date_version |
 | A17 | Brief "suggested actions" are advisory text derived per signal type; typed, policy-checked ActionProposals arrive in Stage 6 — nothing in a brief can execute | Safety boundary (Stage 5) | brief_composition.py |
 | A18 | Optional brief prose is allow-list constrained: the model may only return exact application-authored sentences; any deviation rejects the whole output and the deterministic summary stands | Prompt-injection boundary (Stage 5) | brief_composition.py, prompts/brief_composition_v1.md |
+| A19 | Proposal origin identity is the immutable `action-origin-v1` namespace + closed action type + persisted signal dedupe key; composer-version changes update only pristine proposals and never mint duplicates for the same origin | Change-aware generation (Stage 6) | proposal_composition.py, uq_action_proposals_user_origin |
+| A20 | Stage 6 execution failures are final and have no retry endpoint. A future retry design must be a new explicit user action with fresh policy review; no executor retries automatically | Human control and duplicate prevention | action_proposal_service.py |
+
+## Stage 6 deferred technical debt (recorded at the independent review, 2026-07-16)
+
+| Item | Why deferred | Owner stage |
+|---|---|---|
+| `GET /action-proposals` (list and detail) runs the expiry sweep — a state-changing reconciliation inside GET handlers | Idempotent, time-truth only, and harmless if triggered externally; the proper home is the scheduled job runner | Stage 8 (scheduler owns expiry) |
+| Unexpected (non-`FinalExecutionError`) executor exceptions roll back the whole transaction, losing the audit trail of the attempt | Acceptable while executors are simulated and side-effect-free; real external executors need a durable out-of-transaction attempt record first | Stage 7 prerequisite (before any real executor) |
+| Equivalent instants expressed with different non-zero UTC offsets hash differently (UTC "Z" vs "+00:00" is normalised; "+01:00" is preserved) | Intentional: approval binds the exact representation the user was shown | Documented in `action_payloads.py`; revisit only if a real connector emits mixed offsets |
+| `list_due_for_expiry` locks rows without a deterministic ORDER BY (theoretical deadlock between concurrent sweeps) | Only one sweep path exists today (request-scoped); ordering matters once a scheduler competes with requests | Stage 8 (add `ORDER BY id` with the scheduled sweep) |
+| The approval UI trusts the server-supplied payload/hash pair rather than recomputing the hash of what it renders | Server-side policy re-validates the hash on approval; client-side recomputation is defence-in-depth only | Optional UI enhancement; consider with the Stage 9 trust features |
 
 ## Open questions deliberately deferred (with owner stage)
 

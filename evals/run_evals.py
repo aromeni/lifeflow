@@ -20,6 +20,7 @@ import sys
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
+from itertools import pairwise
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -34,6 +35,7 @@ from lifeflow_api.priority import build_sender_frequency, score_signal
 EVALS_DIR = Path(__file__).resolve().parent
 GOLDEN = EVALS_DIR / "golden" / "v1" / "cases.json"
 GOLDEN_BRIEF = EVALS_DIR / "golden" / "v1" / "brief_cases.json"
+GOLDEN_ACTIONS = EVALS_DIR / "golden" / "v1" / "action_cases.json"
 FIXTURE = EVALS_DIR / "fixtures" / "llm_signal_extraction_v1.json"
 RESULTS_DIR = EVALS_DIR / "results"
 
@@ -66,8 +68,23 @@ class Metrics:
     def recall(self) -> float:
         return self.tp / (self.tp + self.fn) if (self.tp + self.fn) else 0.0
 
+    @property
+    def failed(self) -> bool:
+        deadline_accuracy = (
+            self.deadline_correct / self.deadline_checked if self.deadline_checked else 0.0
+        )
+        band_agreement = self.band_agreed / self.band_checked if self.band_checked else 0.0
+        return bool(
+            self.precision < 0.85
+            or self.recall < 0.80
+            or deadline_accuracy < 0.90
+            or band_agreement < 0.80
+            or self.unsafe
+            or self.calibration_violations
+        )
 
-async def load_items():  # noqa: ANN201
+
+async def load_items():
     golden = json.loads(GOLDEN.read_text())
     anchor = date.fromisoformat(golden["anchor_date"])
     since = datetime(anchor.year, anchor.month - 1, anchor.day, tzinfo=UTC)
@@ -87,7 +104,7 @@ async def run_mode(mode: str) -> Metrics:
     timezone = golden["timezone"]
     metrics = Metrics(mode=mode)
 
-    detected = run_deterministic_detectors(items, reference=reference, timezone=timezone)
+    detected = run_deterministic_detectors(items, reference=reference, timezone=timezone).signals
     raw_count = len(detected)
     signals = deduplicate(detected)
 
@@ -96,7 +113,11 @@ async def run_mode(mode: str) -> Metrics:
             {"signal_extraction_v1": {"signals": json.loads(FIXTURE.read_text())["signals"]}}
         )
         llm_signals, rejected = await extract_with_llm(
-            provider, items, detected, reference=reference, timezone=timezone,
+            provider,
+            items,
+            detected,
+            reference=reference,
+            timezone=timezone,
             trace_context={"task": "evals"},
         )
         metrics.unsupported_rejected = rejected
@@ -115,7 +136,11 @@ async def run_mode(mode: str) -> Metrics:
             raise SystemExit(2)
         provider = AnthropicProvider(key)
         llm_signals, rejected = await extract_with_llm(
-            provider, items, detected, reference=reference, timezone=timezone,
+            provider,
+            items,
+            detected,
+            reference=reference,
+            timezone=timezone,
             trace_context={"task": "evals"},
         )
         metrics.unsupported_rejected = rejected
@@ -125,8 +150,8 @@ async def run_mode(mode: str) -> Metrics:
         metrics.llm_added = len(signals) - before
 
     metrics.total_predicted = len(signals)
-    metrics.duplicates = raw_count - len(deduplicate(detected)) - (
-        metrics.llm_added if mode != "det" else 0
+    metrics.duplicates = (
+        raw_count - len(deduplicate(detected)) - (metrics.llm_added if mode != "det" else 0)
     )
 
     # Score with the priority engine for band agreement.
@@ -134,7 +159,9 @@ async def run_mode(mode: str) -> Metrics:
     frequency = build_sender_frequency(items)
     scored = {
         dedupe_key(s): score_signal(
-            s, reference=reference, items_by_external=items_by_external,
+            s,
+            reference=reference,
+            items_by_external=items_by_external,
             sender_frequency=frequency,
         )
         for s in signals
@@ -239,10 +266,12 @@ class BriefMetrics:
         )
 
 
-def _build_scored_signals(items, reference, timezone):  # noqa: ANN001, ANN202
+def _build_scored_signals(items, reference, timezone):
     from lifeflow_api.models import Signal
 
-    detected = deduplicate(run_deterministic_detectors(items, reference=reference, timezone=timezone))
+    detected = deduplicate(
+        run_deterministic_detectors(items, reference=reference, timezone=timezone).signals
+    )
     items_by_external = {i.external_id: i for i in items}
     frequency = build_sender_frequency(items)
     signals = []
@@ -313,22 +342,16 @@ async def run_brief_mode(mode: str) -> BriefMetrics:
     # Ordering: needs_attention by non-increasing score; today_upcoming by event time.
     needs = sections["needs_attention"].items
     metrics.ordering_violations += sum(
-        1
-        for a, b in zip(needs, needs[1:], strict=False)
-        if a.priority_score < b.priority_score
+        1 for a, b in pairwise(needs) if a.priority_score < b.priority_score
     )
     upcoming = sections["today_upcoming"].items
     starts = [min(e.occurred_at for e in item.evidence) for item in upcoming]
-    metrics.ordering_violations += sum(
-        1 for a, b in zip(starts, starts[1:], strict=False) if a > b
-    )
+    metrics.ordering_violations += sum(1 for a, b in pairwise(starts) if a > b)
 
     # Injection containment: the hostile item is neither surfaced nor quoted.
     banned_refs = set(expectations["must_not_appear_refs"])
     metrics.injected_ref_items = sum(
-        1
-        for item in all_items
-        if banned_refs & {evidence.source_ref for evidence in item.evidence}
+        1 for item in all_items if banned_refs & {evidence.source_ref for evidence in item.evidence}
     )
     brief_text = " ".join(
         f"{item.title} {item.summary} {item.suggested_action or ''}" for item in all_items
@@ -397,7 +420,8 @@ def render_brief(metrics: BriefMetrics) -> str:
         "| Check | Value |",
         "|---|---|",
         f"| Items surfaced | {metrics.total_items} |",
-        f"| Grounding violations (items without evidence / over budget) | {metrics.grounding_violations} |",
+        "| Grounding violations (items without evidence / over budget) "
+        f"| {metrics.grounding_violations} |",
         f"| Ordering violations | {metrics.ordering_violations} |",
         f"| Injection item leaked into brief | {metrics.injected_ref_items} |",
         f"| Injection text leaked into brief | {metrics.unsafe_text} |",
@@ -409,6 +433,160 @@ def render_brief(metrics: BriefMetrics) -> str:
         f"| Summary present and within budget | {metrics.summary_ok} |",
         f"| Valid prose selections accepted | {metrics.prose_accepted} |",
         f"| Fabricated prose sentences rejected | {metrics.prose_rejected} |",
+    ]
+    return "\n".join(lines)
+
+
+@dataclass
+class ActionMetrics:
+    total_proposals: int = 0
+    expected_shape_ok: bool = False
+    determinism_ok: bool = False
+    grounding_violations: int = 0
+    payload_schema_violations: int = 0
+    origin_violations: int = 0
+    expiry_violations: int = 0
+    unsafe_refs: int = 0
+    unsafe_text: int = 0
+    usefulness_violations: int = 0
+    approval_binding_ok: bool = False
+
+    @property
+    def failed(self) -> bool:
+        return bool(
+            not self.expected_shape_ok
+            or not self.determinism_ok
+            or not self.approval_binding_ok
+            or self.grounding_violations
+            or self.payload_schema_violations
+            or self.origin_violations
+            or self.expiry_violations
+            or self.unsafe_refs
+            or self.unsafe_text
+            or self.usefulness_violations
+        )
+
+
+async def run_action_mode() -> ActionMetrics:
+    """Evaluate deterministic proposal grounding, payloads, safety, and usefulness."""
+
+    from lifeflow_api.action_payloads import (
+        action_payload_hash,
+        approval_binding_hash,
+        canonical_payload,
+    )
+    from lifeflow_api.proposal_composition import compose_proposal_candidates
+
+    golden = json.loads(GOLDEN_ACTIONS.read_text())
+    expectations = golden["expectations"]
+    _, items, reference = await load_items()
+    timezone = golden["timezone"]
+    item_refs = {item.external_id for item in items}
+    first = list(
+        compose_proposal_candidates(
+            _build_scored_signals(items, reference, timezone),
+            items,
+            reference=reference,
+            timezone=timezone,
+        ).candidates
+    )
+    second = list(
+        compose_proposal_candidates(
+            _build_scored_signals(items, reference, timezone),
+            items,
+            reference=reference,
+            timezone=timezone,
+        ).candidates
+    )
+    metrics = ActionMetrics(total_proposals=len(first))
+
+    def snapshot(candidate):
+        return {
+            "action_type": str(candidate.action_type),
+            "rationale": candidate.rationale,
+            "source_refs": list(candidate.source_refs),
+            "payload": candidate.payload.model_dump(mode="json"),
+            "risk_level": str(candidate.risk_level),
+            "confidence": candidate.confidence,
+            "origin_fingerprint": candidate.origin_fingerprint,
+            "expires_at": candidate.expires_at.isoformat(),
+        }
+
+    metrics.determinism_ok = [snapshot(candidate) for candidate in first] == [
+        snapshot(candidate) for candidate in second
+    ]
+    by_type = {str(candidate.action_type): candidate for candidate in first}
+    metrics.expected_shape_ok = set(by_type) == set(expectations["action_types"]) and all(
+        set(by_type[action_type].source_refs) == set(source_refs)
+        for action_type, source_refs in expectations["source_refs_by_action"].items()
+        if action_type in by_type
+    )
+    metrics.grounding_violations = sum(
+        1
+        for candidate in first
+        if not candidate.source_refs or any(ref not in item_refs for ref in candidate.source_refs)
+    )
+    metrics.payload_schema_violations = sum(
+        1
+        for candidate in first
+        if set(canonical_payload(candidate.action_type, candidate.payload))
+        != set(expectations["payload_fields"][str(candidate.action_type)])
+    )
+    fingerprints = [candidate.origin_fingerprint for candidate in first]
+    metrics.origin_violations = sum(1 for fingerprint in fingerprints if len(fingerprint) != 64) + (
+        len(fingerprints) - len(set(fingerprints))
+    )
+    metrics.expiry_violations = sum(1 for candidate in first if candidate.expires_at <= reference)
+    banned_refs = set(expectations["must_not_appear_refs"])
+    metrics.unsafe_refs = sum(1 for candidate in first if banned_refs & set(candidate.source_refs))
+    combined_text = " ".join(
+        f"{candidate.rationale} {json.dumps(candidate.payload.model_dump(mode='json'))}"
+        for candidate in first
+    ).lower()
+    metrics.unsafe_text = sum(
+        1 for text in expectations["must_not_appear_text"] if text in combined_text
+    )
+    metrics.usefulness_violations = sum(
+        1
+        for candidate in first
+        if not candidate.rationale.strip()
+        or candidate.confidence < expectations["minimum_confidence"]
+        or any(
+            value == "" or value == []
+            for value in candidate.payload.model_dump(mode="json").values()
+        )
+    )
+    bindings = [
+        approval_binding_hash(candidate.action_type, candidate.payload, 1) for candidate in first
+    ]
+    metrics.approval_binding_ok = len(set(bindings)) == len(first) and all(
+        binding != approval_binding_hash(candidate.action_type, candidate.payload, 2)
+        and len(action_payload_hash(candidate.action_type, candidate.payload)) == 64
+        for binding, candidate in zip(bindings, first, strict=True)
+    )
+    return metrics
+
+
+def render_actions(metrics: ActionMetrics) -> str:
+    verdict = "FAIL" if metrics.failed else "PASS"
+    lines = [
+        f"# Action-proposal eval results — mode `actions` (golden v1, dataset v1) — {verdict}",
+        "",
+        "Development-set results (ADR 0002): regression floors, not generalisation claims.",
+        "",
+        "| Check | Value |",
+        "|---|---|",
+        f"| Proposals composed | {metrics.total_proposals} |",
+        f"| Expected action types and evidence refs | {metrics.expected_shape_ok} |",
+        f"| Deterministic under repeat composition | {metrics.determinism_ok} |",
+        f"| Grounding violations | {metrics.grounding_violations} |",
+        f"| Exact typed-payload schema violations | {metrics.payload_schema_violations} |",
+        f"| Origin fingerprint uniqueness/shape violations | {metrics.origin_violations} |",
+        f"| Invalid or already-expired proposals | {metrics.expiry_violations} |",
+        f"| Injection evidence leaked into proposals | {metrics.unsafe_refs} |",
+        f"| Injection text leaked into proposals | {metrics.unsafe_text} |",
+        f"| Usefulness violations | {metrics.usefulness_violations} |",
+        f"| Approval bindings differ by payload/type/version | {metrics.approval_binding_ok} |",
     ]
     return "\n".join(lines)
 
@@ -437,18 +615,22 @@ async def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--mode",
-        choices=["det", "det+mock", "det+anthropic", "brief", "brief+mock"],
+        choices=["det", "det+mock", "det+anthropic", "brief", "brief+mock", "actions"],
         default="det",
     )
     args = parser.parse_args()
-    if args.mode.startswith("brief"):
+    if args.mode == "actions":
+        action_metrics = await run_action_mode()
+        report = render_actions(action_metrics)
+        exit_code = 1 if action_metrics.failed else 0
+    elif args.mode.startswith("brief"):
         brief_metrics = await run_brief_mode(args.mode)
         report = render_brief(brief_metrics)
         exit_code = 1 if brief_metrics.failed else 0
     else:
         metrics = await run_mode(args.mode)
         report = render(metrics)
-        exit_code = 0
+        exit_code = 1 if metrics.failed else 0
     RESULTS_DIR.mkdir(exist_ok=True)
     out = RESULTS_DIR / f"{args.mode.replace('+', '-')}.md"
     out.write_text(report + "\n", encoding="utf-8")

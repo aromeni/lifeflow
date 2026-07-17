@@ -1,6 +1,6 @@
 # Threat Model
 
-**Status:** Stage 0 draft (v1) · **Date:** 2026-07-15 · **Review before:** Stage 7 (real OAuth) and Stage 11 (deployment)
+**Status:** Stage 6 reviewed (v2) · **Date:** 2026-07-16 · **Review before:** Stage 7 (real OAuth) and Stage 11 (deployment)
 
 Scope: the MVP described in [../product/mvp-scope.md](../product/mvp-scope.md), with components and trust boundaries from [../architecture/system-context.md](../architecture/system-context.md). This document exists **before** any OAuth implementation, as required.
 
@@ -63,6 +63,14 @@ All connector content is untrusted. Concretely:
 - Dev: single symmetric key from environment (`TOKEN_KEY`, with `TOKEN_KEY_ID` naming it), never committed; `.env.example` documents it without a value.
 - Interface: `TokenCipher.encrypt/decrypt` with key-id in the ciphertext envelope, enabling rotation (re-encrypt on read) and a KMS-backed implementation in production.
 - Rotation: documented manual procedure in MVP; automated rotation is post-MVP.
+
+## Stage 6 verification notes
+
+- T3/T4: deterministic composition produced no proposal from injection fixture `em-004`; the action golden suite and Playwright journey verify no injection evidence or text crosses the proposal boundary.
+- T12: `action_executions.proposal_id` and idempotency keys are unique; a replay returns the original success or final failure record without invoking an executor again.
+- T13: approval binds the closed action type, canonical typed payload, payload hash and proposal version. An approved edit clears the snapshot, increments the version and appends `approval.invalidated` in the same transaction.
+- Expiry and ownership are checked while the owner-scoped proposal row is locked immediately before approval or first execution. Denied execution attempts are audited without recording payload content.
+- No Stage 6 module imports a Google client or performs an external side effect; task, Gmail-draft and calendar-event executors return deterministic simulated results only.
 
 ## Out-of-scope threats (recorded, revisit at Stage 11)
 

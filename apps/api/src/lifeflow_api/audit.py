@@ -7,6 +7,7 @@ fix the call site, not rely on redaction.
 """
 
 import uuid
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -50,6 +51,7 @@ def record_audit_event(
         event_type=event_type,
         entity_type=entity_type,
         entity_id=entity_id,
+        timestamp=datetime.now(UTC),
         safe_metadata_json=metadata,
         correlation_id=get_correlation_id(),
     )

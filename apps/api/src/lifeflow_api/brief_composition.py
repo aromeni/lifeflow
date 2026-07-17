@@ -19,6 +19,7 @@ from zoneinfo import ZoneInfo
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from lifeflow_api.action_proposal_service import ActionProposalService
 from lifeflow_api.audit import record_audit_event
 from lifeflow_api.extraction import ExtractionSummary, SignalExtractionService
 from lifeflow_api.llm.provider import LLMProvider, LLMProviderError
@@ -433,8 +434,17 @@ class BriefService:
                     ),
                 )
             )
+        if extraction.diagnostic_counts:
+            notices.append(
+                BriefNotice(
+                    code="signal_data_quality",
+                    message="Some calendar information could not be processed.",
+                )
+            )
 
-        partial = bool(inactive_accounts or composed.omitted_signals)
+        partial = bool(
+            inactive_accounts or composed.omitted_signals or extraction.diagnostic_counts
+        )
         degraded = extraction.llm_failed or llm_summary_failed
         if partial:
             status = BriefStatus.partial
@@ -483,6 +493,40 @@ class BriefService:
         briefs.add(brief)
         await self._session.flush()
         await self._session.refresh(brief)
+        proposal_generation = await ActionProposalService(
+            self._session, self._user_id
+        ).generate_from_brief(
+            brief=brief,
+            signals=signals,
+            sources=sources,
+            timezone=timezone,
+            reference=reference,
+        )
+        brief.model_metadata = {
+            **metadata,
+            "proposal_generation": asdict(proposal_generation),
+        }
+        if proposal_generation.skipped:
+            # A candidate action could not be prepared safely from its source
+            # data. The brief itself is unaffected; state it honestly without
+            # exposing any source content, and mark the brief partial.
+            count = proposal_generation.skipped
+            notices.append(
+                BriefNotice(
+                    code="proposal_candidates_skipped",
+                    message=(
+                        f"{count} suggested action{'s' if count != 1 else ''} could not be "
+                        "prepared safely from the source data and "
+                        f"{'were' if count != 1 else 'was'} skipped."
+                    ),
+                )
+            )
+            brief.sections_json = BriefDocument(
+                sections=composed.sections, notices=notices
+            ).model_dump(mode="json")
+            if brief.status == BriefStatus.complete:
+                brief.status = BriefStatus.partial
+                status = BriefStatus.partial
         record_audit_event(
             self._session,
             user_id=self._user_id,
@@ -498,6 +542,12 @@ class BriefService:
                 "omitted_signals": composed.omitted_signals,
                 "llm_summary_used": llm_summary_used,
                 "llm_summary_failed": llm_summary_failed,
+                "proposals_created": proposal_generation.created,
+                "proposals_updated": proposal_generation.updated,
+                "proposals_unchanged": proposal_generation.unchanged,
+                "proposals_preserved": proposal_generation.preserved,
+                "proposals_skipped": proposal_generation.skipped,
+                "detection_diagnostics": extraction.diagnostic_counts,
             },
         )
         await self._session.flush()
