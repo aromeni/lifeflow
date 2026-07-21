@@ -24,3 +24,6 @@ export type ExecutionMode = components["schemas"]["ExecutionMode"];
 export type ExecutionContextView = components["schemas"]["ExecutionContextView"];
 export type GoogleSyncResult = components["schemas"]["GoogleSyncResponse"];
 export type PublicConfig = components["schemas"]["PublicConfig"];
+export type ScheduledBriefStatus = components["schemas"]["ScheduledBriefStatusResponse"];
+export type EvidenceFreshness = components["schemas"]["EvidenceFreshnessResponse"];
+export type EvidenceFreshnessAccount = components["schemas"]["EvidenceFreshnessAccount"];

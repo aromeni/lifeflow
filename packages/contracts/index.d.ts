@@ -351,6 +351,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/evidence-freshness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Evidence Freshness */
+        get: operations["get_evidence_freshness_evidence_freshness_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -429,6 +446,23 @@ export interface paths {
         };
         /** Ready */
         get: operations["ready_ready_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/scheduled-briefs/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Scheduled Brief Status */
+        get: operations["get_scheduled_brief_status_scheduled_briefs_status_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -682,6 +716,8 @@ export interface components {
             generation_metadata: {
                 [key: string]: unknown;
             };
+            /** Generation Trigger */
+            generation_trigger: string;
             /** Id */
             id: string;
             /** Notices */
@@ -746,6 +782,8 @@ export interface components {
              * Format: date-time
              */
             generated_at: string;
+            /** Generation Trigger */
+            generation_trigger: string;
             /** Id */
             id: string;
             status: components["schemas"]["BriefStatus"];
@@ -813,6 +851,29 @@ export interface components {
              * @default dev@lifeflow.local
              */
             email: string;
+        };
+        /** EvidenceFreshnessAccount */
+        EvidenceFreshnessAccount: {
+            /** Connected */
+            connected: boolean;
+            /** Freshness Band */
+            freshness_band: ("fresh" | "aging" | "stale") | null;
+            /** Last Synced At */
+            last_synced_at: string | null;
+            /** Provider */
+            provider: string;
+            /**
+             * Sync State
+             * @enum {string}
+             */
+            sync_state: "never_synced" | "synced";
+        };
+        /** EvidenceFreshnessResponse */
+        EvidenceFreshnessResponse: {
+            /** Accounts */
+            accounts: components["schemas"]["EvidenceFreshnessAccount"][];
+            /** Scheduled Briefs Use Latest Synced Evidence */
+            scheduled_briefs_use_latest_synced_evidence: boolean;
         };
         /**
          * ExecutionContextView
@@ -1043,6 +1104,31 @@ export interface components {
          * @enum {string}
          */
         RiskLevel: "low" | "medium";
+        /** ScheduledBriefStatusResponse */
+        ScheduledBriefStatusResponse: {
+            /** Briefing Time */
+            briefing_time: string;
+            /** Enabled */
+            enabled: boolean;
+            /** Latest Brief Id */
+            latest_brief_id: string | null;
+            /** Latest Brief Version */
+            latest_brief_version: number | null;
+            /** Latest Run Completed At */
+            latest_run_completed_at: string | null;
+            /** Latest Run Error Code */
+            latest_run_error_code: string | null;
+            /** Latest Run Local Date */
+            latest_run_local_date: string | null;
+            /** Latest Run Status */
+            latest_run_status: string | null;
+            /** Next Run At */
+            next_run_at: string | null;
+            /** Scheduler Available */
+            scheduler_available: boolean;
+            /** Timezone */
+            timezone: string;
+        };
         /** SessionResponse */
         SessionResponse: {
             /** Email */
@@ -1701,6 +1787,26 @@ export interface operations {
             };
         };
     };
+    get_evidence_freshness_evidence_freshness_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvidenceFreshnessResponse"];
+                };
+            };
+        };
+    };
     health_health_get: {
         parameters: {
             query?: never;
@@ -1853,6 +1959,26 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    get_scheduled_brief_status_scheduled_briefs_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScheduledBriefStatusResponse"];
+                };
             };
         };
     };

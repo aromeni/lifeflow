@@ -4,17 +4,17 @@
 
 | Metric | Value |
 |---|---|
-| Python files | 116 |
-| TypeScript files | 24 |
+| Python files | 131 |
+| TypeScript files | 26 |
 | Prompt files | 2 |
 | Eval cases | 20 |
-| Backend tests | 405 passing |
-| Backend coverage | 93% |
-| Frontend tests | 38 passing |
+| Backend tests | 476 passing |
+| Backend coverage | 92% |
+| Frontend tests | 45 passing |
 | E2E journeys (Playwright) | 4 |
 | Frontend coverage | not yet measured — coverage reporter deferred until the UI stabilises |
 | CI | not yet connected — activates on first GitHub push |
-| Current stage | 7 |
-| Approved stages | 7/12 |
+| Current stage | 8 |
+| Approved stages | 8/12 |
 
 Stage detail: [stage-plan.md](stage-plan.md). Quality-gate evidence lives in each stage completion report.

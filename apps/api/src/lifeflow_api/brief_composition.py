@@ -367,7 +367,14 @@ class BriefService:
         self._user_id = user_id
         self._provider = llm_provider
 
-    async def generate(self, *, timezone: str, reference: datetime | None = None) -> Brief:
+    async def generate(
+        self,
+        *,
+        timezone: str,
+        reference: datetime | None = None,
+        generation_trigger: str = "manual",
+        scheduled_run_id: uuid.UUID | None = None,
+    ) -> Brief:
         reference = reference or datetime.now(UTC)
         if reference.tzinfo is None:
             raise ValueError("Brief generation reference must be timezone-aware.")
@@ -540,6 +547,8 @@ class BriefService:
             "prose_state": prose_state,
             "llm_summary_used": llm_summary_used,
             "llm_summary_failed": llm_summary_failed,
+            "generation_trigger": generation_trigger,
+            "scheduled_run_id": str(scheduled_run_id) if scheduled_run_id is not None else None,
         }
         brief = Brief(
             user_id=self._user_id,
@@ -551,6 +560,8 @@ class BriefService:
             source_window=SOURCE_WINDOW,
             prompt_version=BRIEF_PROMPT_TASK if self._provider is not None and allowed else None,
             model_metadata=metadata,
+            generation_trigger=generation_trigger,
+            scheduled_run_id=scheduled_run_id,
         )
         briefs.add(brief)
         await self._session.flush()
@@ -599,6 +610,7 @@ class BriefService:
             metadata={
                 "version": version,
                 "status": str(status),
+                "generation_trigger": generation_trigger,
                 "composer_version": COMPOSER_VERSION,
                 "included_signals": composed.included_signals,
                 "omitted_signals": composed.omitted_signals,

@@ -25,6 +25,7 @@ router = APIRouter(prefix="/preferences")
 BRIEFING_TIME_KEY = "briefing_time"
 WORKING_HOURS_KEY = "working_hours"
 BRIEF_SECTIONS_KEY = "brief_sections"
+SCHEDULED_BRIEFS_ENABLED_KEY = "scheduled_briefs_enabled"
 
 # Sections the user may hide. `needs_attention` is deliberately absent —
 # high-priority items can never be configured out of sight (ADR 0004 D45).
@@ -101,15 +102,25 @@ class BriefSectionsValue(BaseModel):
         return value
 
 
+class ScheduledBriefsEnabledValue(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    enabled: bool
+
+
 _DEFAULTS: dict[str, dict[str, Any]] = {
     BRIEFING_TIME_KEY: {"value": "07:30"},
     WORKING_HOURS_KEY: {"start": "09:00", "end": "17:30"},
     BRIEF_SECTIONS_KEY: {"sections": list(OPTIONAL_BRIEF_SECTIONS)},
+    # Default off (ADR 0004 D50): an existing deployment must not suddenly
+    # start scheduling briefs for every user just because briefing_time
+    # already had a default.
+    SCHEDULED_BRIEFS_ENABLED_KEY: {"enabled": False},
 }
 _VALIDATORS: dict[str, type[BaseModel]] = {
     BRIEFING_TIME_KEY: BriefingTimeValue,
     WORKING_HOURS_KEY: WorkingHoursValue,
     BRIEF_SECTIONS_KEY: BriefSectionsValue,
+    SCHEDULED_BRIEFS_ENABLED_KEY: ScheduledBriefsEnabledValue,
 }
 PREFERENCE_KEYS = tuple(_DEFAULTS)
 
@@ -160,6 +171,20 @@ async def enabled_brief_sections(session: AsyncSession, user_id: uuid.UUID) -> s
     resolved = await resolved_preferences(session, user_id)
     chosen = set(resolved[BRIEF_SECTIONS_KEY]["sections"])
     return chosen | {NEEDS_ATTENTION_SECTION}
+
+
+async def scheduled_briefs_enabled(session: AsyncSession, user_id: uuid.UUID) -> bool:
+    """Whether this user has explicitly opted into scheduled daily briefs
+    (ADR 0004 D50). Consulted only by the Phase 2 dispatcher — never by the
+    policy engine, executors, or approval binding (D46)."""
+    resolved = await resolved_preferences(session, user_id)
+    return bool(resolved[SCHEDULED_BRIEFS_ENABLED_KEY]["enabled"])
+
+
+async def briefing_schedule(session: AsyncSession, user_id: uuid.UUID) -> str:
+    """The user's configured `briefing_time` as `"HH:MM"`."""
+    resolved = await resolved_preferences(session, user_id)
+    return str(resolved[BRIEFING_TIME_KEY]["value"])
 
 
 class PreferenceItem(BaseModel):
@@ -245,9 +270,12 @@ __all__ = [
     "NEEDS_ATTENTION_SECTION",
     "OPTIONAL_BRIEF_SECTIONS",
     "PREFERENCE_KEYS",
+    "SCHEDULED_BRIEFS_ENABLED_KEY",
     "WORKING_HOURS_KEY",
+    "briefing_schedule",
     "enabled_brief_sections",
     "resolved_preferences",
     "router",
+    "scheduled_briefs_enabled",
     "validate_preference_value",
 ]

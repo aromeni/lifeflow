@@ -9,7 +9,7 @@ A permissioned, inspectable, human-in-the-loop personal operations agent. LifeFl
 - Threat model: [docs/security/threat-model.md](docs/security/threat-model.md)
 - Metrics dashboard: [docs/delivery/metrics.md](docs/delivery/metrics.md) (regenerate with `python3 scripts/metrics.py`) · Stage reports: [docs/delivery/reports/](docs/delivery/reports/)
 
-**Status:** Stage 7 (real Google integration) — remediated through a deep architecture review; awaiting the final real-sandbox Calendar test. Stages 0–6 are complete: ingestion, signal extraction, priority scoring, the daily brief, and approval-gated simulated action execution all work end-to-end in demo mode. Stage 7 wired real Google OAuth, sync, and execution into the app; five review/remediation rounds are recorded and closed in [docs/delivery/reports/stage-07.md](docs/delivery/reports/stage-07.md) — most recently the round-5 deep review (ADR 0003 D39–D41), which made real Calendar execution reachable for a real user: a deterministic scheduling-intent detector now turns an inbound "please schedule …" email into an exact, evidence-backed `create_calendar_event` proposal, created events are independently re-fetched and verified, and the demo-only "(proposed)" placeholder convention no longer fires on real synced calendars. The **Gmail** path is verified live end-to-end (real drafts created, verified, `succeeded`). The **Calendar** path is fully implemented and automatedly proven, but the human-performed real-sandbox test ([docs/delivery/stage-07-manual-checklist.md](docs/delivery/stage-07-manual-checklist.md) step 6) has not yet been run — Stage 7 is not complete until it passes. Stage 8 is not active.
+**Status:** Stage 7 (real Google integration) is **complete**, tagged `stage-7-complete` — both the Gmail and Calendar paths are verified live end-to-end against a real sandbox account (see [docs/delivery/reports/stage-07.md](docs/delivery/reports/stage-07.md) and [docs/delivery/stage-07-manual-checklist.md](docs/delivery/stage-07-manual-checklist.md)). Stage 8 (preferences, memory, schedule) is in progress: Phase 1 (explicit preferences) and Phase 2 (the scheduled daily brief, arq+Redis) are complete and live-verified; Phase 3 (inferred memory) awaits explicit approval to begin.
 
 ## Demo mode (one command)
 
@@ -36,7 +36,7 @@ apps/api            FastAPI backend (Python 3.12, SQLAlchemy 2, Alembic)
 packages/contracts  OpenAPI-generated shared types, consumed by apps/web
 prompts/            Versioned prompts and output contracts for LLM-assisted extraction and brief composition
 evals/              Golden datasets and scoring for signals, briefs, and actions
-workers/            Background job entry points (scheduled briefs, retention) — Stage 8, not yet populated
+workers/            Background job entry points (scheduled-brief worker live, Stage 8 Phase 2; retention still Stage 8/9)
 infra/              Deployment configuration beyond local Docker Compose — Stage 11, not yet populated
 docs/               Product, architecture, security, and delivery docs
 ```
@@ -60,8 +60,10 @@ docs/               Product, architecture, security, and delivery docs
 ## Setup (fresh clone)
 
 ```bash
-cp .env.example .env              # local config; never commit .env
-docker compose up -d db --wait    # PostgreSQL 16 on localhost:5433
+cp .env.example .env                    # local config; never commit .env
+docker compose up -d db redis --wait    # PostgreSQL 16 on 5433, Redis 7 on 6380
+# Redis is optional: only the Stage 8 Phase 2 scheduled-brief worker needs
+# it, exactly like the LLM provider — everything else works without it.
 
 # Backend
 cd apps/api
@@ -72,6 +74,12 @@ uv run uvicorn --app-dir src lifeflow_api.main:app --reload --port 8010
 # → http://localhost:8010/ready   (readiness: checks the database)
 # → http://localhost:8010/docs    (OpenAPI UI, development only)
 # Port 8010 by default: 8000 is commonly taken by other local apps.
+
+# Scheduled-brief worker (new terminal; Stage 8 Phase 2, optional)
+uv run arq lifeflow_api.worker_app.WorkerSettings
+# or, from anywhere: python workers/scheduler_worker.py
+# Generates each opted-in user's brief at their configured briefing_time —
+# see "Scheduled briefs" below.
 
 # Frontend (new terminal, from repo root)
 pnpm install
@@ -94,11 +102,21 @@ Real Google sign-in and data access are entirely opt-in and require explicit con
 - **Restricted-scope verification caveat**: the Gmail and Calendar scopes above are Google-restricted scopes. Until Google's app verification (or continued "Testing" status with test users) is in place, only test users you've explicitly added can complete the connector consent flow.
 - Before treating Stage 7 as pilot-ready, run the full **[manual sandbox-account checklist](docs/delivery/stage-07-manual-checklist.md)** against a real test account — it is currently unexecuted in this environment (no real Google credentials or network access here).
 
+## Scheduled briefs (Stage 8 Phase 2, opt-in, off by default)
+
+A background worker can generate each user's daily brief automatically at their configured `briefing_time`, in their timezone — the same brief pipeline the manual "Generate brief" button uses, tagged `generation_trigger: "scheduled"`. It never syncs Google (sync stays user-triggered only) and never approves or executes anything; any suggested actions still land in the ordinary approval inbox.
+
+- **Off by default**: a user must explicitly enable it in Settings (`scheduled_briefs_enabled`) — an existing deployment never starts scheduling for everyone just because `briefing_time` has a default.
+- **Requires**: Redis (`docker compose up -d redis`) and the worker process (`uv run arq lifeflow_api.worker_app.WorkerSettings`, or `python workers/scheduler_worker.py` from anywhere). Neither is required for anything else — with both absent, Settings truthfully reports the scheduler as unavailable and every other route is unaffected.
+- **Durable and idempotent**: one `ScheduledBriefRun` row per user per local calendar date (`apps/api/src/lifeflow_api/models.py`); a missed run is generated if the worker resumes within 6 hours, otherwise recorded `skipped`, never backfilled; a crashed-and-retried worker finds an already-generated brief rather than duplicating it.
+- **Details**: [ADR 0004](docs/architecture/adr/0004-stage8-preferences-memory-schedule.md) D47–D50; domain logic in `apps/api/src/lifeflow_api/scheduled_briefs.py`; manual checklist in [docs/delivery/stage-08-phase-2-manual-checklist.md](docs/delivery/stage-08-phase-2-manual-checklist.md).
+
 ## Tests and checks
 
 ```bash
 # Backend (from apps/api)
-uv run pytest                     # all tests; integration tests need the db container
+uv run pytest                     # all tests; integration tests need the db container,
+                                   # a few scheduled-brief tests also need redis (see below)
 uv run pytest -m "not integration"
 uv run ruff format --check . && uv run ruff check . && uv run mypy
 

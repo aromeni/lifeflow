@@ -20,10 +20,12 @@ from typing import Any
 from sqlalchemy import (
     JSON,
     CheckConstraint,
+    Date,
     DateTime,
     Float,
     ForeignKey,
     Index,
+    Integer,
     String,
     Text,
     UniqueConstraint,
@@ -142,6 +144,26 @@ class ExecutionMode(StrEnum):
 class Provenance(StrEnum):
     explicit = "explicit"
     inferred = "inferred"
+
+
+class ScheduledRunStatus(StrEnum):
+    """Closed lifecycle for one user's one local-date scheduled brief
+    attempt (ADR 0004 D48/D49).
+
+    pending — claimed by the dispatcher, enqueued, not yet started.
+    running — the worker has picked it up; a row stuck here past the stale
+    threshold is recovered (requeued or failed), never left hanging forever.
+    succeeded — a brief was generated and linked via `Brief.scheduled_run_id`.
+    failed — a permanent error, or a transient error that exhausted retries.
+    skipped — never attempted: outside the catch-up window, the user was
+    deleted/disabled, or scheduling was turned off before the job ran.
+    """
+
+    pending = "pending"
+    running = "running"
+    succeeded = "succeeded"
+    failed = "failed"
+    skipped = "skipped"
 
 
 def _uuid_pk() -> Mapped[uuid.UUID]:
@@ -285,6 +307,69 @@ class Brief(Base):
     source_window: Mapped[str] = mapped_column(String(64))
     prompt_version: Mapped[str | None] = mapped_column(String(40))
     model_metadata: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    # Phase 2 (ADR 0004 D49): "manual" (the existing on-demand route) or
+    # "scheduled". `scheduled_run_id` is a real, unique, nullable column
+    # (not JSON-only) so a crashed-and-retried worker can look up "did this
+    # run already produce a brief?" with a simple indexed query, and the
+    # frontend can distinguish manual/scheduled without parsing metadata.
+    generation_trigger: Mapped[str] = mapped_column(String(20), default="manual")
+    # `use_alter` (Stage 8 Phase 2): `scheduled_brief_runs.brief_id` points
+    # back at this table, so the two form a genuine FK cycle — SQLAlchemy's
+    # declarative metadata (used directly by `Base.metadata.create_all` in
+    # tests, bypassing Alembic) can only order that with one side deferred
+    # to a post-create ALTER TABLE.
+    scheduled_run_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey(
+            "scheduled_brief_runs.id",
+            ondelete="SET NULL",
+            use_alter=True,
+            name="fk_briefs_scheduled_run_id",
+        ),
+        unique=True,
+    )
+
+
+class ScheduledBriefRun(Base):
+    """One user's one local-date scheduled-brief attempt (ADR 0004 D48/D49).
+
+    The unique constraint is the final duplicate guard: no process, retry,
+    or race can ever produce two rows for the same user and local date."""
+
+    __tablename__ = "scheduled_brief_runs"
+    __table_args__ = (
+        UniqueConstraint("user_id", "local_brief_date", name="uq_scheduled_brief_runs_user_date"),
+        CheckConstraint(
+            "status IN ('pending', 'running', 'succeeded', 'failed', 'skipped')",
+            name="ck_scheduled_brief_runs_status",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = _user_fk()
+    local_brief_date: Mapped[Any] = mapped_column(Date)
+    scheduled_for_utc: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    # Snapshots of the settings that produced `scheduled_for_utc` — kept even
+    # though they can be looked up live, so a later preference/timezone
+    # change never rewrites the history of what this run was actually based on.
+    timezone_snapshot: Mapped[str] = mapped_column(String(64))
+    briefing_time_snapshot: Mapped[str] = mapped_column(String(5))
+    status: Mapped[str] = mapped_column(String(20), default=ScheduledRunStatus.pending)
+    queue_job_id: Mapped[str | None] = mapped_column(String(160))
+    brief_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("briefs.id", ondelete="SET NULL"), unique=True
+    )
+    attempt_count: Mapped[int] = mapped_column(Integer, default=0)
+    enqueued_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Closed-vocabulary safe codes only (e.g. "missed_grace_window",
+    # "worker_stale_timeout") — never a stack trace or personal content.
+    error_code: Mapped[str | None] = mapped_column(String(64))
+    error_message: Mapped[str | None] = mapped_column(String(500))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
 
 class ActionProposal(Base):

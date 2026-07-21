@@ -8,7 +8,7 @@ append-only by construction — it exposes no update or delete.
 
 import builtins
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,6 +21,7 @@ from lifeflow_api.models import (
     ConnectedAccount,
     Preference,
     ProposalStatus,
+    ScheduledBriefRun,
     Signal,
     SignalStatus,
     SourceItem,
@@ -260,6 +261,50 @@ class BriefRepository:
         if brief.user_id != self._user_id:
             raise ValueError("Brief does not belong to this repository's user.")
         self._session.add(brief)
+
+
+class ScheduledBriefRunRepository:
+    """User-scoped like every other repository. The dispatcher's cross-user
+    "which users are enabled" query and the worker's "load this run before
+    its owning user is known" lookup are NOT here by design — both are
+    documented exceptions in `lifeflow_api.scheduled_briefs`, since dispatch
+    is inherently a system-wide operation; every read it triggers afterwards
+    immediately becomes user-scoped again through this class."""
+
+    def __init__(self, session: AsyncSession, user_id: uuid.UUID) -> None:
+        self._session = session
+        self._user_id = user_id
+
+    async def get(self, run_id: uuid.UUID) -> ScheduledBriefRun | None:
+        result = await self._session.execute(
+            select(ScheduledBriefRun).where(
+                ScheduledBriefRun.id == run_id, ScheduledBriefRun.user_id == self._user_id
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def get_for_local_date(self, local_date: date) -> ScheduledBriefRun | None:
+        result = await self._session.execute(
+            select(ScheduledBriefRun).where(
+                ScheduledBriefRun.user_id == self._user_id,
+                ScheduledBriefRun.local_brief_date == local_date,
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def latest(self) -> ScheduledBriefRun | None:
+        result = await self._session.execute(
+            select(ScheduledBriefRun)
+            .where(ScheduledBriefRun.user_id == self._user_id)
+            .order_by(ScheduledBriefRun.local_brief_date.desc())
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
+
+    def add(self, run: ScheduledBriefRun) -> None:
+        if run.user_id != self._user_id:
+            raise ValueError("Scheduled brief run does not belong to this repository's user.")
+        self._session.add(run)
 
 
 class ActionProposalRepository:
