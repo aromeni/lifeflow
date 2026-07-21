@@ -1155,6 +1155,79 @@
         "title": "OnboardingState",
         "type": "string"
       },
+      "PreferenceItem": {
+        "properties": {
+          "is_default": {
+            "title": "Is Default",
+            "type": "boolean"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "provenance": {
+            "title": "Provenance",
+            "type": "string"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "value": {
+            "additionalProperties": true,
+            "title": "Value",
+            "type": "object"
+          }
+        },
+        "required": [
+          "key",
+          "value",
+          "provenance",
+          "is_default",
+          "updated_at"
+        ],
+        "title": "PreferenceItem",
+        "type": "object"
+      },
+      "PreferenceUpdateRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "value": {
+            "additionalProperties": true,
+            "title": "Value",
+            "type": "object"
+          }
+        },
+        "required": [
+          "value"
+        ],
+        "title": "PreferenceUpdateRequest",
+        "type": "object"
+      },
+      "PreferencesResponse": {
+        "properties": {
+          "preferences": {
+            "items": {
+              "$ref": "#/components/schemas/PreferenceItem"
+            },
+            "title": "Preferences",
+            "type": "array"
+          }
+        },
+        "required": [
+          "preferences"
+        ],
+        "title": "PreferencesResponse",
+        "type": "object"
+      },
       "ProposalApprovalRequest": {
         "additionalProperties": false,
         "properties": {
@@ -2424,6 +2497,73 @@
           }
         },
         "summary": "Update Me"
+      }
+    },
+    "/preferences": {
+      "get": {
+        "operationId": "list_preferences_preferences_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreferencesResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Preferences"
+      }
+    },
+    "/preferences/{key}": {
+      "put": {
+        "operationId": "set_preference_preferences__key__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "title": "Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreferenceUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreferenceItem"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Preference"
       }
     },
     "/ready": {

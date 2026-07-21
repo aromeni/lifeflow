@@ -2,7 +2,7 @@
 
 LifeFlow AI is a permissioned, inspectable, human-in-the-loop personal operations agent. Before making product or architecture decisions, read the North Star: [docs/project/project-foundation.md](docs/project/project-foundation.md). The build follows a stage-gated protocol ([docs/delivery/stage-plan.md](docs/delivery/stage-plan.md)); work only within the active stage.
 
-**Current stage: 7 (real Google integration) — in progress. Stages 0–6 are approved; Stage 8 is not active.**
+**Current stage: 8 (preferences, memory, schedule) — in progress, Phase 1 (explicit preferences). Stages 0–7 are approved (`stage-7-complete` tag); Stage 9 is not active.**
 
 ## Commands
 

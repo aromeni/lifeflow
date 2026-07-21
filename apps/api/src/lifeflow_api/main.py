@@ -29,6 +29,7 @@ from lifeflow_api.google.oauth import GoogleOAuthClient
 from lifeflow_api.health import router as health_router
 from lifeflow_api.logging_setup import configure_logging
 from lifeflow_api.me import router as me_router
+from lifeflow_api.preferences import router as preferences_router
 from lifeflow_api.security.csrf import CSRF_HEADER, CsrfProtectionMiddleware
 from lifeflow_api.security.token_cipher import AesGcmTokenCipher
 from lifeflow_api.signals import router as signals_router
@@ -144,6 +145,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(health_router)
     app.include_router(auth_router)
     app.include_router(me_router)
+    app.include_router(preferences_router)
     app.include_router(demo_router)
     app.include_router(source_items_router)
     app.include_router(signals_router)

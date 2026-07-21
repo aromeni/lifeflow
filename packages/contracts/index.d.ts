@@ -386,6 +386,40 @@ export interface paths {
         patch: operations["update_me_me_patch"];
         trace?: never;
     };
+    "/preferences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Preferences */
+        get: operations["list_preferences_preferences_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/preferences/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set Preference */
+        put: operations["set_preference_preferences__key__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/ready": {
         parameters: {
             query?: never;
@@ -906,6 +940,33 @@ export interface components {
          * @enum {string}
          */
         OnboardingState: "new" | "in_progress" | "complete";
+        /** PreferenceItem */
+        PreferenceItem: {
+            /** Is Default */
+            is_default: boolean;
+            /** Key */
+            key: string;
+            /** Provenance */
+            provenance: string;
+            /** Updated At */
+            updated_at: string | null;
+            /** Value */
+            value: {
+                [key: string]: unknown;
+            };
+        };
+        /** PreferenceUpdateRequest */
+        PreferenceUpdateRequest: {
+            /** Value */
+            value: {
+                [key: string]: unknown;
+            };
+        };
+        /** PreferencesResponse */
+        PreferencesResponse: {
+            /** Preferences */
+            preferences: components["schemas"]["PreferenceItem"][];
+        };
         /** ProposalApprovalRequest */
         ProposalApprovalRequest: {
             action_type: components["schemas"]["ActionType"];
@@ -1700,6 +1761,61 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MeResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_preferences_preferences_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreferencesResponse"];
+                };
+            };
+        };
+    };
+    set_preference_preferences__key__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PreferenceUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreferenceItem"];
                 };
             };
             /** @description Validation Error */

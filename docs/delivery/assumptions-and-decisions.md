@@ -158,12 +158,16 @@ A live test of the Gmail draft path from a genuine self-sent request ("Please re
 
 Verifying the fix also surfaced a latent test-rot defect: the route-level suites seeded proposals against the frozen test reference (2026-07-15) while approving/executing through the real app clock, so every seeded proposal carried a fixed absolute expiry (2026-07-22) and the suites would have begun failing wholesale the next day. Route-level (wall-clock) suites now anchor their seeding to `datetime.now(UTC)`; frozen-clock service-level suites are unchanged (the two-clock rule is documented in `tests/helpers.py`). See ADR 0003 D42 and the round-6 section of `docs/delivery/reports/stage-07.md`.
 
+## Stage 8 Phase 1 — explicit preferences (recorded 2026-07-21)
+
+Stage 8 opened on branch `stage-8-preferences` (from the `stage-7-complete` tag) with ADR 0004 (D43–D46): a three-phase plan (explicit preferences → scheduled brief via arq+Redis → inferred memory), a closed typed preference registry (`briefing_time`, `working_hours`, `brief_sections`; unknown keys 404, invalid values 422), the rule that `needs_attention` can never be hidden (D45), and the invariant that preferences are safety-inert — never consulted by the policy engine, executors, or approval binding (D46). Phase 1 shipped the registry API (`GET /preferences`, `PUT /preferences/{key}`, audited, explicit provenance), a Settings screen (timezone via the existing `/me`, briefing time, working hours, section choices with the D45 disclosure), and the first visible adaptation: the brief's displayed sections follow the user's choice, with `sections_disabled` recorded in brief metadata and extraction/proposal generation always running on the full composition. `User.timezone`/`locale` deliberately stay on the `User` row (already explicit and editable) — no second copy in the preference table.
+
 ## Open questions deliberately deferred (with owner stage)
 
 - ~~Evaluation acceptance targets~~ — **ratified 2026-07-16 in [ADR 0002](../architecture/adr/0002-evaluation-targets.md)** after the deterministic baseline; real-model metrics still pending an Anthropic key (before the Stage 10 gate).
 - Holdout + adversarial evaluation set (blind, dataset v2) — authored and run before the Stage 10 pilot gate; current golden v1 numbers are development-set results (ADR 0002, Stage 5 gate).
 - Real LLM augmentation stays off by default (`LLM_EXTRACTION_ENABLED=false`) until the ADR 0002 real-provider evaluation is recorded (Stage 5 gate check).
-- Job runner confirmation — ADR 0004 at Stage 8.
+- ~~Job runner confirmation~~ — **confirmed 2026-07-21 in ADR 0004 D43**: arq + Redis, introduced only in Stage 8 Phase 2 (the scheduled brief), optional for demo/CI.
 - Production hosting provider + deployment shape — ADR 0005 at Stage 11.
 - Google OAuth app verification and security assessment — roadmap recorded in `docs/security/threat-model.md`; begins in earnest once a real pilot beyond named test users is planned.
 - Entitlements/billing model — interfaces only, Stage 11; no billing implementation without explicit request.
