@@ -18,6 +18,7 @@ from datetime import UTC, datetime
 
 import pytest
 import redis.asyncio as aioredis
+import redis.exceptions as redis_exceptions
 from arq import constants as arq_constants
 from arq.connections import ArqRedis, RedisSettings, create_pool
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -44,7 +45,13 @@ async def redis() -> AsyncIterator[ArqRedis]:
         pool = await create_pool(
             REDIS_SETTINGS, job_serializer=job_serializer, job_deserializer=job_deserializer
         )
-    except OSError:
+    except (OSError, redis_exceptions.RedisError):
+        # arq's create_pool().ping() raises redis.exceptions.ConnectionError
+        # on a refused connection, which does NOT subclass OSError (verified:
+        # isinstance(ConnectionError(...), OSError) is False) — catching only
+        # OSError let this escape as a hard test ERROR instead of the
+        # intended skip whenever Redis isn't running (CI's api job, or a dev
+        # machine that hasn't started the compose redis service).
         pytest.skip("Redis is not running (docker compose up -d redis --wait)")
     await pool.flushdb()
     try:
