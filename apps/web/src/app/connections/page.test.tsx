@@ -24,6 +24,17 @@ const CONNECTED_RESPONSE: ConnectedAccountsResponse = {
   ],
 };
 
+const DISCONNECTED_RESPONSE: ConnectedAccountsResponse = {
+  accounts: [
+    {
+      provider: "google",
+      status: "disconnected",
+      granted_scopes: ["https://www.googleapis.com/auth/gmail.readonly"],
+      last_sync_at: "2026-07-20T06:30:00Z",
+    },
+  ],
+};
+
 function syncResult(overrides: Partial<GoogleSyncResult>): GoogleSyncResult {
   return {
     imported: 181,
@@ -90,6 +101,24 @@ test("calendar events that could not be parsed are disclosed distinctly from exc
     "1 calendar event could not be read fully.",
   );
   expect(screen.queryByTestId("gmail-excluded-notice")).not.toBeInTheDocument();
+});
+
+test("a previously-connected but now-disconnected account offers Connect Google again, not a dead Sync button", async () => {
+  apiMock.mockResolvedValueOnce(DISCONNECTED_RESPONSE);
+
+  render(<ConnectionsPage />);
+
+  await waitFor(() =>
+    expect(screen.getByTestId("google-connection-status")).toHaveTextContent("disconnected"),
+  );
+  // History stays visible — status, prior scopes, and last sync are not hidden.
+  expect(screen.getByText(/gmail.readonly/)).toBeInTheDocument();
+  expect(screen.getByText(/2026-07-20T06:30:00Z/)).toBeInTheDocument();
+  // But the only action offered is reconnecting — never a Sync/Disconnect
+  // button that can no longer do anything against a dead token.
+  expect(screen.queryByTestId("sync-google-now")).not.toBeInTheDocument();
+  expect(screen.queryByText("Disconnect Google")).not.toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "Connect Google" })).toBeInTheDocument();
 });
 
 test("a fully clean sync shows no notices", async () => {

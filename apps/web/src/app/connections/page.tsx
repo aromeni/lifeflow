@@ -113,23 +113,39 @@ export default function ConnectionsPage() {
               </p>
               <p>Last sync: {google.last_sync_at ?? "never"}</p>
               <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  data-testid="sync-google-now"
-                  onClick={syncGoogle}
-                  disabled={syncing || google.status !== "active"}
-                  className="mt-2 w-fit rounded bg-foreground px-4 py-2 text-sm font-medium text-background disabled:opacity-50"
-                >
-                  {syncing ? "Syncing…" : "Sync now"}
-                </button>
-                <button
-                  type="button"
-                  onClick={disconnectGoogle}
-                  disabled={pending}
-                  className="mt-2 w-fit rounded border border-current/30 px-4 py-2 text-sm disabled:opacity-50"
-                >
-                  {pending ? "Disconnecting…" : "Disconnect Google"}
-                </button>
+                {google.status === "active" ? (
+                  <>
+                    <button
+                      type="button"
+                      data-testid="sync-google-now"
+                      onClick={syncGoogle}
+                      disabled={syncing}
+                      className="mt-2 w-fit rounded bg-foreground px-4 py-2 text-sm font-medium text-background disabled:opacity-50"
+                    >
+                      {syncing ? "Syncing…" : "Sync now"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={disconnectGoogle}
+                      disabled={pending}
+                      className="mt-2 w-fit rounded border border-current/30 px-4 py-2 text-sm disabled:opacity-50"
+                    >
+                      {pending ? "Disconnecting…" : "Disconnect Google"}
+                    </button>
+                  </>
+                ) : (
+                  // A disconnected/expired/revoked account keeps its history
+                  // visible above (status, prior scopes, last sync) rather
+                  // than hiding it — but the only useful action left is to
+                  // reconnect, never a Sync/Disconnect button that can no
+                  // longer do anything.
+                  <a
+                    href={`${API_URL}/connected-accounts/google/connect`}
+                    className="mt-2 w-fit rounded bg-foreground px-4 py-2 text-sm font-medium text-background"
+                  >
+                    Connect Google
+                  </a>
+                )}
               </div>
               {syncError ? (
                 <p role="alert" className="text-red-700 dark:text-red-400">
