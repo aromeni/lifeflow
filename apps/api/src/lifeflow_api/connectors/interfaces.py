@@ -30,6 +30,11 @@ class EmailMessage:
     body_text: str
     sent_at: datetime  # timezone-aware
     thread_id: str | None = None
+    # True when the source message carried a List-Unsubscribe header — the
+    # RFC-standard marker of bulk/marketing mail (ADR 0003 D42). Bulk mail
+    # never yields actionable signals; this generalises the heuristic
+    # sender/keyword rules without any domain blocklist.
+    list_unsubscribe: bool = False
 
 
 @dataclass(frozen=True)

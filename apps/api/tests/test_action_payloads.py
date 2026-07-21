@@ -35,9 +35,13 @@ def test_canonical_hash_is_order_independent_and_binds_type_and_version() -> Non
     assert action_payload_hash(ActionType.create_task, first) == action_payload_hash(
         ActionType.create_task, reordered
     )
-    assert approval_binding_hash(ActionType.create_task, first, 1) != approval_binding_hash(
-        ActionType.create_task, first, 2
-    )
+    context_hash = "a" * 64
+    assert approval_binding_hash(
+        ActionType.create_task, first, 1, context_hash
+    ) != approval_binding_hash(ActionType.create_task, first, 2, context_hash)
+    assert approval_binding_hash(
+        ActionType.create_task, first, 1, context_hash
+    ) != approval_binding_hash(ActionType.create_task, first, 1, "b" * 64)
 
 
 @pytest.mark.parametrize(

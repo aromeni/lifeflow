@@ -107,6 +107,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/google/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Google Callback */
+        get: operations["google_callback_auth_google_callback_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/google/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Google Login */
+        get: operations["google_login_auth_google_login_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/logout": {
         parameters: {
             query?: never;
@@ -186,6 +220,114 @@ export interface paths {
         get: operations["get_brief_briefs__brief_id__get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Config */
+        get: operations["config_config_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/connected-accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Connected Accounts */
+        get: operations["list_connected_accounts_connected_accounts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/connected-accounts/google/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Google Connector Callback */
+        get: operations["google_connector_callback_connected_accounts_google_callback_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/connected-accounts/google/connect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Connect Google */
+        get: operations["connect_google_connected_accounts_google_connect_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/connected-accounts/google/disconnect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Disconnect Google */
+        post: operations["disconnect_google_connected_accounts_google_disconnect_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/connected-accounts/google/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sync Google
+         * @description User-triggered, on-demand sync (never automatic on page load — see
+         *     threat model and ADR 0003): pulls the connected user's own Gmail/Calendar
+         *     data through the narrow real clients into persisted `SourceItem` rows,
+         *     exactly as `IngestionService` already does for the synthetic connectors.
+         */
+        post: operations["sync_google_connected_accounts_google_sync_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -323,11 +465,14 @@ export interface components {
             approval_binding_hash: string;
             /** Completed At */
             completed_at: string | null;
+            /** Effective Status */
+            effective_status: string;
             /** Error Code */
             error_code: string | null;
             executed_payload: components["schemas"]["TypedActionPayload"];
             /** Executed Payload Hash */
             executed_payload_hash: string;
+            execution_mode: components["schemas"]["ExecutionMode"];
             /** Id */
             id: string;
             /** Idempotency Key */
@@ -340,6 +485,8 @@ export interface components {
             result: {
                 [key: string]: unknown;
             };
+            /** Simulation Only */
+            simulation_only: boolean;
             /**
              * Started At
              * Format: date-time
@@ -357,6 +504,7 @@ export interface components {
         ActionProposalResponse: {
             action_type: components["schemas"]["ActionType"];
             approval: components["schemas"]["ApprovalPreview"] | null;
+            approved_execution_context: components["schemas"]["ExecutionContextView"] | null;
             /** Audit Events */
             audit_events: components["schemas"]["ProposalAuditEvent"][];
             /** Confidence */
@@ -369,6 +517,12 @@ export interface components {
             /** Evidence */
             evidence: components["schemas"]["ProposalEvidence"][];
             execution: components["schemas"]["ActionExecutionResponse"] | null;
+            execution_context: components["schemas"]["ExecutionContextView"];
+            /** Execution Context Changed */
+            execution_context_changed: boolean;
+            /** Execution Context Hash */
+            execution_context_hash: string;
+            execution_mode: components["schemas"]["ExecutionMode"];
             /**
              * Expires At
              * Format: date-time
@@ -386,10 +540,7 @@ export interface components {
             /** Rejection Reason */
             rejection_reason: string | null;
             risk_level: components["schemas"]["RiskLevel"];
-            /**
-             * Simulation Only
-             * @default true
-             */
+            /** Simulation Only */
             simulation_only: boolean;
             /** Source Refs */
             source_refs: string[];
@@ -420,6 +571,7 @@ export interface components {
             approved_at: string;
             /** Binding Hash */
             binding_hash: string;
+            execution_context: components["schemas"]["ExecutionContextView"];
             payload: components["schemas"]["TypedActionPayload"];
             /** Payload Hash */
             payload_hash: string;
@@ -589,6 +741,22 @@ export interface components {
             /** Title */
             title: string;
         };
+        /** ConnectedAccountView */
+        ConnectedAccountView: {
+            /** Granted Scopes */
+            granted_scopes: string[];
+            /** Last Sync At */
+            last_sync_at: string | null;
+            /** Provider */
+            provider: string;
+            /** Status */
+            status: string;
+        };
+        /** ConnectedAccountsResponse */
+        ConnectedAccountsResponse: {
+            /** Accounts */
+            accounts: components["schemas"]["ConnectedAccountView"][];
+        };
         /** DemoStartResponse */
         DemoStartResponse: {
             /** Imported */
@@ -612,6 +780,37 @@ export interface components {
              */
             email: string;
         };
+        /**
+         * ExecutionContextView
+         * @description A safe, minimal projection of `ExecutionContext` for the frontend —
+         *     deliberately omits `connected_account_id`/`source_account_id` and any
+         *     revision counter (raw internal identifiers, independent-review blocker
+         *     #1 §7).
+         */
+        ExecutionContextView: {
+            mode: components["schemas"]["ExecutionMode"];
+            /** Provider */
+            provider: string;
+            /** Required Scope */
+            required_scope: string | null;
+        };
+        /**
+         * ExecutionMode
+         * @description Which path would/did carry out an approved action (Stage 7
+         *     remediation, independent-review blocker #2/#3). Resolved deterministically
+         *     from the user's currently active connected accounts — never chosen
+         *     reactively after a real call fails, and never a static default.
+         *
+         *     simulation — the demo/synthetic path (or, for `create_task`, the
+         *     always-local Stage 6 behaviour).
+         *     real — a Google-connected account with the exact required scope.
+         *     unavailable — neither path exists yet (e.g. nothing connected); the
+         *     policy engine denies approval/execution in this state, so `unavailable`
+         *     is never persisted on an `ActionExecution` row, only shown on a proposal
+         *     preview.
+         * @enum {string}
+         */
+        ExecutionMode: "simulation" | "real" | "unavailable";
         /** ExtractionResponse */
         ExtractionResponse: {
             /** Deterministic */
@@ -641,6 +840,33 @@ export interface components {
             thread_id: string | null;
             /** To */
             to: string[];
+        };
+        /** GoogleSyncResponse */
+        GoogleSyncResponse: {
+            /** Calendar Cursor Status */
+            calendar_cursor_status: string;
+            /** Calendar Incomplete */
+            calendar_incomplete: number;
+            /** Calendar Sync Complete */
+            calendar_sync_complete: boolean;
+            /** Calendar Synced */
+            calendar_synced: boolean;
+            /** Gmail Cursor Status */
+            gmail_cursor_status: string;
+            /** Gmail Excluded */
+            gmail_excluded: number;
+            /** Gmail Incomplete */
+            gmail_incomplete: number;
+            /** Gmail Sync Complete */
+            gmail_sync_complete: boolean;
+            /** Gmail Synced */
+            gmail_synced: boolean;
+            /** Imported */
+            imported: number;
+            /** Unchanged */
+            unchanged: number;
+            /** Updated */
+            updated: number;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -683,6 +909,8 @@ export interface components {
         /** ProposalApprovalRequest */
         ProposalApprovalRequest: {
             action_type: components["schemas"]["ActionType"];
+            /** Displayed Execution Context Hash */
+            displayed_execution_context_hash: string;
             /** Displayed Payload Hash */
             displayed_payload_hash: string;
             /** Expected Version */
@@ -744,6 +972,11 @@ export interface components {
          * @enum {string}
          */
         ProposalStatus: "proposed" | "edited" | "approved" | "rejected" | "executing" | "executed" | "failed" | "expired";
+        /** PublicConfig */
+        PublicConfig: {
+            /** Google Oauth Enabled */
+            google_oauth_enabled: boolean;
+        };
         /**
          * RiskLevel
          * @enum {string}
@@ -1085,6 +1318,58 @@ export interface operations {
             };
         };
     };
+    google_callback_auth_google_callback_get: {
+        parameters: {
+            query?: {
+                code?: string | null;
+                state?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    google_login_auth_google_login_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
     logout_auth_logout_post: {
         parameters: {
             query?: never;
@@ -1201,6 +1486,136 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    config_config_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicConfig"];
+                };
+            };
+        };
+    };
+    list_connected_accounts_connected_accounts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectedAccountsResponse"];
+                };
+            };
+        };
+    };
+    google_connector_callback_connected_accounts_google_callback_get: {
+        parameters: {
+            query?: {
+                code?: string | null;
+                state?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    connect_google_connected_accounts_google_connect_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    disconnect_google_connected_accounts_google_disconnect_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    sync_google_connected_accounts_google_sync_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoogleSyncResponse"];
                 };
             };
         };

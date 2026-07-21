@@ -102,6 +102,9 @@ export default function TodayPage() {
             <Link href="/approvals" data-testid="approval-inbox-link" className="text-sm underline">
               Review approvals
             </Link>
+            <Link href="/connections" data-testid="connections-link" className="text-sm underline">
+              Connections
+            </Link>
             <button
               data-testid="generate-brief"
               type="button"

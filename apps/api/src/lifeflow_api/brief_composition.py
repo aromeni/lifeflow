@@ -66,6 +66,7 @@ SECTION_ORDER = tuple(BriefSectionKey)
 
 ACTIONABLE_TYPES = {
     SignalType.request,
+    SignalType.schedule_request,
     SignalType.commitment,
     SignalType.deadline,
     SignalType.follow_up,
@@ -174,6 +175,9 @@ def _suggested_action(signal_type: SignalType, section: BriefSectionKey) -> str 
         return None
     return {
         SignalType.request: "Review the request and decide how to respond.",
+        SignalType.schedule_request: (
+            "Review the scheduling request and the prepared calendar event."
+        ),
         SignalType.commitment: "Review the commitment and plan the next step.",
         SignalType.deadline: "Review the deadline and decide what to complete.",
         SignalType.follow_up: "Decide whether to follow up.",
@@ -269,6 +273,25 @@ def compose_sections(signals: list[Signal], source_items: list[SourceItem]) -> C
     ]
     included = sum(len(section.items) for section in sections)
     return ComposedSections(sections=sections, included_signals=included, omitted_signals=omitted)
+
+
+def _count_filtered_solo_events(sources: list[SourceItem], *, reference: datetime) -> int:
+    """Future, timed calendar events the meeting detector's two-attendee
+    threshold keeps out of "Today and upcoming". Malformed attendee metadata
+    is not counted here — it is already surfaced through detection
+    diagnostics as a data-quality notice."""
+    count = 0
+    for item in sources:
+        if item.source_type != SourceType.calendar_event:
+            continue
+        if item.metadata_json.get("all_day") or item.occurred_at < reference:
+            continue
+        raw = item.metadata_json.get("attendees")
+        if raw is not None and not isinstance(raw, list):
+            continue
+        if (len(raw) if isinstance(raw, list) else 0) < 2:
+            count += 1
+    return count
 
 
 def deterministic_summary(sections: list[BriefSection]) -> str:
@@ -376,6 +399,25 @@ class BriefService:
                         f"{composed.omitted_signals} signal"
                         f"{'s were' if composed.omitted_signals != 1 else ' was'} omitted "
                         "because its source evidence could not be resolved."
+                    ),
+                )
+            )
+        # Truthful display-policy disclosure (ADR 0003 D41): "Today and
+        # upcoming" lists meetings (two or more attendees). A synced solo
+        # event is healthy data that this policy intentionally leaves out —
+        # say so, so a quiet Today page is never mistaken for a sync failure.
+        filtered_events = _count_filtered_solo_events(sources, reference=reference)
+        if filtered_events:
+            notices.append(
+                BriefNotice(
+                    code="calendar_events_not_listed",
+                    message=(
+                        f"{filtered_events} synced calendar event"
+                        f"{'s' if filtered_events != 1 else ''} with fewer than two attendees "
+                        f"{'are' if filtered_events != 1 else 'is'} not listed under Today and "
+                        "upcoming. "
+                        f"{'They' if filtered_events != 1 else 'It'} synced correctly and "
+                        "your calendar is unchanged."
                     ),
                 )
             )

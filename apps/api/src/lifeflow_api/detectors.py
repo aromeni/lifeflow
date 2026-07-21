@@ -16,6 +16,7 @@ from zoneinfo import ZoneInfo
 
 from lifeflow_api.deadline_phrases import parse_due_phrase
 from lifeflow_api.models import SignalType, SourceItem, SourceType
+from lifeflow_api.scheduling_phrases import parse_scheduling_request
 
 DETERMINISTIC_VERSION = "det-v1"
 STALE_FOLLOW_UP_DAYS = 5  # assumption A5
@@ -93,7 +94,15 @@ def is_bulk_email(item: SourceItem) -> bool:
     sender = item.sender_or_organiser or ""
     local_part = sender.split("@")[0].lower()
     body = str(item.metadata_json.get("body_preview", "")).lower()
-    return local_part in _BULK_SENDER_LOCALS or "unsubscribe" in body
+    return (
+        local_part in _BULK_SENDER_LOCALS
+        or "unsubscribe" in body
+        # The RFC 2369/8058 List-Unsubscribe header (recorded at sync time,
+        # ADR 0003 D42): the standard marker virtually all bulk/marketing
+        # mail carries, which heuristic sender/keyword rules alone missed on
+        # real promotional mail.
+        or bool(item.metadata_json.get("list_unsubscribe"))
+    )
 
 
 def _local_reference(item: SourceItem, timezone: str) -> datetime:
@@ -130,6 +139,67 @@ def detect_requests(items: list[SourceItem], *, timezone: str) -> list[DetectedS
                 urgency=0.6 if strong else 0.3,
                 due_at=due_at,
                 reason_codes=tuple(reasons),
+            )
+        )
+    return signals
+
+
+def detect_schedule_requests(
+    items: list[SourceItem], *, timezone: str, reference: datetime
+) -> list[DetectedSignal]:
+    """Explicit scheduling requests in inbox emails (ADR 0003 D39).
+
+    A fully-specified, future request (title, date, start, end/duration,
+    timezone, attendees all stated) is high-confidence and carries the event
+    start as `due_at`; anything incomplete or in the past stays below the
+    composition threshold — a clarification signal the user can see, never
+    an executable calendar proposal built on guessed details.
+    """
+    signals = []
+    for item in items:
+        if item.source_type != SourceType.email:
+            continue
+        if item.metadata_json.get("folder") != "inbox" or is_bulk_email(item):
+            continue
+        extraction = parse_scheduling_request(
+            _email_text(item),
+            subject=item.title,
+            sender=item.sender_or_organiser,
+            timezone=timezone,
+        )
+        if not extraction.has_intent:
+            continue
+        executable = extraction.executable(reference=reference)
+        in_past = (
+            extraction.complete
+            and extraction.starts_at is not None
+            and extraction.starts_at <= reference
+        )
+        reasons = ["schedule_request"]
+        if executable:
+            reasons.append("event_details_extracted")
+        else:
+            reasons.append("event_details_incomplete")
+            reasons.extend(f"missing_{name}" for name in extraction.missing)
+            if in_past:
+                reasons.append("event_in_past")
+        reasons.extend(extraction.reason_codes)
+        sender_name = item.metadata_json.get("sender_name", item.sender_or_organiser)
+        summary = f"Scheduling cue '{extraction.cue}'" + (
+            "; complete event details were extracted for review."
+            if executable
+            else "; the event details are incomplete, so nothing can be prepared yet."
+        )
+        signals.append(
+            DetectedSignal(
+                signal_type=SignalType.schedule_request,
+                title=f"Scheduling request from {sender_name}: {item.title}",
+                summary=summary,
+                evidence_refs=(item.external_id,),
+                confidence=0.9 if executable else 0.45,
+                urgency=0.6 if executable else 0.3,
+                due_at=extraction.starts_at if executable else None,
+                reason_codes=tuple(dict.fromkeys(reasons)),
             )
         )
     return signals
@@ -382,7 +452,12 @@ def run_deterministic_detectors(
     """
     requests = detect_requests(items, timezone=timezone)
     commitments = detect_commitments(items, timezone=timezone)
-    covered = {ref for signal in (*requests, *commitments) for ref in signal.evidence_refs}
+    schedule_requests = detect_schedule_requests(items, timezone=timezone, reference=reference)
+    covered = {
+        ref
+        for signal in (*requests, *commitments, *schedule_requests)
+        for ref in signal.evidence_refs
+    }
     deadlines = detect_deadlines(items, timezone=timezone, already_covered=covered)
     meetings = detect_meetings(items, reference=reference)
     conflicts = detect_conflicts(items, reference=reference)
@@ -391,6 +466,7 @@ def run_deterministic_detectors(
         signals=[
             *requests,
             *commitments,
+            *schedule_requests,
             *deadlines,
             *meetings.signals,
             *conflicts,

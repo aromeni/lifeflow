@@ -186,8 +186,13 @@ def approval_binding_hash(
     action_type: ActionType | str,
     payload: dict[str, Any] | TypedActionPayload,
     proposal_version: int,
+    execution_context_hash: str,
 ) -> str:
-    """Bind approval to action type, canonical payload, and proposal version."""
+    """Bind approval to action type, canonical payload, proposal version,
+    AND the execution-context hash (Stage 7 remediation blocker #1) — so an
+    approval can never be replayed against a different execution mode,
+    provider, or connected/source account than the one the user actually
+    saw."""
 
     if proposal_version < 1:
         raise ValueError("Proposal version must be positive.")
@@ -195,6 +200,8 @@ def approval_binding_hash(
     digest.update(canonical_action_bytes(action_type, payload))
     digest.update(b"\x00version\x00")
     digest.update(str(proposal_version).encode("ascii"))
+    digest.update(b"\x00execution_context\x00")
+    digest.update(execution_context_hash.encode("ascii"))
     return digest.hexdigest()
 
 

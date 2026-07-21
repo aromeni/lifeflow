@@ -8,6 +8,7 @@ import secrets
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
+import httpx
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import async_sessionmaker
@@ -17,14 +18,19 @@ from lifeflow_api.action_proposals import router as action_proposals_router
 from lifeflow_api.auth import router as auth_router
 from lifeflow_api.briefs import router as briefs_router
 from lifeflow_api.config import Settings, get_settings
+from lifeflow_api.connected_accounts import router as connected_accounts_router
 from lifeflow_api.correlation import CORRELATION_HEADER, CorrelationIdMiddleware
 from lifeflow_api.db import create_engine
 from lifeflow_api.demo_mode import router as demo_router
 from lifeflow_api.errors import register_error_handlers
+from lifeflow_api.google.calendar_client import CalendarEventClient
+from lifeflow_api.google.gmail_client import GmailDraftClient
+from lifeflow_api.google.oauth import GoogleOAuthClient
 from lifeflow_api.health import router as health_router
 from lifeflow_api.logging_setup import configure_logging
 from lifeflow_api.me import router as me_router
 from lifeflow_api.security.csrf import CSRF_HEADER, CsrfProtectionMiddleware
+from lifeflow_api.security.token_cipher import AesGcmTokenCipher
 from lifeflow_api.signals import router as signals_router
 from lifeflow_api.source_items import router as source_items_router
 
@@ -50,6 +56,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             yield
         finally:
             await app.state.engine.dispose()
+            if app.state.google_http_client is not None:
+                await app.state.google_http_client.aclose()
 
     app = FastAPI(
         title="LifeFlow AI API",
@@ -71,6 +79,46 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.llm_provider = AnthropicProvider(
             settings.anthropic_api_key, model=settings.anthropic_model
         )
+
+    # Token encryption (threat model T1): required once any real tokens are
+    # stored. Demo mode and dev-login never construct a ConnectedAccount
+    # with real tokens, so this stays None until TOKEN_KEY is configured.
+    app.state.token_cipher = None
+    if settings.token_key:
+        app.state.token_cipher = AesGcmTokenCipher(settings.token_key, settings.token_key_id)
+
+    # Real Google integration (Stage 7, ADR 0003 D23) is off by default.
+    # Demo mode, dev-login, and the synthetic connectors never depend on any
+    # of this; when enabled, both separate OAuth client configs (D10) and a
+    # token-encryption key are required, or the app refuses to start.
+    app.state.google_http_client = None
+    app.state.google_oauth_client = None
+    app.state.gmail_client = None
+    app.state.calendar_client = None
+    if settings.google_oauth_enabled:
+        missing = [
+            name
+            for name, value in {
+                "GOOGLE_OIDC_CLIENT_ID": settings.google_oidc_client_id,
+                "GOOGLE_OIDC_CLIENT_SECRET": settings.google_oidc_client_secret,
+                "GOOGLE_OIDC_REDIRECT_URI": settings.google_oidc_redirect_uri,
+                "GOOGLE_CONNECTOR_CLIENT_ID": settings.google_connector_client_id,
+                "GOOGLE_CONNECTOR_CLIENT_SECRET": settings.google_connector_client_secret,
+                "GOOGLE_CONNECTOR_REDIRECT_URI": settings.google_connector_redirect_uri,
+            }.items()
+            if not value
+        ]
+        if missing:
+            raise RuntimeError(
+                "GOOGLE_OAUTH_ENABLED=true requires " + ", ".join(missing) + " to be set."
+            )
+        if app.state.token_cipher is None:
+            raise RuntimeError("GOOGLE_OAUTH_ENABLED=true requires TOKEN_KEY to be set.")
+        app.state.google_http_client = httpx.AsyncClient(timeout=10.0)
+        app.state.google_oauth_client = GoogleOAuthClient(app.state.google_http_client)
+        app.state.gmail_client = GmailDraftClient(app.state.google_http_client)
+        app.state.calendar_client = CalendarEventClient(app.state.google_http_client)
+
     # Middleware runs outermost-last-added: correlation IDs wrap everything,
     # then CSRF rejects forged writes, then the session is available inside.
     app.add_middleware(
@@ -101,6 +149,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(signals_router)
     app.include_router(briefs_router)
     app.include_router(action_proposals_router)
+    app.include_router(connected_accounts_router)
     return app
 
 

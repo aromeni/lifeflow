@@ -11,9 +11,14 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from tests.conftest import CSRF_HEADERS, TEST_DB_URL
-from tests.helpers import REFERENCE, TIMEZONE, demo_source_items
+from tests.helpers import REFERENCE, TIMEZONE, demo_source_items, scheduling_email_source
 
-from lifeflow_api.action_executors import FinalExecutionError, SimulatedExecutorRegistry
+from lifeflow_api.action_executors import (
+    ExecutorOutcome,
+    ExecutorRegistry,
+    FinalExecutionError,
+    SimulatedExecutorRegistry,
+)
 from lifeflow_api.action_payloads import (
     action_payload_hash,
     approval_binding_hash,
@@ -21,9 +26,11 @@ from lifeflow_api.action_payloads import (
 )
 from lifeflow_api.action_proposal_service import (
     ActionProposalService,
+    PostCommitHook,
     ProposalConflictError,
 )
 from lifeflow_api.brief_composition import BriefService
+from lifeflow_api.execution_context import execution_context_hash, resolve_execution_context
 from lifeflow_api.models import (
     AccountStatus,
     ActionProposal,
@@ -37,6 +44,8 @@ from lifeflow_api.models import (
 from lifeflow_api.repositories import (
     ActionProposalRepository,
     AuditEventRepository,
+    ConnectedAccountRepository,
+    SourceItemRepository,
 )
 
 pytestmark = pytest.mark.integration
@@ -79,6 +88,40 @@ async def _seed_proposals(
     return user, proposals
 
 
+async def _seed_google_sourced_proposals(
+    session: AsyncSession, *, granted_scopes: list[str]
+) -> tuple[User, ConnectedAccount, list[ActionProposal]]:
+    """Like `_seed_proposals`, but every `SourceItem`'s evidence is tagged
+    to a real `google` `ConnectedAccount` instead of left unlinked — so
+    `resolve_execution_context` resolves Google provenance, not synthetic
+    (Stage 7 remediation blocker #1). Used to test the real-execution path
+    without conflating it with demo/synthetic evidence."""
+    user = User(
+        email=f"google-actions-{uuid.uuid4()}@lifeflow.local", display_name="Google Actions"
+    )
+    session.add(user)
+    await session.flush()
+    account = ConnectedAccount(
+        user_id=user.id,
+        provider="google",
+        encrypted_access_token=None,
+        encrypted_refresh_token=None,
+        granted_scopes=granted_scopes,
+        expires_at=None,
+        status=AccountStatus.active,
+        last_sync_at=None,
+    )
+    session.add(account)
+    await session.flush()
+    session.add_all(await demo_source_items(user.id, account_id=account.id))
+    session.add(scheduling_email_source(user.id, account_id=account.id))
+    await session.flush()
+    await BriefService(session, user.id).generate(timezone=TIMEZONE, reference=REFERENCE)
+    proposals = await ActionProposalRepository(session, user.id).list()
+    assert {ActionType(item.action_type) for item in proposals} == set(ActionType)
+    return user, account, proposals
+
+
 def _proposal(proposals: list[ActionProposal], action_type: ActionType) -> ActionProposal:
     return next(item for item in proposals if item.action_type == action_type)
 
@@ -88,21 +131,42 @@ def _service(
     user: User,
     *,
     executors: SimulatedExecutorRegistry | None = None,
+    google_executors: ExecutorRegistry | None = None,
+    post_commit_hook: PostCommitHook | None = None,
 ) -> ActionProposalService:
     return ActionProposalService(
         session,
         user.id,
         executors=executors,
+        google_executors=google_executors,
         now_factory=lambda: NOW,
+        post_commit_hook=post_commit_hook,
     )
 
 
-async def _approve(service: ActionProposalService, proposal: ActionProposal) -> ActionProposal:
+async def _displayed_execution_context_hash(
+    session: AsyncSession, user: User, proposal: ActionProposal
+) -> str:
+    accounts = await ConnectedAccountRepository(session, user.id).list()
+    evidence_sources = await SourceItemRepository(session, user.id).list_by_external_ids(
+        list(proposal.source_refs)
+    )
+    context = resolve_execution_context(
+        ActionType(proposal.action_type), accounts=accounts, evidence_sources=evidence_sources
+    )
+    return execution_context_hash(context)
+
+
+async def _approve(
+    service: ActionProposalService, proposal: ActionProposal, *, session: AsyncSession, user: User
+) -> ActionProposal:
+    context_hash = await _displayed_execution_context_hash(session, user, proposal)
     return await service.approve(
         proposal.id,
         expected_version=proposal.version,
         action_type=ActionType(proposal.action_type),
         displayed_payload_hash=proposal.payload_hash,
+        displayed_execution_context_hash=context_hash,
     )
 
 
@@ -215,17 +279,22 @@ async def test_approval_binds_exact_displayed_type_payload_and_version(
             expected_version=proposal.version,
             action_type=ActionType.create_task,
             displayed_payload_hash="0" * 64,
+            displayed_execution_context_hash="0" * 64,
         )
     _assert_conflict(stale_payload, "stale_preview")
 
-    approved = await _approve(service, proposal)
+    approved = await _approve(service, proposal, session=session, user=user)
     assert approved.status == ProposalStatus.approved
     assert approved.approved_action_type == approved.action_type
     assert approved.approved_payload_json == approved.payload_json
     assert approved.approved_payload_hash == approved.payload_hash
     assert approved.approved_version == approved.version
+    assert approved.approved_execution_context_hash is not None
     assert approved.approved_binding_hash == approval_binding_hash(
-        ActionType(approved.action_type), approved.payload_json, approved.version
+        ActionType(approved.action_type),
+        approved.payload_json,
+        approved.version,
+        approved.approved_execution_context_hash,
     )
 
 
@@ -235,7 +304,7 @@ async def test_editing_approved_atomically_invalidates_and_versions_approval(
     user, proposals = await _seed_proposals(session)
     proposal = _proposal(proposals, ActionType.create_task)
     service = _service(session, user)
-    approved = await _approve(service, proposal)
+    approved = await _approve(service, proposal, session=session, user=user)
     old_version = approved.version
     old_hash = approved.payload_hash
     edited_payload = {
@@ -278,15 +347,18 @@ class CountingExecutor:
         self.calls = 0
         self.fail = fail
 
-    async def execute(self, **_: Any) -> dict[str, str]:
+    async def execute(self, **_: Any) -> ExecutorOutcome:
         self.calls += 1
         if self.fail:
             raise FinalExecutionError("simulated_final_failure")
-        return {
-            "status": "simulated",
-            "simulated_id": "counted-once",
-            "message": "Exactly one simulated call.",
-        }
+        return ExecutorOutcome(
+            status="succeeded",
+            result={
+                "status": "simulated",
+                "simulated_id": "counted-once",
+                "message": "Exactly one simulated call.",
+            },
+        )
 
 
 async def test_simulated_execution_uses_approved_snapshot_and_is_idempotent(
@@ -297,7 +369,7 @@ async def test_simulated_execution_uses_approved_snapshot_and_is_idempotent(
     executor = CountingExecutor()
     registry = SimulatedExecutorRegistry({ActionType.create_task: executor})
     service = _service(session, user, executors=registry)
-    approved = await _approve(service, proposal)
+    approved = await _approve(service, proposal, session=session, user=user)
 
     first_proposal, first_execution = await service.execute(approved.id)
     second_proposal, second_execution = await service.execute(approved.id)
@@ -323,7 +395,7 @@ async def test_final_failure_is_recorded_once_and_never_auto_retried(
         user,
         executors=SimulatedExecutorRegistry({ActionType.create_task: executor}),
     )
-    await _approve(service, proposal)
+    await _approve(service, proposal, session=session, user=user)
 
     first_proposal, first_execution = await service.execute(proposal.id)
     second_proposal, second_execution = await service.execute(proposal.id)
@@ -352,7 +424,7 @@ async def test_rejection_is_terminal(session: AsyncSession) -> None:
         )
     _assert_conflict(edit_conflict, "invalid_transition")
     with pytest.raises(ProposalConflictError) as approve_conflict:
-        await _approve(service, rejected)
+        await _approve(service, rejected, session=session, user=user)
     _assert_conflict(approve_conflict, "invalid_transition")
     with pytest.raises(ProposalConflictError) as execute_conflict:
         await service.execute(rejected.id)
@@ -369,12 +441,12 @@ async def test_expiry_is_checked_immediately_before_approval_and_execution(
     await session.flush()
 
     with pytest.raises(ProposalConflictError) as approval_conflict:
-        await _approve(service, approval_target)
+        await _approve(service, approval_target, session=session, user=user)
     _assert_conflict(approval_conflict, "proposal_expired")
     assert approval_target.status == ProposalStatus.expired
 
     execution_target = _proposal(proposals, ActionType.create_gmail_draft)
-    await _approve(service, execution_target)
+    await _approve(service, execution_target, session=session, user=user)
     execution_target.expires_at = NOW
     await session.flush()
     with pytest.raises(ProposalConflictError) as execution_conflict:
@@ -460,6 +532,7 @@ async def test_action_proposal_api_exposes_exact_preview_and_safe_transitions(
             "expected_version": task["version"],
             "action_type": task["action_type"],
             "displayed_payload_hash": "0" * 64,
+            "displayed_execution_context_hash": task["execution_context_hash"],
         },
     )
     assert stale.status_code == 409
@@ -472,6 +545,7 @@ async def test_action_proposal_api_exposes_exact_preview_and_safe_transitions(
             "expected_version": task["version"],
             "action_type": task["action_type"],
             "displayed_payload_hash": task["payload_hash"],
+            "displayed_execution_context_hash": task["execution_context_hash"],
         },
     )
     assert approved.status_code == 200
@@ -479,6 +553,7 @@ async def test_action_proposal_api_exposes_exact_preview_and_safe_transitions(
     assert approved_body["approval"]["payload"] == task["payload"]
     assert approved_body["approval"]["payload_hash"] == task["payload_hash"]
     assert approved_body["approval"]["proposal_version"] == task["version"]
+    assert approved_body["approval"]["execution_context"]["mode"] == "simulation"
 
     first_execution = await dev_client.post(
         f"/action-proposals/{task['id']}/execute", headers=CSRF_HEADERS
@@ -503,6 +578,7 @@ async def test_action_proposal_api_exposes_exact_preview_and_safe_transitions(
             "expected_version": calendar["version"],
             "action_type": calendar["action_type"],
             "displayed_payload_hash": calendar["payload_hash"],
+            "displayed_execution_context_hash": calendar["execution_context_hash"],
         },
     )
     assert terminal.status_code == 409
@@ -524,6 +600,7 @@ async def test_action_proposal_api_accepts_emitted_iso_payload_and_invalidates_a
             "expected_version": task["version"],
             "action_type": task["action_type"],
             "displayed_payload_hash": task["payload_hash"],
+            "displayed_execution_context_hash": task["execution_context_hash"],
         },
     )
     assert approved.status_code == 200
@@ -885,17 +962,17 @@ async def test_audit_metadata_never_contains_payload_content(session: AsyncSessi
         calendar.payload_json["attendees"][0],
     ]
 
-    await _approve(service, draft)
+    await _approve(service, draft, session=session, user=user)
     await service.execute(draft.id)
     await service.execute(draft.id)  # replay
-    await _approve(service, task)
+    await _approve(service, task, session=session, user=user)
     edited = await service.edit(
         task.id,
         expected_version=task.version,
         action_type=ActionType.create_task,
         payload={**task.payload_json, "title": "Privacy check edited title"},
     )
-    await _approve(service, edited)
+    await _approve(service, edited, session=session, user=user)
     rejection_reason = "Contains details about the Fenwick account."
     await service.reject(calendar.id, expected_version=calendar.version, reason=rejection_reason)
     sensitive_values.append("Privacy check edited title")

@@ -16,6 +16,7 @@ from tests.test_action_proposals import (
     NOW,
     CountingExecutor,
     _approve,
+    _displayed_execution_context_hash,
     _proposal,
     _seed_proposals,
     _service,
@@ -84,6 +85,22 @@ def _corrupt_edit_after_approval(proposal: ActionProposal) -> None:
     proposal.user_edited_at = NOW + timedelta(seconds=1)
 
 
+def _corrupt_authorisation_revision(proposal: ActionProposal) -> None:
+    """Stage 7 focused remediation: a corrupted `approved_authorisation_
+    revision` must not silently authorise execution under a different
+    revision than the one the binding hash actually covers — caught by
+    `validate_execution`'s recomputed-context-hash check, not merely the
+    binding-hash comparison (the binding hash itself is untouched here)."""
+    proposal.approved_authorisation_revision = 99
+
+
+def _corrupt_execution_context_hash(proposal: ActionProposal) -> None:
+    """A corrupted `approved_execution_context_hash` invalidates the
+    binding hash itself (Stage 7 focused remediation), since
+    `approval_binding_hash` folds the context hash in directly."""
+    proposal.approved_execution_context_hash = "f" * 64
+
+
 @pytest.mark.parametrize(
     ("corrupt", "expected_code"),
     [
@@ -94,6 +111,8 @@ def _corrupt_edit_after_approval(proposal: ActionProposal) -> None:
         (_corrupt_payload_json, "approval_mismatch"),
         (_corrupt_binding, "approval_mismatch"),
         (_corrupt_edit_after_approval, "approval_stale"),
+        (_corrupt_authorisation_revision, "approval_mismatch"),
+        (_corrupt_execution_context_hash, "approval_mismatch"),
     ],
     ids=[
         "incomplete-snapshot",
@@ -103,6 +122,8 @@ def _corrupt_edit_after_approval(proposal: ActionProposal) -> None:
         "payload-json-drift",
         "binding-hash-invalid",
         "approved-before-edit",
+        "authorisation-revision-tampered",
+        "execution-context-hash-tampered",
     ],
 )
 async def test_tampered_approval_state_denies_execution(
@@ -116,7 +137,7 @@ async def test_tampered_approval_state_denies_execution(
         session, user, executors=SimulatedExecutorRegistry({ActionType.create_task: executor})
     )
     task = _proposal(proposals, ActionType.create_task)
-    await _approve(service, task)
+    await _approve(service, task, session=session, user=user)
 
     corrupt(task)
     await session.flush()
@@ -162,21 +183,32 @@ async def test_missing_simulated_capability_denies_approval_and_execution(
 
     # Approve one medium-risk proposal while the capability is still active,
     # then degrade the account: execution must also be denied.
-    await _approve(service, draft)
+    await _approve(service, draft, session=session, user=user)
     await degrade(session, user.id)
 
     with pytest.raises(ProposalConflictError) as approval_conflict:
-        await _approve(service, calendar)
+        await _approve(service, calendar, session=session, user=user)
     assert approval_conflict.value.code == "simulated_scope_missing"
     denied_approval = await _last_denied_event(session, user.id, calendar.id, "approval.denied")
     assert denied_approval.safe_metadata_json["reason_code"] == "simulated_scope_missing"
 
+    # `draft` was already approved while the capability was active — its
+    # approved execution-context snapshot no longer matches current state,
+    # so execution is refused as a stale-context conflict (Stage 7
+    # remediation blocker #1 §6), not the generic "still missing" code the
+    # first-time approval above gets.
     with pytest.raises(ProposalConflictError) as execution_conflict:
         await service.execute(draft.id)
-    assert execution_conflict.value.code == "simulated_scope_missing"
+    assert execution_conflict.value.code == "approval_context_changed"
     denied_execution = await _last_denied_event(session, user.id, draft.id, "execution.denied")
-    assert denied_execution.safe_metadata_json["reason_code"] == "simulated_scope_missing"
+    assert denied_execution.safe_metadata_json["reason_code"] == "approval_context_changed"
     assert set(denied_execution.safe_metadata_json) <= SAFE_DENIAL_KEYS
+
+    # The invalidated approval requires a fresh approve() before it can be
+    # retried — a second execute() must not silently reuse the stale snapshot.
+    with pytest.raises(ProposalConflictError) as replay_conflict:
+        await service.execute(draft.id)
+    assert replay_conflict.value.code == "invalid_transition"
 
 
 async def test_policy_engine_rejects_foreign_ownership_directly(
@@ -187,15 +219,18 @@ async def test_policy_engine_rejects_foreign_ownership_directly(
     user, proposals = await _seed_proposals(session)
     task = _proposal(proposals, ActionType.create_task)
     accounts = await ConnectedAccountRepository(session, user.id).list()
+    context_hash = await _displayed_execution_context_hash(session, user, task)
 
     with pytest.raises(PolicyViolationError) as violation:
         ActionPolicyEngine().validate_approval(
             task,
             user_id=uuid.uuid4(),  # a different user
             accounts=accounts,
+            evidence_sources=[],
             now=NOW,
             displayed_action_type=ActionType(task.action_type),
             displayed_payload_hash=task.payload_hash,
             displayed_version=task.version,
+            displayed_execution_context_hash=context_hash,
         )
     assert violation.value.code == "ownership_mismatch"

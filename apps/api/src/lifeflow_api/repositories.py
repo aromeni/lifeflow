@@ -39,36 +39,64 @@ class UserRepository:
         result = await self._session.execute(select(User).where(User.email == email))
         return result.scalar_one_or_none()
 
+    async def get_by_google_subject(self, google_subject: str) -> User | None:
+        result = await self._session.execute(
+            select(User).where(User.google_subject == google_subject)
+        )
+        return result.scalar_one_or_none()
+
     def add(self, user: User) -> None:
         self._session.add(user)
 
 
 class ConnectedAccountRepository:
+    """Every read here is consent/authorisation-relevant (status, granted
+    scopes, `authorisation_revision`) and therefore always uses
+    `populate_existing()` (Stage 7 focused remediation): with this app's
+    `expire_on_commit=False` session configuration, an object already in the
+    session's identity map — e.g. loaded earlier in the same request by
+    `execute()`'s own `accounts.list()` call — would otherwise silently
+    survive a commit and hand back stale attribute values even when a fresh
+    query (or a real `FOR UPDATE` lock) reads a row a concurrent transaction
+    has since changed. Never rely on this repository returning a cached
+    copy; every call re-reads the database."""
+
     def __init__(self, session: AsyncSession, user_id: uuid.UUID) -> None:
         self._session = session
         self._user_id = user_id
 
     async def get(self, account_id: uuid.UUID) -> ConnectedAccount | None:
         result = await self._session.execute(
-            select(ConnectedAccount).where(
+            select(ConnectedAccount)
+            .where(
                 ConnectedAccount.id == account_id,
                 ConnectedAccount.user_id == self._user_id,
             )
+            .execution_options(populate_existing=True)
         )
         return result.scalar_one_or_none()
 
-    async def get_by_provider(self, provider: str) -> ConnectedAccount | None:
-        result = await self._session.execute(
-            select(ConnectedAccount).where(
+    async def get_by_provider(
+        self, provider: str, *, for_update: bool = False
+    ) -> ConnectedAccount | None:
+        query = (
+            select(ConnectedAccount)
+            .where(
                 ConnectedAccount.provider == provider,
                 ConnectedAccount.user_id == self._user_id,
             )
+            .execution_options(populate_existing=True)
         )
+        if for_update:
+            query = query.with_for_update()
+        result = await self._session.execute(query)
         return result.scalar_one_or_none()
 
     async def list(self) -> list[ConnectedAccount]:
         result = await self._session.execute(
-            select(ConnectedAccount).where(ConnectedAccount.user_id == self._user_id)
+            select(ConnectedAccount)
+            .where(ConnectedAccount.user_id == self._user_id)
+            .execution_options(populate_existing=True)
         )
         return list(result.scalars())
 
@@ -140,6 +168,22 @@ class SourceItemRepository:
             query = query.where(SourceItem.occurred_at <= occurring_before)
         query = query.order_by(SourceItem.occurred_at.desc(), SourceItem.id).limit(limit)
         result = await self._session.execute(query.offset(offset))
+        return list(result.scalars())
+
+    async def list_by_external_ids(
+        self, external_ids: builtins.list[str]
+    ) -> builtins.list[SourceItem]:
+        """Resolve a proposal's `source_refs` back to their `SourceItem`
+        rows — used to determine evidence provenance (Stage 7 remediation
+        blocker #1). Owner-scoped like every other query here."""
+        if not external_ids:
+            return []
+        result = await self._session.execute(
+            select(SourceItem).where(
+                SourceItem.user_id == self._user_id,
+                SourceItem.external_id.in_(external_ids),
+            )
+        )
         return list(result.scalars())
 
     def add(self, item: SourceItem) -> None:

@@ -22,6 +22,10 @@
             ],
             "title": "Completed At"
           },
+          "effective_status": {
+            "title": "Effective Status",
+            "type": "string"
+          },
           "error_code": {
             "anyOf": [
               {
@@ -39,6 +43,9 @@
           "executed_payload_hash": {
             "title": "Executed Payload Hash",
             "type": "string"
+          },
+          "execution_mode": {
+            "$ref": "#/components/schemas/ExecutionMode"
           },
           "id": {
             "title": "Id",
@@ -61,6 +68,10 @@
             "title": "Result",
             "type": "object"
           },
+          "simulation_only": {
+            "title": "Simulation Only",
+            "type": "boolean"
+          },
           "started_at": {
             "format": "date-time",
             "title": "Started At",
@@ -71,6 +82,9 @@
           "id",
           "idempotency_key",
           "outcome",
+          "effective_status",
+          "execution_mode",
+          "simulation_only",
           "started_at",
           "completed_at",
           "action_type",
@@ -120,6 +134,16 @@
               }
             ]
           },
+          "approved_execution_context": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExecutionContextView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "audit_events": {
             "items": {
               "$ref": "#/components/schemas/ProposalAuditEvent"
@@ -152,6 +176,20 @@
                 "type": "null"
               }
             ]
+          },
+          "execution_context": {
+            "$ref": "#/components/schemas/ExecutionContextView"
+          },
+          "execution_context_changed": {
+            "title": "Execution Context Changed",
+            "type": "boolean"
+          },
+          "execution_context_hash": {
+            "title": "Execution Context Hash",
+            "type": "string"
+          },
+          "execution_mode": {
+            "$ref": "#/components/schemas/ExecutionMode"
           },
           "expires_at": {
             "format": "date-time",
@@ -192,7 +230,6 @@
             "$ref": "#/components/schemas/RiskLevel"
           },
           "simulation_only": {
-            "default": true,
             "title": "Simulation Only",
             "type": "boolean"
           },
@@ -235,7 +272,13 @@
           "rejection_reason",
           "created_at",
           "updated_at",
-          "audit_events"
+          "audit_events",
+          "execution_mode",
+          "simulation_only",
+          "execution_context",
+          "execution_context_hash",
+          "approved_execution_context",
+          "execution_context_changed"
         ],
         "title": "ActionProposalResponse",
         "type": "object"
@@ -264,6 +307,9 @@
             "title": "Binding Hash",
             "type": "string"
           },
+          "execution_context": {
+            "$ref": "#/components/schemas/ExecutionContextView"
+          },
           "payload": {
             "$ref": "#/components/schemas/TypedActionPayload"
           },
@@ -282,7 +328,8 @@
           "payload",
           "payload_hash",
           "binding_hash",
-          "approved_at"
+          "approved_at",
+          "execution_context"
         ],
         "title": "ApprovalPreview",
         "type": "object"
@@ -701,6 +748,60 @@
         "title": "CalendarEventCreatePayload",
         "type": "object"
       },
+      "ConnectedAccountView": {
+        "properties": {
+          "granted_scopes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Granted Scopes",
+            "type": "array"
+          },
+          "last_sync_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Sync At"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "provider",
+          "status",
+          "granted_scopes",
+          "last_sync_at"
+        ],
+        "title": "ConnectedAccountView",
+        "type": "object"
+      },
+      "ConnectedAccountsResponse": {
+        "properties": {
+          "accounts": {
+            "items": {
+              "$ref": "#/components/schemas/ConnectedAccountView"
+            },
+            "title": "Accounts",
+            "type": "array"
+          }
+        },
+        "required": [
+          "accounts"
+        ],
+        "title": "ConnectedAccountsResponse",
+        "type": "object"
+      },
       "DemoStartResponse": {
         "properties": {
           "imported": {
@@ -740,6 +841,46 @@
         },
         "title": "DevLoginRequest",
         "type": "object"
+      },
+      "ExecutionContextView": {
+        "description": "A safe, minimal projection of `ExecutionContext` for the frontend \u2014\ndeliberately omits `connected_account_id`/`source_account_id` and any\nrevision counter (raw internal identifiers, independent-review blocker\n#1 \u00a77).",
+        "properties": {
+          "mode": {
+            "$ref": "#/components/schemas/ExecutionMode"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "required_scope": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Required Scope"
+          }
+        },
+        "required": [
+          "mode",
+          "provider",
+          "required_scope"
+        ],
+        "title": "ExecutionContextView",
+        "type": "object"
+      },
+      "ExecutionMode": {
+        "description": "Which path would/did carry out an approved action (Stage 7\nremediation, independent-review blocker #2/#3). Resolved deterministically\nfrom the user's currently active connected accounts \u2014 never chosen\nreactively after a real call fails, and never a static default.\n\nsimulation \u2014 the demo/synthetic path (or, for `create_task`, the\nalways-local Stage 6 behaviour).\nreal \u2014 a Google-connected account with the exact required scope.\nunavailable \u2014 neither path exists yet (e.g. nothing connected); the\npolicy engine denies approval/execution in this state, so `unavailable`\nis never persisted on an `ActionExecution` row, only shown on a proposal\npreview.",
+        "enum": [
+          "simulation",
+          "real",
+          "unavailable"
+        ],
+        "title": "ExecutionMode",
+        "type": "string"
       },
       "ExtractionResponse": {
         "properties": {
@@ -833,6 +974,74 @@
           "thread_id"
         ],
         "title": "GmailDraftCreatePayload",
+        "type": "object"
+      },
+      "GoogleSyncResponse": {
+        "properties": {
+          "calendar_cursor_status": {
+            "title": "Calendar Cursor Status",
+            "type": "string"
+          },
+          "calendar_incomplete": {
+            "title": "Calendar Incomplete",
+            "type": "integer"
+          },
+          "calendar_sync_complete": {
+            "title": "Calendar Sync Complete",
+            "type": "boolean"
+          },
+          "calendar_synced": {
+            "title": "Calendar Synced",
+            "type": "boolean"
+          },
+          "gmail_cursor_status": {
+            "title": "Gmail Cursor Status",
+            "type": "string"
+          },
+          "gmail_excluded": {
+            "title": "Gmail Excluded",
+            "type": "integer"
+          },
+          "gmail_incomplete": {
+            "title": "Gmail Incomplete",
+            "type": "integer"
+          },
+          "gmail_sync_complete": {
+            "title": "Gmail Sync Complete",
+            "type": "boolean"
+          },
+          "gmail_synced": {
+            "title": "Gmail Synced",
+            "type": "boolean"
+          },
+          "imported": {
+            "title": "Imported",
+            "type": "integer"
+          },
+          "unchanged": {
+            "title": "Unchanged",
+            "type": "integer"
+          },
+          "updated": {
+            "title": "Updated",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "imported",
+          "updated",
+          "unchanged",
+          "gmail_excluded",
+          "gmail_incomplete",
+          "calendar_incomplete",
+          "gmail_synced",
+          "gmail_cursor_status",
+          "gmail_sync_complete",
+          "calendar_synced",
+          "calendar_cursor_status",
+          "calendar_sync_complete"
+        ],
+        "title": "GoogleSyncResponse",
         "type": "object"
       },
       "HTTPValidationError": {
@@ -952,6 +1161,12 @@
           "action_type": {
             "$ref": "#/components/schemas/ActionType"
           },
+          "displayed_execution_context_hash": {
+            "maxLength": 64,
+            "minLength": 64,
+            "title": "Displayed Execution Context Hash",
+            "type": "string"
+          },
           "displayed_payload_hash": {
             "maxLength": 64,
             "minLength": 64,
@@ -967,7 +1182,8 @@
         "required": [
           "expected_version",
           "action_type",
-          "displayed_payload_hash"
+          "displayed_payload_hash",
+          "displayed_execution_context_hash"
         ],
         "title": "ProposalApprovalRequest",
         "type": "object"
@@ -1128,6 +1344,19 @@
         ],
         "title": "ProposalStatus",
         "type": "string"
+      },
+      "PublicConfig": {
+        "properties": {
+          "google_oauth_enabled": {
+            "title": "Google Oauth Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "google_oauth_enabled"
+        ],
+        "title": "PublicConfig",
+        "type": "object"
       },
       "RiskLevel": {
         "enum": [
@@ -1760,6 +1989,82 @@
         "summary": "Dev Login"
       }
     },
+    "/auth/google/callback": {
+      "get": {
+        "operationId": "google_callback_auth_google_callback_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "code",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Code"
+            }
+          },
+          {
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Google Callback"
+      }
+    },
+    "/auth/google/login": {
+      "get": {
+        "operationId": "google_login_auth_google_login_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Google Login"
+      }
+    },
     "/auth/logout": {
       "post": {
         "operationId": "logout_auth_logout_post",
@@ -1887,6 +2192,148 @@
           }
         },
         "summary": "Get Brief"
+      }
+    },
+    "/config": {
+      "get": {
+        "operationId": "config_config_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicConfig"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Config"
+      }
+    },
+    "/connected-accounts": {
+      "get": {
+        "operationId": "list_connected_accounts_connected_accounts_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectedAccountsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Connected Accounts"
+      }
+    },
+    "/connected-accounts/google/callback": {
+      "get": {
+        "operationId": "google_connector_callback_connected_accounts_google_callback_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "code",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Code"
+            }
+          },
+          {
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Google Connector Callback"
+      }
+    },
+    "/connected-accounts/google/connect": {
+      "get": {
+        "operationId": "connect_google_connected_accounts_google_connect_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Connect Google"
+      }
+    },
+    "/connected-accounts/google/disconnect": {
+      "post": {
+        "operationId": "disconnect_google_connected_accounts_google_disconnect_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Disconnect Google"
+      }
+    },
+    "/connected-accounts/google/sync": {
+      "post": {
+        "description": "User-triggered, on-demand sync (never automatic on page load \u2014 see\nthreat model and ADR 0003): pulls the connected user's own Gmail/Calendar\ndata through the narrow real clients into persisted `SourceItem` rows,\nexactly as `IngestionService` already does for the synthetic connectors.",
+        "operationId": "sync_google_connected_accounts_google_sync_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoogleSyncResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Sync Google"
       }
     },
     "/demo/start": {

@@ -12,9 +12,12 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // Browser extensions can add attributes to <body> before React hydrates it.
+  // Browser extensions can add attributes to <html> and <body> before React
+  // hydrates them (e.g. a password-manager or ad-blocker's own marker
+  // attribute) — suppress the resulting mismatch warning on both root tags,
+  // not just <body>.
   return (
-    <html lang="en" className="h-full antialiased">
+    <html lang="en" className="h-full antialiased" suppressHydrationWarning>
       <body suppressHydrationWarning className="min-h-full flex flex-col">
         {children}
       </body>

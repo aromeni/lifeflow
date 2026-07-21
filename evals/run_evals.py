@@ -482,7 +482,7 @@ async def run_action_mode() -> ActionMetrics:
     _, items, reference = await load_items()
     timezone = golden["timezone"]
     item_refs = {item.external_id for item in items}
-    first = list(
+    composed_first = list(
         compose_proposal_candidates(
             _build_scored_signals(items, reference, timezone),
             items,
@@ -490,7 +490,7 @@ async def run_action_mode() -> ActionMetrics:
             timezone=timezone,
         ).candidates
     )
-    second = list(
+    composed_second = list(
         compose_proposal_candidates(
             _build_scored_signals(items, reference, timezone),
             items,
@@ -498,6 +498,23 @@ async def run_action_mode() -> ActionMetrics:
             timezone=timezone,
         ).candidates
     )
+
+    def active_selection(candidates: list) -> list:
+        """What generation would persist into an empty proposal store: the
+        first-ranked candidate per action type (ADR 0003 D36 — the composer
+        returns every ranked candidate so terminal proposals never shadow a
+        newer signal; the service still creates one active proposal per
+        type). Safety checks below still run over the FULL composed list."""
+        seen: set[str] = set()
+        selected = []
+        for candidate in candidates:
+            if str(candidate.action_type) in seen:
+                continue
+            seen.add(str(candidate.action_type))
+            selected.append(candidate)
+        return selected
+
+    first = active_selection(composed_first)
     metrics = ActionMetrics(total_proposals=len(first))
 
     def snapshot(candidate):
@@ -512,8 +529,8 @@ async def run_action_mode() -> ActionMetrics:
             "expires_at": candidate.expires_at.isoformat(),
         }
 
-    metrics.determinism_ok = [snapshot(candidate) for candidate in first] == [
-        snapshot(candidate) for candidate in second
+    metrics.determinism_ok = [snapshot(candidate) for candidate in composed_first] == [
+        snapshot(candidate) for candidate in composed_second
     ]
     by_type = {str(candidate.action_type): candidate for candidate in first}
     metrics.expected_shape_ok = set(by_type) == set(expectations["action_types"]) and all(
@@ -523,7 +540,7 @@ async def run_action_mode() -> ActionMetrics:
     )
     metrics.grounding_violations = sum(
         1
-        for candidate in first
+        for candidate in composed_first
         if not candidate.source_refs or any(ref not in item_refs for ref in candidate.source_refs)
     )
     metrics.payload_schema_violations = sum(
@@ -532,16 +549,20 @@ async def run_action_mode() -> ActionMetrics:
         if set(canonical_payload(candidate.action_type, candidate.payload))
         != set(expectations["payload_fields"][str(candidate.action_type)])
     )
-    fingerprints = [candidate.origin_fingerprint for candidate in first]
+    fingerprints = [candidate.origin_fingerprint for candidate in composed_first]
     metrics.origin_violations = sum(1 for fingerprint in fingerprints if len(fingerprint) != 64) + (
         len(fingerprints) - len(set(fingerprints))
     )
-    metrics.expiry_violations = sum(1 for candidate in first if candidate.expires_at <= reference)
+    metrics.expiry_violations = sum(
+        1 for candidate in composed_first if candidate.expires_at <= reference
+    )
     banned_refs = set(expectations["must_not_appear_refs"])
-    metrics.unsafe_refs = sum(1 for candidate in first if banned_refs & set(candidate.source_refs))
+    metrics.unsafe_refs = sum(
+        1 for candidate in composed_first if banned_refs & set(candidate.source_refs)
+    )
     combined_text = " ".join(
         f"{candidate.rationale} {json.dumps(candidate.payload.model_dump(mode='json'))}"
-        for candidate in first
+        for candidate in composed_first
     ).lower()
     metrics.unsafe_text = sum(
         1 for text in expectations["must_not_appear_text"] if text in combined_text
@@ -556,11 +577,19 @@ async def run_action_mode() -> ActionMetrics:
             for value in candidate.payload.model_dump(mode="json").values()
         )
     )
+    # A fixed placeholder context hash: this eval checks that bindings differ
+    # by payload/type/version, not execution-context binding (covered by the
+    # backend's own approval-context test suite).
+    placeholder_context_hash = "0" * 64
     bindings = [
-        approval_binding_hash(candidate.action_type, candidate.payload, 1) for candidate in first
+        approval_binding_hash(candidate.action_type, candidate.payload, 1, placeholder_context_hash)
+        for candidate in first
     ]
     metrics.approval_binding_ok = len(set(bindings)) == len(first) and all(
-        binding != approval_binding_hash(candidate.action_type, candidate.payload, 2)
+        binding
+        != approval_binding_hash(
+            candidate.action_type, candidate.payload, 2, placeholder_context_hash
+        )
         and len(action_payload_hash(candidate.action_type, candidate.payload)) == 64
         for binding, candidate in zip(bindings, first, strict=True)
     )

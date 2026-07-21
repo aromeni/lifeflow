@@ -12,6 +12,7 @@ type Proposal = {
   version: number;
   status: string;
   origin_fingerprint: string;
+  execution_context_hash: string;
   approval: null | {
     action_type: string;
     proposal_version: number;
@@ -178,6 +179,7 @@ test("approval inbox preserves exact, grounded, idempotent proposal transitions"
         expected_version: originalCalendar.version,
         action_type: originalCalendar.action_type,
         displayed_payload_hash: originalCalendar.payload_hash,
+        displayed_execution_context_hash: originalCalendar.execution_context_hash,
       },
     },
   );
@@ -191,12 +193,23 @@ test("approval inbox preserves exact, grounded, idempotent proposal transitions"
     timeout: 15_000,
   });
   const afterRegeneration = await proposalList(page.request);
-  expect(afterRegeneration).toHaveLength(3);
-  expect(afterRegeneration.map((proposal) => proposal.id).sort()).toEqual(
-    beforeRegeneration.map((proposal) => proposal.id).sort(),
+  // D36 semantics: the executed task proposal is terminal, so it no longer
+  // occupies the one active create_task slot — regeneration surfaces the
+  // next-ranked evidenced task as ONE new `proposed` proposal, while every
+  // pre-existing proposal (including the terminal ones) is preserved
+  // byte-for-byte and never retried or reopened.
+  expect(afterRegeneration).toHaveLength(4);
+  const beforeIds = new Set(beforeRegeneration.map((proposal) => proposal.id));
+  const surfaced = afterRegeneration.filter((proposal) => !beforeIds.has(proposal.id));
+  expect(surfaced).toHaveLength(1);
+  expect(surfaced[0].action_type).toBe("create_task");
+  expect(surfaced[0].status).toBe("proposed");
+  expect(beforeRegeneration.map((proposal) => proposal.origin_fingerprint)).not.toContain(
+    surfaced[0].origin_fingerprint,
   );
-  expect(afterRegeneration.map((proposal) => proposal.origin_fingerprint).sort()).toEqual(
-    beforeRegeneration.map((proposal) => proposal.origin_fingerprint).sort(),
+  const preserved = afterRegeneration.filter((proposal) => beforeIds.has(proposal.id));
+  expect(preserved.map((proposal) => proposal.id).sort()).toEqual(
+    beforeRegeneration.map((proposal) => proposal.id).sort(),
   );
   expect(afterRegeneration.flatMap((proposal) => proposal.source_refs)).not.toContain("em-004");
   expect(

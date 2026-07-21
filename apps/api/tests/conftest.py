@@ -24,7 +24,13 @@ CSRF_HEADERS = {CSRF_HEADER: "1"}
 
 
 def _test_settings(environment: str = "test") -> Settings:
+    # `_env_file=None` deliberately skips the developer's local `.env` (now
+    # that `config.py` resolves it correctly regardless of CWD, tests must
+    # not become hermetic-by-accident any more — every field the test suite
+    # cares about is set explicitly here, or must stay at its documented
+    # off-by-default value, exactly as CI sees it).
     return Settings(
+        _env_file=None,
         environment=environment,  # type: ignore[arg-type]
         log_level="WARNING",
         database_url=TEST_DB_URL,

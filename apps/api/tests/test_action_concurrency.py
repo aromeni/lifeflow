@@ -14,7 +14,14 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from tests.conftest import TEST_DB_URL
 from tests.helpers import REFERENCE, TIMEZONE, demo_source_items
-from tests.test_action_proposals import NOW, CountingExecutor, _approve, _proposal, _service
+from tests.test_action_proposals import (
+    NOW,
+    CountingExecutor,
+    _approve,
+    _displayed_execution_context_hash,
+    _proposal,
+    _service,
+)
 
 from lifeflow_api.action_executors import SimulatedExecutorRegistry
 from lifeflow_api.action_proposal_service import (
@@ -156,9 +163,15 @@ async def test_concurrent_first_generation_creates_each_origin_exactly_once(
 
 
 async def test_concurrent_execution_invokes_executor_once(session: AsyncSession) -> None:
+    """Stage 7 (ADR 0003 D16): the pending attempt is committed durably
+    BEFORE the executor is called, which necessarily releases the proposal's
+    row lock early — a concurrent replay can therefore legitimately observe
+    `executing` (mid-flight) rather than `executed`. The invariants that
+    must always hold: exactly one real executor call, both callers agree on
+    the same execution id, and the state is `executed` once both finish."""
     user, proposals = await _seed_full(session)
     task = _proposal(proposals, ActionType.create_task)
-    await _approve(_service(session, user), task)
+    await _approve(_service(session, user), task, session=session, user=user)
     await session.commit()
     executor = CountingExecutor()
 
@@ -185,7 +198,17 @@ async def test_concurrent_execution_invokes_executor_once(session: AsyncSession)
 
     assert executor.calls == 1  # exactly one real invocation; the other replays
     assert first_id == second_id
-    assert first_status == second_status == ProposalStatus.executed
+    assert {first_status, second_status} <= {ProposalStatus.executing, ProposalStatus.executed}
+
+    engine = create_async_engine(TEST_DB_URL)
+    try:
+        maker = async_sessionmaker(engine, expire_on_commit=False)
+        async with maker() as reader:
+            final = await ActionProposalRepository(reader, user.id).get(task.id)
+            assert final is not None
+            assert final.status == ProposalStatus.executed
+    finally:
+        await engine.dispose()
 
 
 async def test_concurrent_approve_and_edit_stay_controlled_and_consistent(
@@ -194,6 +217,7 @@ async def test_concurrent_approve_and_edit_stay_controlled_and_consistent(
     user, proposals = await _seed_full(session)
     task = _proposal(proposals, ActionType.create_task)
     edited_payload = {**task.payload_json, "title": "Edited concurrently"}
+    context_hash = await _displayed_execution_context_hash(session, user, task)
 
     async def approve_task() -> object:
         engine = create_async_engine(TEST_DB_URL)
@@ -206,6 +230,7 @@ async def test_concurrent_approve_and_edit_stay_controlled_and_consistent(
                     expected_version=task.version,
                     action_type=ActionType.create_task,
                     displayed_payload_hash=task.payload_hash,
+                    displayed_execution_context_hash=context_hash,
                 )
                 await racing.commit()
                 return proposal.status

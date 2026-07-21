@@ -1,8 +1,8 @@
 # Delivery Stage Plan
 
-**Status:** Stage 6 complete pending approval (Stages 0–5 approved) · **Date:** 2026-07-16
+**Status:** Stage 7 in progress (Stages 0–6 approved) · **Date:** 2026-07-17
 
-**Active stage: 6 (complete pending approval).** Stage 7 is not active and cannot begin without explicit human approval of the Stage 6 completion report. Silence is never approval. Commits are made only when explicitly requested.
+**Active stage: 7 (real Google integration, in progress).** Stage 8 is not active and cannot begin without explicit human approval of the Stage 7 completion report. Silence is never approval. Commits are made only when explicitly requested.
 
 Guiding rule: *build one trustworthy end-to-end loop, prove it with tests and evidence, then expand deliberately.* The first end-to-end path is:
 
@@ -22,8 +22,8 @@ Gmail + Calendar → Daily Brief → Proposed Action → Approval → Execution 
 | 3 — Demo mode & synthetic connectors (approved) | First vertical slice, no credentials | Demo user sees coherent normalised information | 2 |
 | 4 — Signals & priority engine (approved) | Defensible prioritised signals | Requests/deadlines/follow-ups/conflicts ranked with evidence; injection fixtures safe | 3 |
 | 5 — Daily brief (approved) | First genuinely useful outcome | Brief understandable in < 2 min; every actionable statement evidenced | 4 |
-| **6 — Proposals & approval inbox** (complete pending approval) | Safe, editable next steps | Inspect/edit/approve/reject/trace with zero hidden side effects | 5 |
-| 7 — Real Google integration | Proven workflow on real data | Test user connects Google, gets brief, approves draft/event, sees audit | 6 |
+| 6 — Proposals & approval inbox (approved) | Safe, editable next steps | Inspect/edit/approve/reject/trace with zero hidden side effects | 5 |
+| **7 — Real Google integration** (in progress) | Proven workflow on real data | Test user connects Google, gets brief, approves draft/event, sees audit | 6 |
 | 8 — Preferences, memory, schedule | Transparent adaptation | Scheduled brief at configured time reflecting visible preferences | 7 |
 | 9 — Privacy, audit UX, resilience | Trust features operational | Users control data; product fails safely in outages | 8 |
 | 10 — Evaluation & pilot readiness | Evidence of usefulness | Acceptance targets met or exceptions documented; pilot pack ready | 9 |

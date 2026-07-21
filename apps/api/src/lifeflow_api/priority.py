@@ -56,6 +56,8 @@ def _deadline_proximity(due_at: datetime | None, reference: datetime) -> tuple[f
 def _request_strength(signal: DetectedSignal) -> float:
     if signal.signal_type == SignalType.request:
         return 0.9 if "explicit_request" in signal.reason_codes else 0.4
+    if signal.signal_type == SignalType.schedule_request:
+        return 0.9  # always an explicit ask, by definition of the cue set
     if signal.signal_type == SignalType.commitment:
         return 0.6  # a promise you made carries request-like weight
     return 0.0
@@ -67,6 +69,7 @@ def _importance(signal: DetectedSignal) -> float:
         SignalType.conflict: 0.8,
         SignalType.deadline: 0.7,
         SignalType.request: 0.6,
+        SignalType.schedule_request: 0.6,
         SignalType.commitment: 0.6,
         SignalType.follow_up: 0.5,
         SignalType.meeting: 0.4,

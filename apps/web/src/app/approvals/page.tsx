@@ -9,6 +9,19 @@ import type { ActionProposal, ActionProposalList, Me } from "@/lib/types";
 
 type LoadState = "loading" | "ready" | "unauthenticated" | "error";
 
+// A real action must never be presented as simulated (independent-review
+// blocker #4) — this header must stay in sync with each proposal's own
+// execution_mode, not assume the whole inbox is simulated.
+function executionSummary(proposals: ActionProposal[]): string {
+  const count = proposals.length;
+  const label = `${count} proposal${count === 1 ? "" : "s"}`;
+  const realCount = proposals.filter((proposal) => proposal.execution_mode === "real").length;
+  if (realCount === 0) {
+    return `${label} · simulated execution only`;
+  }
+  return `${label} · ${realCount} will make a real change to your connected Google account if approved`;
+}
+
 export default function ApprovalsPage() {
   const [state, setState] = useState<LoadState>("loading");
   const [timezone, setTimezone] = useState("Europe/London");
@@ -66,8 +79,7 @@ export default function ApprovalsPage() {
         <p aria-live="polite" className="text-sm opacity-70">
           {state === "loading" && "Loading action proposals…"}
           {state === "error" && "Could not load action proposals. Is the API running?"}
-          {state === "ready" &&
-            `${proposals.length} proposal${proposals.length === 1 ? "" : "s"} · simulated execution only`}
+          {state === "ready" && executionSummary(proposals)}
         </p>
       </header>
 
