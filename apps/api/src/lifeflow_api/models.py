@@ -19,6 +19,7 @@ from typing import Any
 
 from sqlalchemy import (
     JSON,
+    CheckConstraint,
     DateTime,
     Float,
     ForeignKey,
@@ -62,6 +63,10 @@ class SignalType(StrEnum):
     commitment = "commitment"
     deadline = "deadline"
     meeting = "meeting"
+    # An explicit, evidenced ask to put something on the calendar (ADR 0003
+    # D39) — distinct from `request` (generic, answered with a reply draft)
+    # and from `meeting` (an event that already exists on a calendar).
+    schedule_request = "schedule_request"
     follow_up = "follow_up"
     conflict = "conflict"
 
@@ -93,6 +98,47 @@ class ProposalStatus(StrEnum):
     expired = "expired"
 
 
+class ExecutionOutcome(StrEnum):
+    """Stage 7 (ADR 0003 D16): the true state of an external attempt.
+
+    pending — the attempt is durably recorded but the executor call has not
+    yet resolved (or the process died before it could). A `pending` row
+    older than the staleness threshold is treated as `uncertain`, never left
+    ambiguous forever and never silently retried.
+    uncertain — the executor call could not be confirmed to have succeeded
+    or failed (timeout, connection error, 5xx, or an unverifiable echoed
+    resource). This is a distinct, honest terminal-for-now state — not a
+    failure and not a success. `ProposalStatus` stays `executing` while an
+    execution is `pending` or `uncertain`; the API derives an
+    `effective_status` from this column instead.
+    """
+
+    pending = "pending"
+    succeeded = "succeeded"
+    failed = "failed"
+    uncertain = "uncertain"
+
+
+class ExecutionMode(StrEnum):
+    """Which path would/did carry out an approved action (Stage 7
+    remediation, independent-review blocker #2/#3). Resolved deterministically
+    from the user's currently active connected accounts — never chosen
+    reactively after a real call fails, and never a static default.
+
+    simulation — the demo/synthetic path (or, for `create_task`, the
+    always-local Stage 6 behaviour).
+    real — a Google-connected account with the exact required scope.
+    unavailable — neither path exists yet (e.g. nothing connected); the
+    policy engine denies approval/execution in this state, so `unavailable`
+    is never persisted on an `ActionExecution` row, only shown on a proposal
+    preview.
+    """
+
+    simulation = "simulation"
+    real = "real"
+    unavailable = "unavailable"
+
+
 class Provenance(StrEnum):
     explicit = "explicit"
     inferred = "inferred"
@@ -116,6 +162,10 @@ class User(Base):
     locale: Mapped[str] = mapped_column(String(16), default="en-GB")
     onboarding_state: Mapped[str] = mapped_column(String(20), default=OnboardingState.new)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # Google ID token `sub` claim — the sole identity key for Google sign-in
+    # (ADR 0003 D15). NULL for dev-login users. Never matched by email; no
+    # automatic account linking.
+    google_subject: Mapped[str | None] = mapped_column(String(255), unique=True)
 
 
 class ConnectedAccount(Base):
@@ -132,6 +182,20 @@ class ConnectedAccount(Base):
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     status: Mapped[str] = mapped_column(String(20), default=AccountStatus.active)
     last_sync_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Incremental-sync cursors keyed by source type, e.g. {"gmail": {...},
+    # "calendar": {...}} — each value a serialised `GoogleSyncCursor`
+    # (committed cursor kept separate from mid-pagination continuation state,
+    # Stage 7 remediation blocker #3). The two APIs' cursor types are
+    # unrelated and never share a slot (ADR 0003 D21).
+    sync_cursors: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    # Monotonic counter (Stage 7 remediation blocker #1): incremented every
+    # time connector consent is (re)granted — new connect, reconnect, a
+    # materially different scope grant, or a disconnect-then-reconnect.
+    # Never incremented for an ordinary access-token refresh
+    # (`GoogleTokenService.get_valid_access_token`), so an approval stays
+    # valid across routine refreshes but goes stale the moment the
+    # underlying authorisation actually changes.
+    authorisation_revision: Mapped[int] = mapped_column(default=1)
 
 
 class SourceItem(Base):
@@ -188,8 +252,10 @@ class BriefStatus(StrEnum):
     degraded — optional LLM prose failed or was rejected; the deterministic
     fallback summary is shown. Facts are unaffected (they never come from
     the LLM).
-    partial — one or more configured sources are unavailable, or a persisted
-    signal was omitted because its source evidence could not be resolved.
+    partial — one or more configured sources are unavailable, a persisted
+    signal was omitted because its source evidence could not be resolved, or
+    an action-proposal candidate was skipped because its source data could
+    not be validated.
     """
 
     complete = "complete"
@@ -223,21 +289,89 @@ class Brief(Base):
 
 class ActionProposal(Base):
     __tablename__ = "action_proposals"
+    __table_args__ = (
+        UniqueConstraint("user_id", "origin_fingerprint", name="uq_action_proposals_user_origin"),
+        CheckConstraint(
+            "action_type IN ('create_task', 'create_gmail_draft', 'create_calendar_event')",
+            name="ck_action_proposals_action_type",
+        ),
+        CheckConstraint("risk_level IN ('low', 'medium')", name="ck_action_proposals_risk"),
+        CheckConstraint(
+            "status IN ('proposed', 'edited', 'approved', 'rejected', "
+            "'executing', 'executed', 'failed', 'expired')",
+            name="ck_action_proposals_status",
+        ),
+        CheckConstraint("version >= 1", name="ck_action_proposals_version"),
+        # NULL passes a SQL CHECK (unknown = pass) so this only ever
+        # constrains an approved row — `unavailable` is never persisted here
+        # (Stage 7 remediation blocker #1).
+        CheckConstraint(
+            "approved_execution_mode IN ('simulation', 'real')",
+            name="ck_action_proposals_approved_execution_mode",
+        ),
+    )
 
     id: Mapped[uuid.UUID] = _uuid_pk()
     user_id: Mapped[uuid.UUID] = _user_fk()
+    origin_brief_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("briefs.id", ondelete="SET NULL"), index=True
+    )
+    origin_fingerprint: Mapped[str] = mapped_column(String(64))
     action_type: Mapped[str] = mapped_column(String(40))
     rationale: Mapped[str] = mapped_column(Text)
     source_refs: Mapped[list[str]] = mapped_column(JSON, default=list)
     payload_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    payload_hash: Mapped[str] = mapped_column(String(64))
+    version: Mapped[int] = mapped_column(default=1)
     risk_level: Mapped[str] = mapped_column(String(10))
     confidence: Mapped[float] = mapped_column(Float)
     status: Mapped[str] = mapped_column(String(20), default=ProposalStatus.proposed)
-    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    approved_action_type: Mapped[str | None] = mapped_column(String(40))
+    approved_payload_json: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    approved_payload_hash: Mapped[str | None] = mapped_column(String(64))
+    approved_binding_hash: Mapped[str | None] = mapped_column(String(64))
+    approved_version: Mapped[int | None] = mapped_column()
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Immutable approval-bound execution-context snapshot (Stage 7
+    # remediation blocker #1): captured once, at approval, from
+    # `execution_context.resolve_execution_context()`. `execute()` must
+    # revalidate the CURRENT context against this exact snapshot and refuse
+    # to run on any difference — never recompute "what would run now" and
+    # trust it blindly.
+    approved_execution_mode: Mapped[str | None] = mapped_column(String(20))
+    approved_provider: Mapped[str | None] = mapped_column(String(20))
+    approved_connected_account_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("connected_accounts.id", ondelete="SET NULL")
+    )
+    approved_authorisation_revision: Mapped[int | None] = mapped_column()
+    approved_required_scope: Mapped[str | None] = mapped_column(String(200))
+    approved_source_account_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("connected_accounts.id", ondelete="SET NULL")
+    )
+    approved_execution_context_hash: Mapped[str | None] = mapped_column(String(64))
+    user_edited_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    rejected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    rejection_reason: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
 
 class ActionExecution(Base):
     __tablename__ = "action_executions"
+    __table_args__ = (
+        UniqueConstraint("proposal_id", name="uq_action_executions_proposal"),
+        CheckConstraint(
+            "outcome IN ('pending', 'succeeded', 'failed', 'uncertain')",
+            name="ck_action_executions_outcome",
+        ),
+        CheckConstraint(
+            "execution_mode IN ('simulation', 'real')",
+            name="ck_action_executions_execution_mode",
+        ),
+    )
 
     id: Mapped[uuid.UUID] = _uuid_pk()
     proposal_id: Mapped[uuid.UUID] = mapped_column(
@@ -246,6 +380,20 @@ class ActionExecution(Base):
     # Duplicate execution attempts collide here instead of acting twice
     # (threat model T12).
     idempotency_key: Mapped[str] = mapped_column(String(128), unique=True)
+    approved_action_type: Mapped[str] = mapped_column(String(40))
+    approved_proposal_version: Mapped[int] = mapped_column()
+    executed_payload_json: Mapped[dict[str, Any]] = mapped_column(JSON)
+    executed_payload_hash: Mapped[str] = mapped_column(String(64))
+    approval_binding_hash: Mapped[str] = mapped_column(String(64))
+    # Which path actually ran (Stage 7 remediation): persisted at creation,
+    # never recomputed later, so a historical record stays truthful even if
+    # the user's connected accounts change afterwards.
+    execution_mode: Mapped[str] = mapped_column(String(20))
+    # pending/succeeded/failed/uncertain (ADR 0003 D16). Durably committed as
+    # `pending` before any real external call is made, independent of the
+    # request's main transaction, so a crash or network failure cannot erase
+    # the fact that an attempt happened.
+    outcome: Mapped[str] = mapped_column(String(20), default=ExecutionOutcome.pending)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     result_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)

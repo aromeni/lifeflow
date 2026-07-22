@@ -3,14 +3,14 @@
 import pytest
 from tests.helpers import REFERENCE, TIMEZONE, demo_source_items
 
-from lifeflow_api.detectors import run_deterministic_detectors
+from lifeflow_api.detectors import INVALID_ATTENDEES_METADATA, run_deterministic_detectors
 from lifeflow_api.models import SignalType
 
 
 @pytest.fixture
 async def signals():
     items = await demo_source_items()
-    return run_deterministic_detectors(items, reference=REFERENCE, timezone=TIMEZONE)
+    return run_deterministic_detectors(items, reference=REFERENCE, timezone=TIMEZONE).signals
 
 
 def by_type(signals, signal_type):
@@ -89,3 +89,42 @@ async def test_every_signal_carries_evidence_and_reasons(signals) -> None:
         assert signal.evidence_refs, f"{signal.title} lacks evidence"
         assert signal.reason_codes, f"{signal.title} lacks reason codes"
         assert 0.0 <= signal.confidence <= 1.0
+
+
+async def test_malformed_metadata_never_aborts_detection() -> None:
+    """Untrusted-metadata boundary: a malformed SourceItem degrades only its
+    own detection — never a TypeError/KeyError that aborts the whole run."""
+    items = await demo_source_items()
+    by_id = {item.external_id: item for item in items}
+    # Timezone-naive end on one side of the known ev-002/ev-003 conflict pair:
+    # the conflict calculation is skipped, never computed against a guessed zone.
+    by_id["ev-002"].metadata_json = {
+        **by_id["ev-002"].metadata_json,
+        "ends_at": "2026-07-16T11:00:00",
+    }
+    # Attendees that cannot establish a count suppress that meeting only.
+    by_id["ev-007"].metadata_json = {**by_id["ev-007"].metadata_json, "attendees": 7}
+    # Non-list recipients on a sent email must not break commitment detection.
+    by_id["em-015"].metadata_json = {
+        **by_id["em-015"].metadata_json,
+        "recipients": {"to": "someone@example.com"},
+    }
+
+    result = run_deterministic_detectors(items, reference=REFERENCE, timezone=TIMEZONE)
+    detected = result.signals
+
+    assert not by_type(detected, SignalType.conflict)  # skipped, not guessed
+    meetings = evidence(by_type(detected, SignalType.meeting))
+    assert "ev-007" not in meetings
+    assert {"ev-001", "ev-002", "ev-011"} <= meetings  # other meetings survive
+    assert "em-015" in evidence(by_type(detected, SignalType.commitment))
+    assert "em-001" in evidence(by_type(detected, SignalType.request))
+
+    # Whole-value malformed attendees (ev-007) is reported as a safe
+    # diagnostic — a fixed code and the source item's own id only, never the
+    # malformed value itself.
+    assert len(result.diagnostics) == 1
+    diagnostic = result.diagnostics[0]
+    assert diagnostic.code == INVALID_ATTENDEES_METADATA
+    assert diagnostic.severity == "warning"
+    assert diagnostic.source_item_id == "ev-007"

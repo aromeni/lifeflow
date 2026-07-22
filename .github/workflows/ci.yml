@@ -82,6 +82,21 @@ jobs:
           git diff --exit-code packages/contracts \
             || { echo "::error::packages/contracts is stale — run ./scripts/generate-contracts.sh and commit the result."; exit 1; }
 
+  evaluations:
+    name: Evaluations — signals, briefs, action proposals
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - run: cd apps/api && uv sync --locked
+      - run: ./scripts/run-evals.sh det
+      - run: ./scripts/run-evals.sh det+mock
+      - run: ./scripts/run-evals.sh brief
+      - run: ./scripts/run-evals.sh brief+mock
+      - run: ./scripts/run-evals.sh actions
+
   e2e:
     name: E2E — demo journey (Playwright)
     runs-on: ubuntu-latest

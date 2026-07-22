@@ -105,6 +105,33 @@ test("offers first-time generation when no brief exists yet", async () => {
   expect(await screen.findByText(/1 item needs attention/)).toBeInTheDocument();
 });
 
+test("issues one generation request and disables the control while it is in flight", async () => {
+  let resolveGeneration: (value: Brief) => void = () => undefined;
+  const pendingGeneration = new Promise<Brief>((resolve) => {
+    resolveGeneration = resolve;
+  });
+  apiMock.mockImplementation(async (path: string) => {
+    if (path === "/me") return me;
+    if (path === "/briefs/latest") return brief;
+    if (path === "/briefs/generate") return pendingGeneration;
+    throw new Error(`unexpected ${path}`);
+  });
+
+  render(<TodayPage />);
+  expect(await screen.findByText(/version 2/)).toBeInTheDocument();
+  const button = screen.getByRole("button", { name: "Generate brief" });
+  const user = userEvent.setup();
+
+  await user.click(button);
+  expect(button).toBeDisabled();
+  await user.click(button);
+  expect(apiMock.mock.calls.filter(([path]) => path === "/briefs/generate")).toHaveLength(1);
+
+  resolveGeneration({ ...brief, id: "b2", version: 3 });
+  expect(await screen.findByText(/version 3/)).toBeInTheDocument();
+  expect(button).toBeEnabled();
+});
+
 test("shows the honest degraded note when model assistance was unavailable", async () => {
   apiMock.mockImplementation(async (path: string) => {
     if (path === "/me") return me;

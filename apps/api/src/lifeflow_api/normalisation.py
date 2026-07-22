@@ -33,6 +33,7 @@ def email_to_source_item(
         "recipients": sorted(message.recipients),
         "thread_id": message.thread_id,
         "body_preview": message.body_text[:_PREVIEW_CHARS],
+        "list_unsubscribe": message.list_unsubscribe,
     }
     return SourceItem(
         user_id=user_id,

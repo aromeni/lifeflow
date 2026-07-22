@@ -5,13 +5,21 @@ is never committed). See the root .env.example for the documented set.
 """
 
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# `.env` lives at the repo root, but this module is imported with the process
+# CWD set to wherever uvicorn/pytest was launched from (commonly `apps/api`,
+# per the documented dev command) — a plain relative "`.env`" would silently
+# resolve against that CWD and find nothing there. Anchor it to this file's
+# location instead so `.env` loads correctly regardless of invocation CWD.
+_ENV_FILE = Path(__file__).resolve().parents[4] / ".env"
+
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=_ENV_FILE, extra="ignore")
 
     environment: Literal["development", "test", "production"] = "development"
     log_level: str = "INFO"
@@ -36,6 +44,22 @@ class Settings(BaseSettings):
     llm_extraction_enabled: bool = False
     anthropic_api_key: str = ""
     anthropic_model: str = "claude-opus-4-8"
+
+    # Real Google integration (Stage 7, ADR 0003) — disabled by default. Demo
+    # mode, dev-login, and the synthetic connectors never depend on any of
+    # these being set. When enabled, BOTH client configs below are required
+    # or the app refuses to start (ADR 0003 D23).
+    google_oauth_enabled: bool = False
+    # App sign-in (OIDC): openid+email+profile only, never mailbox access
+    # (ADR 0003 D10). Deliberately a separate client from the one below.
+    google_oidc_client_id: str = ""
+    google_oidc_client_secret: str = ""
+    google_oidc_redirect_uri: str = ""
+    # Connector consent (Gmail/Calendar data scopes), requested only from the
+    # Connections screen after the user already has a LifeFlow session.
+    google_connector_client_id: str = ""
+    google_connector_client_secret: str = ""
+    google_connector_redirect_uri: str = ""
 
 
 @lru_cache

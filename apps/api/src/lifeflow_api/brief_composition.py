@@ -19,6 +19,7 @@ from zoneinfo import ZoneInfo
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from lifeflow_api.action_proposal_service import ActionProposalService
 from lifeflow_api.audit import record_audit_event
 from lifeflow_api.extraction import ExtractionSummary, SignalExtractionService
 from lifeflow_api.llm.provider import LLMProvider, LLMProviderError
@@ -31,6 +32,7 @@ from lifeflow_api.models import (
     SourceItem,
     SourceType,
 )
+from lifeflow_api.preferences import enabled_brief_sections
 from lifeflow_api.repositories import (
     BriefRepository,
     ConnectedAccountRepository,
@@ -65,6 +67,7 @@ SECTION_ORDER = tuple(BriefSectionKey)
 
 ACTIONABLE_TYPES = {
     SignalType.request,
+    SignalType.schedule_request,
     SignalType.commitment,
     SignalType.deadline,
     SignalType.follow_up,
@@ -173,6 +176,9 @@ def _suggested_action(signal_type: SignalType, section: BriefSectionKey) -> str 
         return None
     return {
         SignalType.request: "Review the request and decide how to respond.",
+        SignalType.schedule_request: (
+            "Review the scheduling request and the prepared calendar event."
+        ),
         SignalType.commitment: "Review the commitment and plan the next step.",
         SignalType.deadline: "Review the deadline and decide what to complete.",
         SignalType.follow_up: "Decide whether to follow up.",
@@ -270,8 +276,30 @@ def compose_sections(signals: list[Signal], source_items: list[SourceItem]) -> C
     return ComposedSections(sections=sections, included_signals=included, omitted_signals=omitted)
 
 
+def _count_filtered_solo_events(sources: list[SourceItem], *, reference: datetime) -> int:
+    """Future, timed calendar events the meeting detector's two-attendee
+    threshold keeps out of "Today and upcoming". Malformed attendee metadata
+    is not counted here — it is already surfaced through detection
+    diagnostics as a data-quality notice."""
+    count = 0
+    for item in sources:
+        if item.source_type != SourceType.calendar_event:
+            continue
+        if item.metadata_json.get("all_day") or item.occurred_at < reference:
+            continue
+        raw = item.metadata_json.get("attendees")
+        if raw is not None and not isinstance(raw, list):
+            continue
+        if (len(raw) if isinstance(raw, list) else 0) < 2:
+            count += 1
+    return count
+
+
 def deterministic_summary(sections: list[BriefSection]) -> str:
-    counts = {section.key: len(section.items) for section in sections}
+    # `.get(..., 0)` because a section the user has chosen to hide (ADR 0004
+    # D45) is absent from the displayed list entirely.
+    counts = {key: 0 for key in SECTION_ORDER}
+    counts.update({section.key: len(section.items) for section in sections})
     if not sum(counts.values()):
         return (
             "There is nothing to review yet. Generate again after source information is available."
@@ -351,6 +379,21 @@ class BriefService:
         sources = await SourceItemRepository(self._session, self._user_id).list(limit=1000)
         composed = compose_sections(signals, sources)
 
+        # Display-level adaptation only (ADR 0004 D44/D45): the user's chosen
+        # sections filter what the brief SHOWS — extraction, persistence, and
+        # proposal generation below always run on the full composition, and
+        # `needs_attention` can never be hidden. The pure `compose_sections`
+        # eval boundary is untouched.
+        enabled_sections = await enabled_brief_sections(self._session, self._user_id)
+        displayed_sections = [
+            section for section in composed.sections if str(section.key) in enabled_sections
+        ]
+        sections_disabled = sorted(
+            str(section.key)
+            for section in composed.sections
+            if str(section.key) not in enabled_sections
+        )
+
         accounts = await ConnectedAccountRepository(self._session, self._user_id).list()
         inactive_accounts = [
             account for account in accounts if account.status != AccountStatus.active
@@ -378,12 +421,31 @@ class BriefService:
                     ),
                 )
             )
+        # Truthful display-policy disclosure (ADR 0003 D41): "Today and
+        # upcoming" lists meetings (two or more attendees). A synced solo
+        # event is healthy data that this policy intentionally leaves out —
+        # say so, so a quiet Today page is never mistaken for a sync failure.
+        filtered_events = _count_filtered_solo_events(sources, reference=reference)
+        if filtered_events:
+            notices.append(
+                BriefNotice(
+                    code="calendar_events_not_listed",
+                    message=(
+                        f"{filtered_events} synced calendar event"
+                        f"{'s' if filtered_events != 1 else ''} with fewer than two attendees "
+                        f"{'are' if filtered_events != 1 else 'is'} not listed under Today and "
+                        "upcoming. "
+                        f"{'They' if filtered_events != 1 else 'It'} synced correctly and "
+                        "your calendar is unchanged."
+                    ),
+                )
+            )
 
-        summary = deterministic_summary(composed.sections)
+        summary = deterministic_summary(displayed_sections)
         prose_state = "not_configured"
         llm_summary_used = False
         llm_summary_failed = False
-        allowed = allowed_summary_sentences(composed.sections)
+        allowed = allowed_summary_sentences(displayed_sections)
         if self._provider is not None and allowed:
             try:
                 output = await self._provider.generate_structured(
@@ -433,8 +495,17 @@ class BriefService:
                     ),
                 )
             )
+        if extraction.diagnostic_counts:
+            notices.append(
+                BriefNotice(
+                    code="signal_data_quality",
+                    message="Some calendar information could not be processed.",
+                )
+            )
 
-        partial = bool(inactive_accounts or composed.omitted_signals)
+        partial = bool(
+            inactive_accounts or composed.omitted_signals or extraction.diagnostic_counts
+        )
         degraded = extraction.llm_failed or llm_summary_failed
         if partial:
             status = BriefStatus.partial
@@ -452,7 +523,7 @@ class BriefService:
         briefs = BriefRepository(self._session, self._user_id)
         version = await briefs.next_version(briefing_date)
         section_counts = {str(section.key): len(section.items) for section in composed.sections}
-        document = BriefDocument(sections=composed.sections, notices=notices)
+        document = BriefDocument(sections=displayed_sections, notices=notices)
         metadata = {
             "composer_version": COMPOSER_VERSION,
             "reference_at": reference.astimezone(UTC).isoformat(),
@@ -463,6 +534,7 @@ class BriefService:
             "included_signal_count": composed.included_signals,
             "omitted_signal_count": composed.omitted_signals,
             "section_counts": section_counts,
+            "sections_disabled": sections_disabled,
             "extraction_versions": sorted({signal.extraction_version for signal in signals}),
             "extraction": asdict(extraction),
             "prose_state": prose_state,
@@ -483,6 +555,40 @@ class BriefService:
         briefs.add(brief)
         await self._session.flush()
         await self._session.refresh(brief)
+        proposal_generation = await ActionProposalService(
+            self._session, self._user_id
+        ).generate_from_brief(
+            brief=brief,
+            signals=signals,
+            sources=sources,
+            timezone=timezone,
+            reference=reference,
+        )
+        brief.model_metadata = {
+            **metadata,
+            "proposal_generation": asdict(proposal_generation),
+        }
+        if proposal_generation.skipped:
+            # A candidate action could not be prepared safely from its source
+            # data. The brief itself is unaffected; state it honestly without
+            # exposing any source content, and mark the brief partial.
+            count = proposal_generation.skipped
+            notices.append(
+                BriefNotice(
+                    code="proposal_candidates_skipped",
+                    message=(
+                        f"{count} suggested action{'s' if count != 1 else ''} could not be "
+                        "prepared safely from the source data and "
+                        f"{'were' if count != 1 else 'was'} skipped."
+                    ),
+                )
+            )
+            brief.sections_json = BriefDocument(
+                sections=displayed_sections, notices=notices
+            ).model_dump(mode="json")
+            if brief.status == BriefStatus.complete:
+                brief.status = BriefStatus.partial
+                status = BriefStatus.partial
         record_audit_event(
             self._session,
             user_id=self._user_id,
@@ -498,6 +604,12 @@ class BriefService:
                 "omitted_signals": composed.omitted_signals,
                 "llm_summary_used": llm_summary_used,
                 "llm_summary_failed": llm_summary_failed,
+                "proposals_created": proposal_generation.created,
+                "proposals_updated": proposal_generation.updated,
+                "proposals_unchanged": proposal_generation.unchanged,
+                "proposals_preserved": proposal_generation.preserved,
+                "proposals_skipped": proposal_generation.skipped,
+                "detection_diagnostics": extraction.diagnostic_counts,
             },
         )
         await self._session.flush()

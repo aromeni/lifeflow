@@ -63,7 +63,7 @@ async def user_with_items(session: AsyncSession) -> User:
 
 async def test_dedupe_prefers_deterministic_signals() -> None:
     items = await demo_source_items()
-    detected = run_deterministic_detectors(items, reference=REFERENCE, timezone=TIMEZONE)
+    detected = run_deterministic_detectors(items, reference=REFERENCE, timezone=TIMEZONE).signals
     duplicate = detected[0]
     assert deduplicate([*detected, duplicate]) == deduplicate(detected)
     assert dedupe_key(duplicate) == dedupe_key(detected[0])

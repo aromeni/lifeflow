@@ -21,8 +21,19 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 TOTAL_STAGES = 12  # stages 0-11
 
-EXCLUDED_DIRS = {".venv", "node_modules", ".next", "__pycache__", ".git", ".ruff_cache",
-                 ".pytest_cache", ".mypy_cache", "coverage", "htmlcov"}
+EXCLUDED_DIRS = {
+    ".venv",
+    "node_modules",
+    ".next",
+    ".next-dev",
+    "__pycache__",
+    ".git",
+    ".ruff_cache",
+    ".pytest_cache",
+    ".mypy_cache",
+    "coverage",
+    "htmlcov",
+}
 
 
 def count_files(bases: list[str], suffixes: tuple[str, ...]) -> int:
@@ -87,9 +98,14 @@ def main() -> int:
     )
     api_tests, api_coverage = backend_tests_and_coverage()
     web = web_tests()
-    e2e_specs = len(
-        re.findall(r"^test\(", (ROOT / "apps/web/e2e/demo-brief.spec.ts").read_text(), re.M)
-    ) if (ROOT / "apps/web/e2e").exists() else 0
+    e2e_specs = (
+        sum(
+            len(re.findall(r"^test\(", path.read_text(), re.M))
+            for path in (ROOT / "apps/web/e2e").glob("*.spec.ts")
+        )
+        if (ROOT / "apps/web/e2e").exists()
+        else 0
+    )
     current_stage, completed = stage_progress()
 
     doc = f"""# Repository Metrics

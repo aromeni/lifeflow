@@ -4,6 +4,92 @@
  */
 
 export interface paths {
+    "/action-proposals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Action Proposals */
+        get: operations["list_action_proposals_action_proposals_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/action-proposals/{proposal_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Action Proposal */
+        get: operations["get_action_proposal_action_proposals__proposal_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Edit Action Proposal */
+        patch: operations["edit_action_proposal_action_proposals__proposal_id__patch"];
+        trace?: never;
+    };
+    "/action-proposals/{proposal_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve Action Proposal */
+        post: operations["approve_action_proposal_action_proposals__proposal_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/action-proposals/{proposal_id}/execute": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Execute Action Proposal */
+        post: operations["execute_action_proposal_action_proposals__proposal_id__execute_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/action-proposals/{proposal_id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reject Action Proposal */
+        post: operations["reject_action_proposal_action_proposals__proposal_id__reject_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/dev-login": {
         parameters: {
             query?: never;
@@ -15,6 +101,40 @@ export interface paths {
         put?: never;
         /** Dev Login */
         post: operations["dev_login_auth_dev_login_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/google/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Google Callback */
+        get: operations["google_callback_auth_google_callback_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/google/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Google Login */
+        get: operations["google_login_auth_google_login_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -106,6 +226,114 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Config */
+        get: operations["config_config_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/connected-accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Connected Accounts */
+        get: operations["list_connected_accounts_connected_accounts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/connected-accounts/google/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Google Connector Callback */
+        get: operations["google_connector_callback_connected_accounts_google_callback_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/connected-accounts/google/connect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Connect Google */
+        get: operations["connect_google_connected_accounts_google_connect_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/connected-accounts/google/disconnect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Disconnect Google */
+        post: operations["disconnect_google_connected_accounts_google_disconnect_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/connected-accounts/google/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sync Google
+         * @description User-triggered, on-demand sync (never automatic on page load — see
+         *     threat model and ADR 0003): pulls the connected user's own Gmail/Calendar
+         *     data through the narrow real clients into persisted `SourceItem` rows,
+         *     exactly as `IngestionService` already does for the synthetic connectors.
+         */
+        post: operations["sync_google_connected_accounts_google_sync_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/demo/start": {
         parameters: {
             query?: never;
@@ -156,6 +384,40 @@ export interface paths {
         head?: never;
         /** Update Me */
         patch: operations["update_me_me_patch"];
+        trace?: never;
+    };
+    "/preferences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Preferences */
+        get: operations["list_preferences_preferences_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/preferences/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set Preference */
+        put: operations["set_preference_preferences__key__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/ready": {
@@ -230,6 +492,126 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** ActionExecutionResponse */
+        ActionExecutionResponse: {
+            action_type: components["schemas"]["ActionType"];
+            /** Approval Binding Hash */
+            approval_binding_hash: string;
+            /** Completed At */
+            completed_at: string | null;
+            /** Effective Status */
+            effective_status: string;
+            /** Error Code */
+            error_code: string | null;
+            executed_payload: components["schemas"]["TypedActionPayload"];
+            /** Executed Payload Hash */
+            executed_payload_hash: string;
+            execution_mode: components["schemas"]["ExecutionMode"];
+            /** Id */
+            id: string;
+            /** Idempotency Key */
+            idempotency_key: string;
+            /** Outcome */
+            outcome: string;
+            /** Proposal Version */
+            proposal_version: number;
+            /** Result */
+            result: {
+                [key: string]: unknown;
+            };
+            /** Simulation Only */
+            simulation_only: boolean;
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+        };
+        /** ActionProposalListResponse */
+        ActionProposalListResponse: {
+            /** Count */
+            count: number;
+            /** Proposals */
+            proposals: components["schemas"]["ActionProposalResponse"][];
+        };
+        /** ActionProposalResponse */
+        ActionProposalResponse: {
+            action_type: components["schemas"]["ActionType"];
+            approval: components["schemas"]["ApprovalPreview"] | null;
+            approved_execution_context: components["schemas"]["ExecutionContextView"] | null;
+            /** Audit Events */
+            audit_events: components["schemas"]["ProposalAuditEvent"][];
+            /** Confidence */
+            confidence: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Evidence */
+            evidence: components["schemas"]["ProposalEvidence"][];
+            execution: components["schemas"]["ActionExecutionResponse"] | null;
+            execution_context: components["schemas"]["ExecutionContextView"];
+            /** Execution Context Changed */
+            execution_context_changed: boolean;
+            /** Execution Context Hash */
+            execution_context_hash: string;
+            execution_mode: components["schemas"]["ExecutionMode"];
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Id */
+            id: string;
+            /** Origin Fingerprint */
+            origin_fingerprint: string;
+            payload: components["schemas"]["TypedActionPayload"];
+            /** Payload Hash */
+            payload_hash: string;
+            /** Rationale */
+            rationale: string;
+            /** Rejection Reason */
+            rejection_reason: string | null;
+            risk_level: components["schemas"]["RiskLevel"];
+            /** Simulation Only */
+            simulation_only: boolean;
+            /** Source Refs */
+            source_refs: string[];
+            status: components["schemas"]["ProposalStatus"];
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Version */
+            version: number;
+        };
+        /**
+         * ActionType
+         * @description Closed set of proposable actions. High-risk actions (send email,
+         *     delete event, purchase) are prohibited in the MVP and intentionally
+         *     absent — they cannot be proposed, approved, or executed.
+         * @enum {string}
+         */
+        ActionType: "create_task" | "create_gmail_draft" | "create_calendar_event";
+        /** ApprovalPreview */
+        ApprovalPreview: {
+            action_type: components["schemas"]["ActionType"];
+            /**
+             * Approved At
+             * Format: date-time
+             */
+            approved_at: string;
+            /** Binding Hash */
+            binding_hash: string;
+            execution_context: components["schemas"]["ExecutionContextView"];
+            payload: components["schemas"]["TypedActionPayload"];
+            /** Payload Hash */
+            payload_hash: string;
+            /** Proposal Version */
+            proposal_version: number;
+        };
         /** BriefEvidence */
         BriefEvidence: {
             /** Excerpt */
@@ -338,8 +720,10 @@ export interface components {
          *     degraded — optional LLM prose failed or was rejected; the deterministic
          *     fallback summary is shown. Facts are unaffected (they never come from
          *     the LLM).
-         *     partial — one or more configured sources are unavailable, or a persisted
-         *     signal was omitted because its source evidence could not be resolved.
+         *     partial — one or more configured sources are unavailable, a persisted
+         *     signal was omitted because its source evidence could not be resolved, or
+         *     an action-proposal candidate was skipped because its source data could
+         *     not be validated.
          * @enum {string}
          */
         BriefStatus: "complete" | "empty" | "degraded" | "partial";
@@ -368,6 +752,45 @@ export interface components {
             /** Version */
             version: number;
         };
+        /** CalendarEventCreatePayload */
+        CalendarEventCreatePayload: {
+            /** Attendees */
+            attendees: string[];
+            /** Description */
+            description: string;
+            /**
+             * Ends At
+             * Format: date-time
+             */
+            ends_at: string;
+            /** Location */
+            location: string | null;
+            /**
+             * Starts At
+             * Format: date-time
+             */
+            starts_at: string;
+            /** Timezone */
+            timezone: string;
+            /** Title */
+            title: string;
+        };
+        /** ConnectedAccountView */
+        ConnectedAccountView: {
+            /** Granted Scopes */
+            granted_scopes: string[];
+            /** Last Sync At */
+            last_sync_at: string | null;
+            /** Provider */
+            provider: string;
+            /** Status */
+            status: string;
+        };
+        /** ConnectedAccountsResponse */
+        ConnectedAccountsResponse: {
+            /** Accounts */
+            accounts: components["schemas"]["ConnectedAccountView"][];
+        };
         /** DemoStartResponse */
         DemoStartResponse: {
             /** Imported */
@@ -391,6 +814,37 @@ export interface components {
              */
             email: string;
         };
+        /**
+         * ExecutionContextView
+         * @description A safe, minimal projection of `ExecutionContext` for the frontend —
+         *     deliberately omits `connected_account_id`/`source_account_id` and any
+         *     revision counter (raw internal identifiers, independent-review blocker
+         *     #1 §7).
+         */
+        ExecutionContextView: {
+            mode: components["schemas"]["ExecutionMode"];
+            /** Provider */
+            provider: string;
+            /** Required Scope */
+            required_scope: string | null;
+        };
+        /**
+         * ExecutionMode
+         * @description Which path would/did carry out an approved action (Stage 7
+         *     remediation, independent-review blocker #2/#3). Resolved deterministically
+         *     from the user's currently active connected accounts — never chosen
+         *     reactively after a real call fails, and never a static default.
+         *
+         *     simulation — the demo/synthetic path (or, for `create_task`, the
+         *     always-local Stage 6 behaviour).
+         *     real — a Google-connected account with the exact required scope.
+         *     unavailable — neither path exists yet (e.g. nothing connected); the
+         *     policy engine denies approval/execution in this state, so `unavailable`
+         *     is never persisted on an `ActionExecution` row, only shown on a proposal
+         *     preview.
+         * @enum {string}
+         */
+        ExecutionMode: "simulation" | "real" | "unavailable";
         /** ExtractionResponse */
         ExtractionResponse: {
             /** Deterministic */
@@ -409,6 +863,44 @@ export interface components {
             persisted_unchanged: number;
             /** Persisted Updated */
             persisted_updated: number;
+        };
+        /** GmailDraftCreatePayload */
+        GmailDraftCreatePayload: {
+            /** Body */
+            body: string;
+            /** Subject */
+            subject: string;
+            /** Thread Id */
+            thread_id: string | null;
+            /** To */
+            to: string[];
+        };
+        /** GoogleSyncResponse */
+        GoogleSyncResponse: {
+            /** Calendar Cursor Status */
+            calendar_cursor_status: string;
+            /** Calendar Incomplete */
+            calendar_incomplete: number;
+            /** Calendar Sync Complete */
+            calendar_sync_complete: boolean;
+            /** Calendar Synced */
+            calendar_synced: boolean;
+            /** Gmail Cursor Status */
+            gmail_cursor_status: string;
+            /** Gmail Excluded */
+            gmail_excluded: number;
+            /** Gmail Incomplete */
+            gmail_incomplete: number;
+            /** Gmail Sync Complete */
+            gmail_sync_complete: boolean;
+            /** Gmail Synced */
+            gmail_synced: boolean;
+            /** Imported */
+            imported: number;
+            /** Unchanged */
+            unchanged: number;
+            /** Updated */
+            updated: number;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -448,6 +940,109 @@ export interface components {
          * @enum {string}
          */
         OnboardingState: "new" | "in_progress" | "complete";
+        /** PreferenceItem */
+        PreferenceItem: {
+            /** Is Default */
+            is_default: boolean;
+            /** Key */
+            key: string;
+            /** Provenance */
+            provenance: string;
+            /** Updated At */
+            updated_at: string | null;
+            /** Value */
+            value: {
+                [key: string]: unknown;
+            };
+        };
+        /** PreferenceUpdateRequest */
+        PreferenceUpdateRequest: {
+            /** Value */
+            value: {
+                [key: string]: unknown;
+            };
+        };
+        /** PreferencesResponse */
+        PreferencesResponse: {
+            /** Preferences */
+            preferences: components["schemas"]["PreferenceItem"][];
+        };
+        /** ProposalApprovalRequest */
+        ProposalApprovalRequest: {
+            action_type: components["schemas"]["ActionType"];
+            /** Displayed Execution Context Hash */
+            displayed_execution_context_hash: string;
+            /** Displayed Payload Hash */
+            displayed_payload_hash: string;
+            /** Expected Version */
+            expected_version: number;
+        };
+        /** ProposalAuditEvent */
+        ProposalAuditEvent: {
+            /** Actor */
+            actor: string;
+            /** Event Type */
+            event_type: string;
+            /** Safe Metadata */
+            safe_metadata: {
+                [key: string]: unknown;
+            };
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+        };
+        /** ProposalEditRequest */
+        ProposalEditRequest: {
+            action_type: components["schemas"]["ActionType"];
+            /** Expected Version */
+            expected_version: number;
+            /** Payload */
+            payload: components["schemas"]["TaskCreatePayload"] | components["schemas"]["GmailDraftCreatePayload"] | components["schemas"]["CalendarEventCreatePayload"];
+        };
+        /** ProposalEvidence */
+        ProposalEvidence: {
+            /** Excerpt */
+            excerpt: string;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+            /** Sender Or Organiser */
+            sender_or_organiser: string | null;
+            /** Source Item Id */
+            source_item_id: string;
+            /** Source Ref */
+            source_ref: string;
+            /** Source Type */
+            source_type: string;
+            /** Title */
+            title: string;
+        };
+        /** ProposalRejectionRequest */
+        ProposalRejectionRequest: {
+            /** Expected Version */
+            expected_version: number;
+            /** Reason */
+            reason?: string | null;
+        };
+        /**
+         * ProposalStatus
+         * @enum {string}
+         */
+        ProposalStatus: "proposed" | "edited" | "approved" | "rejected" | "executing" | "executed" | "failed" | "expired";
+        /** PublicConfig */
+        PublicConfig: {
+            /** Google Oauth Enabled */
+            google_oauth_enabled: boolean;
+        };
+        /**
+         * RiskLevel
+         * @enum {string}
+         */
+        RiskLevel: "low" | "medium";
         /** SessionResponse */
         SessionResponse: {
             /** Email */
@@ -521,6 +1116,16 @@ export interface components {
          * @enum {string}
          */
         SourceType: "email" | "calendar_event" | "internal_task";
+        /** TaskCreatePayload */
+        TaskCreatePayload: {
+            /** Due At */
+            due_at: string | null;
+            /** Notes */
+            notes: string;
+            /** Title */
+            title: string;
+        };
+        TypedActionPayload: components["schemas"]["TaskCreatePayload"] | components["schemas"]["GmailDraftCreatePayload"] | components["schemas"]["CalendarEventCreatePayload"];
         /** ValidationError */
         ValidationError: {
             /** Context */
@@ -543,6 +1148,204 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    list_action_proposals_action_proposals_get: {
+        parameters: {
+            query?: {
+                status?: components["schemas"]["ProposalStatus"][] | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActionProposalListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_action_proposal_action_proposals__proposal_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proposal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActionProposalResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    edit_action_proposal_action_proposals__proposal_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proposal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProposalEditRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActionProposalResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_action_proposal_action_proposals__proposal_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proposal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProposalApprovalRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActionProposalResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    execute_action_proposal_action_proposals__proposal_id__execute_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proposal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActionProposalResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reject_action_proposal_action_proposals__proposal_id__reject_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proposal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProposalRejectionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActionProposalResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     dev_login_auth_dev_login_post: {
         parameters: {
             query?: never;
@@ -572,6 +1375,58 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    google_callback_auth_google_callback_get: {
+        parameters: {
+            query?: {
+                code?: string | null;
+                state?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    google_login_auth_google_login_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
         };
@@ -696,6 +1551,136 @@ export interface operations {
             };
         };
     };
+    config_config_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicConfig"];
+                };
+            };
+        };
+    };
+    list_connected_accounts_connected_accounts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectedAccountsResponse"];
+                };
+            };
+        };
+    };
+    google_connector_callback_connected_accounts_google_callback_get: {
+        parameters: {
+            query?: {
+                code?: string | null;
+                state?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    connect_google_connected_accounts_google_connect_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    disconnect_google_connected_accounts_google_disconnect_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    sync_google_connected_accounts_google_sync_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoogleSyncResponse"];
+                };
+            };
+        };
+    };
     start_demo_demo_start_post: {
         parameters: {
             query?: never;
@@ -776,6 +1761,61 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MeResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_preferences_preferences_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreferencesResponse"];
+                };
+            };
+        };
+    };
+    set_preference_preferences__key__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PreferenceUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreferenceItem"];
                 };
             };
             /** @description Validation Error */

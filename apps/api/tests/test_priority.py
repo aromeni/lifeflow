@@ -11,7 +11,7 @@ from lifeflow_api.priority import build_sender_frequency, score_signal
 
 async def scored_signals():
     items = await demo_source_items()
-    detected = run_deterministic_detectors(items, reference=REFERENCE, timezone=TIMEZONE)
+    detected = run_deterministic_detectors(items, reference=REFERENCE, timezone=TIMEZONE).signals
     items_by_external = {i.external_id: i for i in items}
     freq = build_sender_frequency(items)
     return [

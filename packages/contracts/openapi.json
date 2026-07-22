@@ -1,6 +1,339 @@
 {
   "components": {
     "schemas": {
+      "ActionExecutionResponse": {
+        "properties": {
+          "action_type": {
+            "$ref": "#/components/schemas/ActionType"
+          },
+          "approval_binding_hash": {
+            "title": "Approval Binding Hash",
+            "type": "string"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "effective_status": {
+            "title": "Effective Status",
+            "type": "string"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "executed_payload": {
+            "$ref": "#/components/schemas/TypedActionPayload"
+          },
+          "executed_payload_hash": {
+            "title": "Executed Payload Hash",
+            "type": "string"
+          },
+          "execution_mode": {
+            "$ref": "#/components/schemas/ExecutionMode"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "idempotency_key": {
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "outcome": {
+            "title": "Outcome",
+            "type": "string"
+          },
+          "proposal_version": {
+            "title": "Proposal Version",
+            "type": "integer"
+          },
+          "result": {
+            "additionalProperties": true,
+            "title": "Result",
+            "type": "object"
+          },
+          "simulation_only": {
+            "title": "Simulation Only",
+            "type": "boolean"
+          },
+          "started_at": {
+            "format": "date-time",
+            "title": "Started At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "idempotency_key",
+          "outcome",
+          "effective_status",
+          "execution_mode",
+          "simulation_only",
+          "started_at",
+          "completed_at",
+          "action_type",
+          "proposal_version",
+          "executed_payload",
+          "executed_payload_hash",
+          "approval_binding_hash",
+          "result",
+          "error_code"
+        ],
+        "title": "ActionExecutionResponse",
+        "type": "object"
+      },
+      "ActionProposalListResponse": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "proposals": {
+            "items": {
+              "$ref": "#/components/schemas/ActionProposalResponse"
+            },
+            "title": "Proposals",
+            "type": "array"
+          }
+        },
+        "required": [
+          "proposals",
+          "count"
+        ],
+        "title": "ActionProposalListResponse",
+        "type": "object"
+      },
+      "ActionProposalResponse": {
+        "properties": {
+          "action_type": {
+            "$ref": "#/components/schemas/ActionType"
+          },
+          "approval": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ApprovalPreview"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "approved_execution_context": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExecutionContextView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "audit_events": {
+            "items": {
+              "$ref": "#/components/schemas/ProposalAuditEvent"
+            },
+            "title": "Audit Events",
+            "type": "array"
+          },
+          "confidence": {
+            "title": "Confidence",
+            "type": "number"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/ProposalEvidence"
+            },
+            "title": "Evidence",
+            "type": "array"
+          },
+          "execution": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActionExecutionResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "execution_context": {
+            "$ref": "#/components/schemas/ExecutionContextView"
+          },
+          "execution_context_changed": {
+            "title": "Execution Context Changed",
+            "type": "boolean"
+          },
+          "execution_context_hash": {
+            "title": "Execution Context Hash",
+            "type": "string"
+          },
+          "execution_mode": {
+            "$ref": "#/components/schemas/ExecutionMode"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "origin_fingerprint": {
+            "title": "Origin Fingerprint",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/TypedActionPayload"
+          },
+          "payload_hash": {
+            "title": "Payload Hash",
+            "type": "string"
+          },
+          "rationale": {
+            "title": "Rationale",
+            "type": "string"
+          },
+          "rejection_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rejection Reason"
+          },
+          "risk_level": {
+            "$ref": "#/components/schemas/RiskLevel"
+          },
+          "simulation_only": {
+            "title": "Simulation Only",
+            "type": "boolean"
+          },
+          "source_refs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Source Refs",
+            "type": "array"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ProposalStatus"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "origin_fingerprint",
+          "action_type",
+          "rationale",
+          "source_refs",
+          "evidence",
+          "payload",
+          "payload_hash",
+          "version",
+          "risk_level",
+          "confidence",
+          "status",
+          "expires_at",
+          "approval",
+          "execution",
+          "rejection_reason",
+          "created_at",
+          "updated_at",
+          "audit_events",
+          "execution_mode",
+          "simulation_only",
+          "execution_context",
+          "execution_context_hash",
+          "approved_execution_context",
+          "execution_context_changed"
+        ],
+        "title": "ActionProposalResponse",
+        "type": "object"
+      },
+      "ActionType": {
+        "description": "Closed set of proposable actions. High-risk actions (send email,\ndelete event, purchase) are prohibited in the MVP and intentionally\nabsent \u2014 they cannot be proposed, approved, or executed.",
+        "enum": [
+          "create_task",
+          "create_gmail_draft",
+          "create_calendar_event"
+        ],
+        "title": "ActionType",
+        "type": "string"
+      },
+      "ApprovalPreview": {
+        "properties": {
+          "action_type": {
+            "$ref": "#/components/schemas/ActionType"
+          },
+          "approved_at": {
+            "format": "date-time",
+            "title": "Approved At",
+            "type": "string"
+          },
+          "binding_hash": {
+            "title": "Binding Hash",
+            "type": "string"
+          },
+          "execution_context": {
+            "$ref": "#/components/schemas/ExecutionContextView"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/TypedActionPayload"
+          },
+          "payload_hash": {
+            "title": "Payload Hash",
+            "type": "string"
+          },
+          "proposal_version": {
+            "title": "Proposal Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "action_type",
+          "proposal_version",
+          "payload",
+          "payload_hash",
+          "binding_hash",
+          "approved_at",
+          "execution_context"
+        ],
+        "title": "ApprovalPreview",
+        "type": "object"
+      },
       "BriefEvidence": {
         "additionalProperties": false,
         "properties": {
@@ -286,7 +619,7 @@
         "type": "string"
       },
       "BriefStatus": {
-        "description": "Honest generation states surfaced to the user (skill \u00a712).\n\ncomplete \u2014 sections composed from persisted signals.\nempty \u2014 generation ran but there were no signals to report.\ndegraded \u2014 optional LLM prose failed or was rejected; the deterministic\nfallback summary is shown. Facts are unaffected (they never come from\nthe LLM).\npartial \u2014 one or more configured sources are unavailable, or a persisted\nsignal was omitted because its source evidence could not be resolved.",
+        "description": "Honest generation states surfaced to the user (skill \u00a712).\n\ncomplete \u2014 sections composed from persisted signals.\nempty \u2014 generation ran but there were no signals to report.\ndegraded \u2014 optional LLM prose failed or was rejected; the deterministic\nfallback summary is shown. Facts are unaffected (they never come from\nthe LLM).\npartial \u2014 one or more configured sources are unavailable, a persisted\nsignal was omitted because its source evidence could not be resolved, or\nan action-proposal candidate was skipped because its source data could\nnot be validated.",
         "enum": [
           "complete",
           "empty",
@@ -351,6 +684,124 @@
         "title": "BriefVersionResponse",
         "type": "object"
       },
+      "CalendarEventCreatePayload": {
+        "additionalProperties": false,
+        "properties": {
+          "attendees": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Attendees",
+            "type": "array"
+          },
+          "description": {
+            "maxLength": 5000,
+            "title": "Description",
+            "type": "string"
+          },
+          "ends_at": {
+            "format": "date-time",
+            "title": "Ends At",
+            "type": "string"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location"
+          },
+          "starts_at": {
+            "format": "date-time",
+            "title": "Starts At",
+            "type": "string"
+          },
+          "timezone": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Timezone",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 250,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "starts_at",
+          "ends_at",
+          "timezone",
+          "location",
+          "description",
+          "attendees"
+        ],
+        "title": "CalendarEventCreatePayload",
+        "type": "object"
+      },
+      "ConnectedAccountView": {
+        "properties": {
+          "granted_scopes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Granted Scopes",
+            "type": "array"
+          },
+          "last_sync_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Sync At"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "provider",
+          "status",
+          "granted_scopes",
+          "last_sync_at"
+        ],
+        "title": "ConnectedAccountView",
+        "type": "object"
+      },
+      "ConnectedAccountsResponse": {
+        "properties": {
+          "accounts": {
+            "items": {
+              "$ref": "#/components/schemas/ConnectedAccountView"
+            },
+            "title": "Accounts",
+            "type": "array"
+          }
+        },
+        "required": [
+          "accounts"
+        ],
+        "title": "ConnectedAccountsResponse",
+        "type": "object"
+      },
       "DemoStartResponse": {
         "properties": {
           "imported": {
@@ -390,6 +841,46 @@
         },
         "title": "DevLoginRequest",
         "type": "object"
+      },
+      "ExecutionContextView": {
+        "description": "A safe, minimal projection of `ExecutionContext` for the frontend \u2014\ndeliberately omits `connected_account_id`/`source_account_id` and any\nrevision counter (raw internal identifiers, independent-review blocker\n#1 \u00a77).",
+        "properties": {
+          "mode": {
+            "$ref": "#/components/schemas/ExecutionMode"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "required_scope": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Required Scope"
+          }
+        },
+        "required": [
+          "mode",
+          "provider",
+          "required_scope"
+        ],
+        "title": "ExecutionContextView",
+        "type": "object"
+      },
+      "ExecutionMode": {
+        "description": "Which path would/did carry out an approved action (Stage 7\nremediation, independent-review blocker #2/#3). Resolved deterministically\nfrom the user's currently active connected accounts \u2014 never chosen\nreactively after a real call fails, and never a static default.\n\nsimulation \u2014 the demo/synthetic path (or, for `create_task`, the\nalways-local Stage 6 behaviour).\nreal \u2014 a Google-connected account with the exact required scope.\nunavailable \u2014 neither path exists yet (e.g. nothing connected); the\npolicy engine denies approval/execution in this state, so `unavailable`\nis never persisted on an `ActionExecution` row, only shown on a proposal\npreview.",
+        "enum": [
+          "simulation",
+          "real",
+          "unavailable"
+        ],
+        "title": "ExecutionMode",
+        "type": "string"
       },
       "ExtractionResponse": {
         "properties": {
@@ -437,6 +928,120 @@
           "persisted_unchanged"
         ],
         "title": "ExtractionResponse",
+        "type": "object"
+      },
+      "GmailDraftCreatePayload": {
+        "additionalProperties": false,
+        "properties": {
+          "body": {
+            "maxLength": 10000,
+            "minLength": 1,
+            "title": "Body",
+            "type": "string"
+          },
+          "subject": {
+            "maxLength": 250,
+            "minLength": 1,
+            "title": "Subject",
+            "type": "string"
+          },
+          "thread_id": {
+            "anyOf": [
+              {
+                "maxLength": 512,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thread Id"
+          },
+          "to": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 10,
+            "minItems": 1,
+            "title": "To",
+            "type": "array"
+          }
+        },
+        "required": [
+          "to",
+          "subject",
+          "body",
+          "thread_id"
+        ],
+        "title": "GmailDraftCreatePayload",
+        "type": "object"
+      },
+      "GoogleSyncResponse": {
+        "properties": {
+          "calendar_cursor_status": {
+            "title": "Calendar Cursor Status",
+            "type": "string"
+          },
+          "calendar_incomplete": {
+            "title": "Calendar Incomplete",
+            "type": "integer"
+          },
+          "calendar_sync_complete": {
+            "title": "Calendar Sync Complete",
+            "type": "boolean"
+          },
+          "calendar_synced": {
+            "title": "Calendar Synced",
+            "type": "boolean"
+          },
+          "gmail_cursor_status": {
+            "title": "Gmail Cursor Status",
+            "type": "string"
+          },
+          "gmail_excluded": {
+            "title": "Gmail Excluded",
+            "type": "integer"
+          },
+          "gmail_incomplete": {
+            "title": "Gmail Incomplete",
+            "type": "integer"
+          },
+          "gmail_sync_complete": {
+            "title": "Gmail Sync Complete",
+            "type": "boolean"
+          },
+          "gmail_synced": {
+            "title": "Gmail Synced",
+            "type": "boolean"
+          },
+          "imported": {
+            "title": "Imported",
+            "type": "integer"
+          },
+          "unchanged": {
+            "title": "Unchanged",
+            "type": "integer"
+          },
+          "updated": {
+            "title": "Updated",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "imported",
+          "updated",
+          "unchanged",
+          "gmail_excluded",
+          "gmail_incomplete",
+          "calendar_incomplete",
+          "gmail_synced",
+          "gmail_cursor_status",
+          "gmail_sync_complete",
+          "calendar_synced",
+          "calendar_cursor_status",
+          "calendar_sync_complete"
+        ],
+        "title": "GoogleSyncResponse",
         "type": "object"
       },
       "HTTPValidationError": {
@@ -548,6 +1153,290 @@
           "complete"
         ],
         "title": "OnboardingState",
+        "type": "string"
+      },
+      "PreferenceItem": {
+        "properties": {
+          "is_default": {
+            "title": "Is Default",
+            "type": "boolean"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "provenance": {
+            "title": "Provenance",
+            "type": "string"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "value": {
+            "additionalProperties": true,
+            "title": "Value",
+            "type": "object"
+          }
+        },
+        "required": [
+          "key",
+          "value",
+          "provenance",
+          "is_default",
+          "updated_at"
+        ],
+        "title": "PreferenceItem",
+        "type": "object"
+      },
+      "PreferenceUpdateRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "value": {
+            "additionalProperties": true,
+            "title": "Value",
+            "type": "object"
+          }
+        },
+        "required": [
+          "value"
+        ],
+        "title": "PreferenceUpdateRequest",
+        "type": "object"
+      },
+      "PreferencesResponse": {
+        "properties": {
+          "preferences": {
+            "items": {
+              "$ref": "#/components/schemas/PreferenceItem"
+            },
+            "title": "Preferences",
+            "type": "array"
+          }
+        },
+        "required": [
+          "preferences"
+        ],
+        "title": "PreferencesResponse",
+        "type": "object"
+      },
+      "ProposalApprovalRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "action_type": {
+            "$ref": "#/components/schemas/ActionType"
+          },
+          "displayed_execution_context_hash": {
+            "maxLength": 64,
+            "minLength": 64,
+            "title": "Displayed Execution Context Hash",
+            "type": "string"
+          },
+          "displayed_payload_hash": {
+            "maxLength": 64,
+            "minLength": 64,
+            "title": "Displayed Payload Hash",
+            "type": "string"
+          },
+          "expected_version": {
+            "minimum": 1.0,
+            "title": "Expected Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "expected_version",
+          "action_type",
+          "displayed_payload_hash",
+          "displayed_execution_context_hash"
+        ],
+        "title": "ProposalApprovalRequest",
+        "type": "object"
+      },
+      "ProposalAuditEvent": {
+        "properties": {
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "event_type": {
+            "title": "Event Type",
+            "type": "string"
+          },
+          "safe_metadata": {
+            "additionalProperties": true,
+            "title": "Safe Metadata",
+            "type": "object"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "title": "Timestamp",
+            "type": "string"
+          }
+        },
+        "required": [
+          "event_type",
+          "actor",
+          "timestamp",
+          "safe_metadata"
+        ],
+        "title": "ProposalAuditEvent",
+        "type": "object"
+      },
+      "ProposalEditRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "action_type": {
+            "$ref": "#/components/schemas/ActionType"
+          },
+          "expected_version": {
+            "minimum": 1.0,
+            "title": "Expected Version",
+            "type": "integer"
+          },
+          "payload": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskCreatePayload"
+              },
+              {
+                "$ref": "#/components/schemas/GmailDraftCreatePayload"
+              },
+              {
+                "$ref": "#/components/schemas/CalendarEventCreatePayload"
+              }
+            ],
+            "title": "Payload"
+          }
+        },
+        "required": [
+          "expected_version",
+          "action_type",
+          "payload"
+        ],
+        "title": "ProposalEditRequest",
+        "type": "object"
+      },
+      "ProposalEvidence": {
+        "additionalProperties": false,
+        "properties": {
+          "excerpt": {
+            "title": "Excerpt",
+            "type": "string"
+          },
+          "occurred_at": {
+            "format": "date-time",
+            "title": "Occurred At",
+            "type": "string"
+          },
+          "sender_or_organiser": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sender Or Organiser"
+          },
+          "source_item_id": {
+            "title": "Source Item Id",
+            "type": "string"
+          },
+          "source_ref": {
+            "title": "Source Ref",
+            "type": "string"
+          },
+          "source_type": {
+            "title": "Source Type",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_item_id",
+          "source_ref",
+          "source_type",
+          "title",
+          "sender_or_organiser",
+          "occurred_at",
+          "excerpt"
+        ],
+        "title": "ProposalEvidence",
+        "type": "object"
+      },
+      "ProposalRejectionRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_version": {
+            "minimum": 1.0,
+            "title": "Expected Version",
+            "type": "integer"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "required": [
+          "expected_version"
+        ],
+        "title": "ProposalRejectionRequest",
+        "type": "object"
+      },
+      "ProposalStatus": {
+        "enum": [
+          "proposed",
+          "edited",
+          "approved",
+          "rejected",
+          "executing",
+          "executed",
+          "failed",
+          "expired"
+        ],
+        "title": "ProposalStatus",
+        "type": "string"
+      },
+      "PublicConfig": {
+        "properties": {
+          "google_oauth_enabled": {
+            "title": "Google Oauth Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "google_oauth_enabled"
+        ],
+        "title": "PublicConfig",
+        "type": "object"
+      },
+      "RiskLevel": {
+        "enum": [
+          "low",
+          "medium"
+        ],
+        "title": "RiskLevel",
         "type": "string"
       },
       "SessionResponse": {
@@ -762,6 +1651,54 @@
         "title": "SourceType",
         "type": "string"
       },
+      "TaskCreatePayload": {
+        "additionalProperties": false,
+        "properties": {
+          "due_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due At"
+          },
+          "notes": {
+            "maxLength": 2000,
+            "title": "Notes",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "notes",
+          "due_at"
+        ],
+        "title": "TaskCreatePayload",
+        "type": "object"
+      },
+      "TypedActionPayload": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/TaskCreatePayload"
+          },
+          {
+            "$ref": "#/components/schemas/GmailDraftCreatePayload"
+          },
+          {
+            "$ref": "#/components/schemas/CalendarEventCreatePayload"
+          }
+        ]
+      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -810,6 +1747,283 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/action-proposals": {
+      "get": {
+        "operationId": "list_action_proposals_action_proposals_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "$ref": "#/components/schemas/ProposalStatus"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionProposalListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Action Proposals"
+      }
+    },
+    "/action-proposals/{proposal_id}": {
+      "get": {
+        "operationId": "get_action_proposal_action_proposals__proposal_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "proposal_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Proposal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionProposalResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Action Proposal"
+      },
+      "patch": {
+        "operationId": "edit_action_proposal_action_proposals__proposal_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "proposal_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Proposal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProposalEditRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionProposalResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Edit Action Proposal"
+      }
+    },
+    "/action-proposals/{proposal_id}/approve": {
+      "post": {
+        "operationId": "approve_action_proposal_action_proposals__proposal_id__approve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "proposal_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Proposal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProposalApprovalRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionProposalResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Approve Action Proposal"
+      }
+    },
+    "/action-proposals/{proposal_id}/execute": {
+      "post": {
+        "operationId": "execute_action_proposal_action_proposals__proposal_id__execute_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "proposal_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Proposal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionProposalResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Execute Action Proposal"
+      }
+    },
+    "/action-proposals/{proposal_id}/reject": {
+      "post": {
+        "operationId": "reject_action_proposal_action_proposals__proposal_id__reject_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "proposal_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Proposal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProposalRejectionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionProposalResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reject Action Proposal"
+      }
+    },
     "/auth/dev-login": {
       "post": {
         "operationId": "dev_login_auth_dev_login_post",
@@ -846,6 +2060,82 @@
           }
         },
         "summary": "Dev Login"
+      }
+    },
+    "/auth/google/callback": {
+      "get": {
+        "operationId": "google_callback_auth_google_callback_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "code",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Code"
+            }
+          },
+          {
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Google Callback"
+      }
+    },
+    "/auth/google/login": {
+      "get": {
+        "operationId": "google_login_auth_google_login_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Google Login"
       }
     },
     "/auth/logout": {
@@ -977,6 +2267,148 @@
         "summary": "Get Brief"
       }
     },
+    "/config": {
+      "get": {
+        "operationId": "config_config_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicConfig"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Config"
+      }
+    },
+    "/connected-accounts": {
+      "get": {
+        "operationId": "list_connected_accounts_connected_accounts_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectedAccountsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Connected Accounts"
+      }
+    },
+    "/connected-accounts/google/callback": {
+      "get": {
+        "operationId": "google_connector_callback_connected_accounts_google_callback_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "code",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Code"
+            }
+          },
+          {
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Google Connector Callback"
+      }
+    },
+    "/connected-accounts/google/connect": {
+      "get": {
+        "operationId": "connect_google_connected_accounts_google_connect_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Connect Google"
+      }
+    },
+    "/connected-accounts/google/disconnect": {
+      "post": {
+        "operationId": "disconnect_google_connected_accounts_google_disconnect_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Disconnect Google"
+      }
+    },
+    "/connected-accounts/google/sync": {
+      "post": {
+        "description": "User-triggered, on-demand sync (never automatic on page load \u2014 see\nthreat model and ADR 0003): pulls the connected user's own Gmail/Calendar\ndata through the narrow real clients into persisted `SourceItem` rows,\nexactly as `IngestionService` already does for the synthetic connectors.",
+        "operationId": "sync_google_connected_accounts_google_sync_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoogleSyncResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Sync Google"
+      }
+    },
     "/demo/start": {
       "post": {
         "operationId": "start_demo_demo_start_post",
@@ -1065,6 +2497,73 @@
           }
         },
         "summary": "Update Me"
+      }
+    },
+    "/preferences": {
+      "get": {
+        "operationId": "list_preferences_preferences_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreferencesResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Preferences"
+      }
+    },
+    "/preferences/{key}": {
+      "put": {
+        "operationId": "set_preference_preferences__key__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "title": "Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreferenceUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreferenceItem"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Preference"
       }
     },
     "/ready": {

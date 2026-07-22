@@ -9,7 +9,8 @@ the product's floor, and the failure is visible in the audit trail.
 import hashlib
 import logging
 import uuid
-from dataclasses import dataclass
+from collections import Counter
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -53,6 +54,9 @@ class ExtractionSummary:
     persisted_new: int = 0
     persisted_updated: int = 0
     persisted_unchanged: int = 0
+    # Safe counts only: fixed diagnostic code -> occurrences. Never a source
+    # item id or the malformed value itself (threat model logging rules).
+    diagnostic_counts: dict[str, int] = field(default_factory=dict)
 
 
 class SignalExtractionService:
@@ -75,8 +79,12 @@ class SignalExtractionService:
         items = await SourceItemRepository(self._session, self._user_id).list(limit=1000)
         summary = ExtractionSummary()
 
-        detected = run_deterministic_detectors(items, reference=reference, timezone=timezone)
+        detection = run_deterministic_detectors(items, reference=reference, timezone=timezone)
+        detected = detection.signals
         summary.deterministic = len(detected)
+        summary.diagnostic_counts = dict(
+            Counter(diagnostic.code for diagnostic in detection.diagnostics)
+        )
 
         combined = list(detected)
         if self._provider is not None:
@@ -134,6 +142,7 @@ class SignalExtractionService:
                 "persisted_new": summary.persisted_new,
                 "persisted_updated": summary.persisted_updated,
                 "persisted_unchanged": summary.persisted_unchanged,
+                "diagnostic_counts": summary.diagnostic_counts,
             },
         )
         await self._session.flush()
