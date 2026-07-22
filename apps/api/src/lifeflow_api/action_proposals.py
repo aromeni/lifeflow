@@ -28,6 +28,7 @@ from lifeflow_api.execution_context import (
     resolve_execution_context,
 )
 from lifeflow_api.google_wiring import build_google_executor_registry
+from lifeflow_api.memory_inference import enqueue_recompute
 from lifeflow_api.models import (
     ActionExecution,
     ActionProposal,
@@ -39,6 +40,7 @@ from lifeflow_api.models import (
     SourceItem,
     SourceType,
 )
+from lifeflow_api.preferences import memory_inference_enabled
 from lifeflow_api.repositories import (
     ActionExecutionRepository,
     ActionProposalRepository,
@@ -398,6 +400,7 @@ async def edit_action_proposal(
 
 @router.post("/{proposal_id}/approve", response_model=ActionProposalResponse)
 async def approve_action_proposal(
+    request: Request,
     proposal_id: uuid.UUID,
     body: ProposalApprovalRequest,
     user: CurrentUser,
@@ -413,6 +416,17 @@ async def approve_action_proposal(
         )
     except ProposalConflictError as exc:
         return _conflict_response(exc)
+    # Stage 8 Phase 3 (ADR 0004 D56): a user-edited Gmail draft the user just
+    # approved is the one evidence source for inferred memory. Best-effort
+    # enqueue a recompute — only when the user has opted in, and never in a
+    # way that can fail this approval (Redis down → skipped, self-heals on the
+    # next recompute). The worker reloads all state from PostgreSQL.
+    if (
+        ActionType(proposal.action_type) == ActionType.create_gmail_draft
+        and proposal.user_edited_at is not None
+        and await memory_inference_enabled(session, user.id)
+    ):
+        await enqueue_recompute(request.app.state.settings.redis_url, user.id)
     return await _to_response(
         session,
         user.id,

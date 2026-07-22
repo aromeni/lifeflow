@@ -68,6 +68,7 @@ const brief: Brief = {
   notices: [],
   source_window: "past-14d/future-30d",
   prompt_version: null,
+  generation_trigger: "manual",
   generation_metadata: { llm_summary_used: false },
 };
 
@@ -86,6 +87,16 @@ test("renders the latest brief with sections, version, and summary", async () =>
   expect(screen.getByText(/version 2/)).toBeInTheDocument();
   expect(screen.getByRole("heading", { name: /Needs attention/ })).toBeInTheDocument();
   expect(screen.getByRole("heading", { name: /Low-confidence review/ })).toBeInTheDocument();
+});
+
+test("labels a scheduled brief distinctly from a manual one", async () => {
+  apiMock.mockImplementation(async (path: string) => {
+    if (path === "/me") return me;
+    if (path === "/briefs/latest") return { ...brief, generation_trigger: "scheduled" };
+    throw new Error(`unexpected ${path}`);
+  });
+  render(<TodayPage />);
+  expect(await screen.findByText(/scheduled/)).toBeInTheDocument();
 });
 
 test("offers first-time generation when no brief exists yet", async () => {

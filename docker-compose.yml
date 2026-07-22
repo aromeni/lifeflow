@@ -16,5 +16,23 @@ services:
       timeout: 3s
       retries: 10
 
+  # Stage 8 Phase 2 (ADR 0004 D48): job transport for the scheduled-brief
+  # dispatcher/worker only. Optional for demo/CI exactly like the LLM
+  # provider — nothing else in the API depends on it. Remapped to 6380 by
+  # default, like Postgres's 5433, since many dev machines already run a
+  # Redis on 6379. No persistence volume: PostgreSQL's `scheduled_brief_runs`
+  # table is the durable source of truth, never Redis (ADR 0004 D48) — an
+  # emptied queue on restart loses nothing that isn't already recoverable by
+  # the next dispatcher tick.
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "${REDIS_PORT:-6380}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
 volumes:
   lifeflow-db-data:

@@ -31,6 +31,10 @@ class BriefResponse(BaseModel):
     notices: list[BriefNotice]
     source_window: str
     prompt_version: str | None
+    # "manual" (the on-demand route below) or "scheduled" (Stage 8 Phase 2,
+    # ADR 0004 D49) — lets the frontend label each version without parsing
+    # generation_metadata.
+    generation_trigger: str
     generation_metadata: dict[str, Any]
 
 
@@ -40,6 +44,7 @@ class BriefVersionResponse(BaseModel):
     generated_at: datetime
     version: int
     status: BriefStatus
+    generation_trigger: str
 
 
 class BriefVersionListResponse(BaseModel):
@@ -60,6 +65,7 @@ def _to_response(brief: Brief) -> BriefResponse:
         notices=document.notices,
         source_window=brief.source_window,
         prompt_version=brief.prompt_version,
+        generation_trigger=brief.generation_trigger,
         generation_metadata=brief.model_metadata,
     )
 
@@ -71,6 +77,7 @@ def _to_version_response(brief: Brief) -> BriefVersionResponse:
         generated_at=brief.generated_at,
         version=brief.version,
         status=BriefStatus(brief.status),
+        generation_trigger=brief.generation_trigger,
     )
 
 

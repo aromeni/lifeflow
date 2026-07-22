@@ -7,6 +7,7 @@ nothing here is ever consulted by the policy engine, executors, or approval
 binding.
 """
 
+import re
 import uuid
 from datetime import datetime, time
 from typing import Annotated, Any
@@ -17,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from lifeflow_api.audit import record_audit_event
 from lifeflow_api.deps import CurrentUser, DbSession
+from lifeflow_api.memory_registry import DEFAULT_SIGNOFF, PREFERRED_EMAIL_SIGNOFF_KEY
 from lifeflow_api.models import Preference, Provenance
 from lifeflow_api.repositories import PreferenceRepository
 
@@ -25,6 +27,16 @@ router = APIRouter(prefix="/preferences")
 BRIEFING_TIME_KEY = "briefing_time"
 WORKING_HOURS_KEY = "working_hours"
 BRIEF_SECTIONS_KEY = "brief_sections"
+SCHEDULED_BRIEFS_ENABLED_KEY = "scheduled_briefs_enabled"
+# Phase 3 (ADR 0004 D55/D57): the on/off control for inferred-memory learning
+# (default off), and the explicit sign-off a confirmed memory writes to — the
+# only channel through which inferred memory can affect an outgoing draft.
+MEMORY_INFERENCE_ENABLED_KEY = "memory_inference_enabled"
+
+# A safe, human sign-off: a short closing phrase, no digits, no contact info,
+# no newlines. Validated the same whether the user sets it directly or a
+# confirmed memory writes it.
+_SIGNOFF_PATTERN = re.compile(r"^[A-Za-z][A-Za-z .,'\-]{0,39}$")
 
 # Sections the user may hide. `needs_attention` is deliberately absent —
 # high-priority items can never be configured out of sight (ADR 0004 D45).
@@ -101,15 +113,54 @@ class BriefSectionsValue(BaseModel):
         return value
 
 
+class ScheduledBriefsEnabledValue(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    enabled: bool
+
+
+class MemoryInferenceEnabledValue(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    enabled: bool
+
+
+class PreferredEmailSignoffValue(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    value: str
+
+    @field_validator("value")
+    @classmethod
+    def value_is_signoff(cls, value: str) -> str:
+        stripped = value.strip()
+        if not _SIGNOFF_PATTERN.fullmatch(stripped):
+            raise ValueError(
+                "Email sign-off must be a short closing phrase (letters and spaces only, "
+                "no digits or contact details)."
+            )
+        return stripped
+
+
 _DEFAULTS: dict[str, dict[str, Any]] = {
     BRIEFING_TIME_KEY: {"value": "07:30"},
     WORKING_HOURS_KEY: {"start": "09:00", "end": "17:30"},
     BRIEF_SECTIONS_KEY: {"sections": list(OPTIONAL_BRIEF_SECTIONS)},
+    # Default off (ADR 0004 D50): an existing deployment must not suddenly
+    # start scheduling briefs for every user just because briefing_time
+    # already had a default.
+    SCHEDULED_BRIEFS_ENABLED_KEY: {"enabled": False},
+    # Default off (ADR 0004 D55): the conservative, privacy-first default —
+    # inferred-memory learning is opt-in, matching D50's precedent.
+    MEMORY_INFERENCE_ENABLED_KEY: {"enabled": False},
+    # The system-default sign-off (ADR 0004 D57): until the user sets or
+    # confirms one, `is_default` stays true and the composer uses "Best".
+    PREFERRED_EMAIL_SIGNOFF_KEY: {"value": DEFAULT_SIGNOFF},
 }
 _VALIDATORS: dict[str, type[BaseModel]] = {
     BRIEFING_TIME_KEY: BriefingTimeValue,
     WORKING_HOURS_KEY: WorkingHoursValue,
     BRIEF_SECTIONS_KEY: BriefSectionsValue,
+    SCHEDULED_BRIEFS_ENABLED_KEY: ScheduledBriefsEnabledValue,
+    MEMORY_INFERENCE_ENABLED_KEY: MemoryInferenceEnabledValue,
+    PREFERRED_EMAIL_SIGNOFF_KEY: PreferredEmailSignoffValue,
 }
 PREFERENCE_KEYS = tuple(_DEFAULTS)
 
@@ -160,6 +211,46 @@ async def enabled_brief_sections(session: AsyncSession, user_id: uuid.UUID) -> s
     resolved = await resolved_preferences(session, user_id)
     chosen = set(resolved[BRIEF_SECTIONS_KEY]["sections"])
     return chosen | {NEEDS_ATTENTION_SECTION}
+
+
+async def scheduled_briefs_enabled(session: AsyncSession, user_id: uuid.UUID) -> bool:
+    """Whether this user has explicitly opted into scheduled daily briefs
+    (ADR 0004 D50). Consulted only by the Phase 2 dispatcher — never by the
+    policy engine, executors, or approval binding (D46)."""
+    resolved = await resolved_preferences(session, user_id)
+    return bool(resolved[SCHEDULED_BRIEFS_ENABLED_KEY]["enabled"])
+
+
+async def briefing_schedule(session: AsyncSession, user_id: uuid.UUID) -> str:
+    """The user's configured `briefing_time` as `"HH:MM"`."""
+    resolved = await resolved_preferences(session, user_id)
+    return str(resolved[BRIEFING_TIME_KEY]["value"])
+
+
+async def memory_inference_enabled(session: AsyncSession, user_id: uuid.UUID) -> bool:
+    """Whether this user has opted into inferred-memory learning
+    (ADR 0004 D55, default off). Consulted only by the Phase 3 inference
+    worker/enqueue path — never by the policy engine, executors, or approval
+    binding (D46)."""
+    resolved = await resolved_preferences(session, user_id)
+    return bool(resolved[MEMORY_INFERENCE_ENABLED_KEY]["enabled"])
+
+
+async def explicit_signoff(session: AsyncSession, user_id: uuid.UUID) -> str | None:
+    """The user's explicitly set/confirmed sign-off, or None if they have
+    never set one (only the system default is in force). Distinct from the
+    resolved value: a `None` here means "use the composer's own default",
+    and lets the memory layer tell an override from an unset default
+    (ADR 0004 D55/D57)."""
+    row = await PreferenceRepository(session, user_id).get(PREFERRED_EMAIL_SIGNOFF_KEY)
+    if row is None:
+        return None
+    try:
+        return str(
+            validate_preference_value(PREFERRED_EMAIL_SIGNOFF_KEY, dict(row.value_json))["value"]
+        )
+    except (ValueError, TypeError):
+        return None
 
 
 class PreferenceItem(BaseModel):
@@ -242,12 +333,19 @@ async def set_preference(
 __all__ = [
     "BRIEFING_TIME_KEY",
     "BRIEF_SECTIONS_KEY",
+    "MEMORY_INFERENCE_ENABLED_KEY",
     "NEEDS_ATTENTION_SECTION",
     "OPTIONAL_BRIEF_SECTIONS",
     "PREFERENCE_KEYS",
+    "PREFERRED_EMAIL_SIGNOFF_KEY",
+    "SCHEDULED_BRIEFS_ENABLED_KEY",
     "WORKING_HOURS_KEY",
+    "briefing_schedule",
     "enabled_brief_sections",
+    "explicit_signoff",
+    "memory_inference_enabled",
     "resolved_preferences",
     "router",
+    "scheduled_briefs_enabled",
     "validate_preference_value",
 ]

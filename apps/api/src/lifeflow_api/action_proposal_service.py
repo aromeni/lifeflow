@@ -211,6 +211,7 @@ class ActionProposalService:
         sources: list[SourceItem],
         timezone: str,
         reference: datetime,
+        preferred_signoff: str | None = None,
     ) -> ProposalGenerationSummary:
         """Change-aware proposal generation with stable origin uniqueness.
 
@@ -242,6 +243,9 @@ class ActionProposalService:
             google_account_ids=frozenset(
                 account.id for account in accounts if account.provider == GOOGLE_PROVIDER
             ),
+            # The user's confirmed explicit sign-off, if any (ADR 0004 D57).
+            # Composition-only: never read by the policy engine or executors.
+            preferred_signoff=preferred_signoff,
         )
         if composed.skipped:
             # Safe by construction: SkippedCandidate carries only the closed

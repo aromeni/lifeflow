@@ -24,6 +24,7 @@ from lifeflow_api.action_payloads import (
     effective_payload_deadline,
 )
 from lifeflow_api.detectors import parse_aware_datetime
+from lifeflow_api.memory_registry import DEFAULT_SIGNOFF
 from lifeflow_api.models import ActionType, RiskLevel, Signal, SignalType, SourceItem, SourceType
 from lifeflow_api.scheduling_phrases import parse_scheduling_request
 
@@ -153,7 +154,15 @@ def _draft_candidates(
     sources: dict[str, SourceItem],
     reference: datetime,
     skipped: list[SkippedCandidate],
+    preferred_signoff: str | None,
 ) -> list[ProposalCandidate]:
+    # The closing line: a confirmed explicit sign-off preference (D57) if the
+    # user has one, otherwise the system default. `preferred_signoff` is the
+    # already-resolved *explicit* value — inferred memory is never read here;
+    # it can only reach this point after the user confirms it into a
+    # preference, so precedence holds by construction.
+    signoff = preferred_signoff or DEFAULT_SIGNOFF
+    applied_from_preference = preferred_signoff is not None and preferred_signoff != DEFAULT_SIGNOFF
     candidates: list[ProposalCandidate] = []
     for signal in signals:
         if signal.signal_type not in {SignalType.request, SignalType.follow_up}:
@@ -190,7 +199,7 @@ def _draft_candidates(
                 body=(
                     f"Hi {sender_name},\n\n"
                     f'Thanks for your message about "{source.title}". '
-                    "I'm reviewing it and will follow up.\n\nBest"
+                    f"I'm reviewing it and will follow up.\n\n{signoff}"
                 ),
                 thread_id=source.metadata_json.get("thread_id"),
             )
@@ -200,12 +209,16 @@ def _draft_candidates(
         expires_at = _expiry(payload, reference)
         if expires_at is None:
             continue
+        rationale = "Prepare a draft reply to an evidence-backed request; this never sends email."
+        if applied_from_preference:
+            # Provenance recorded in the proposal itself (D57): the user sees
+            # exactly why the sign-off differs from the default, and the
+            # adapted body is part of the payload (and its hash) already.
+            rationale += " Sign-off applied from your confirmed preference."
         candidates.append(
             ProposalCandidate(
                 action_type=ActionType.create_gmail_draft,
-                rationale=(
-                    "Prepare a draft reply to an evidence-backed request; this never sends email."
-                ),
+                rationale=rationale,
                 source_refs=tuple(sorted(signal.evidence_refs)),
                 payload=payload,
                 risk_level=RiskLevel.medium,
@@ -404,6 +417,7 @@ def compose_proposal_candidates(
     reference: datetime,
     timezone: str,
     google_account_ids: frozenset[uuid.UUID] = frozenset(),
+    preferred_signoff: str | None = None,
 ) -> ComposedProposals:
     """Return every grounded proposal candidate for each closed action type,
     ranked most-preferred first within each type (by ``_signal_order``).
@@ -430,7 +444,7 @@ def compose_proposal_candidates(
     skipped: list[SkippedCandidate] = []
     candidates = [
         *_task_candidates(ordered, sources, reference, skipped),
-        *_draft_candidates(ordered, sources, reference, skipped),
+        *_draft_candidates(ordered, sources, reference, skipped, preferred_signoff),
         *_calendar_candidates(ordered, sources, reference, timezone, google_account_ids, skipped),
     ]
     return ComposedProposals(

@@ -61,6 +61,13 @@ class Settings(BaseSettings):
     google_connector_client_secret: str = ""
     google_connector_redirect_uri: str = ""
 
+    # Stage 8 Phase 2: the scheduled brief (ADR 0004 D47-D50). Optional for
+    # demo/CI exactly like the LLM provider — the web API is fully usable
+    # (including manual brief generation) with Redis absent; only the
+    # scheduled-brief status surface reports reduced capability, and no
+    # scheduling happens without a running worker regardless.
+    redis_url: str = "redis://localhost:6380/0"
+
 
 @lru_cache
 def get_settings() -> Settings:

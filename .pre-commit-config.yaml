@@ -27,3 +27,12 @@ repos:
         args: [--baseline, .secrets.baseline]
         # Lockfile "secrets" are public package integrity hashes.
         exclude: pnpm-lock\.yaml
+
+  - repo: local
+    hooks:
+      - id: check-env-example-secrets
+        name: check .env.example for live-secret-shaped values
+        entry: python3 scripts/check_env_example_secrets.py
+        language: system
+        files: ^\.env\.example$
+        pass_filenames: false

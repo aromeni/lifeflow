@@ -2,21 +2,22 @@
 
 LifeFlow AI is a permissioned, inspectable, human-in-the-loop personal operations agent. Before making product or architecture decisions, read the North Star: [docs/project/project-foundation.md](docs/project/project-foundation.md). The build follows a stage-gated protocol ([docs/delivery/stage-plan.md](docs/delivery/stage-plan.md)); work only within the active stage.
 
-**Current stage: 8 (preferences, memory, schedule) — in progress, Phase 1 (explicit preferences). Stages 0–7 are approved (`stage-7-complete` tag); Stage 9 is not active.**
+**Current stage: 8 (preferences, memory, schedule) — complete and approved. All three phases (explicit preferences; scheduled brief, arq+Redis; transparent inferred memory) passed the committed-state closure review; the Phase 3 commit is `466de179a7af1fe6410ee4e4f661402bec5b8925`, approved for remote completion. Stages 0–7 are approved (`stage-7-complete` tag). Stage 9 (privacy, audit UX, resilience) has not begun; all remaining work belongs to Stage 9.**
 
 ## Commands
 
 Prerequisites: Docker, uv, pnpm, Node 22+.
 
 ```bash
-cp .env.example .env            # once; never commit .env
-docker compose up -d db --wait  # PostgreSQL on localhost:5433
+cp .env.example .env                  # once; never commit .env
+docker compose up -d db redis --wait  # PostgreSQL on 5433, Redis on 6380 (Redis optional — Stage 8 Phase 2 only)
 
 # Backend (from apps/api)
 uv sync                         # install deps (Python 3.12 auto-provisioned)
 uv run alembic upgrade head     # migrations
 uv run uvicorn --app-dir src lifeflow_api.main:app --reload --port 8010
-uv run pytest                   # all tests (integration needs the db container)
+uv run arq lifeflow_api.worker_app.WorkerSettings  # scheduled-brief worker (Stage 8 Phase 2; needs redis)
+uv run pytest                   # all tests (integration needs the db container; a few also need redis)
 uv run pytest -m "not integration"
 uv run ruff format . && uv run ruff check . && uv run mypy
 

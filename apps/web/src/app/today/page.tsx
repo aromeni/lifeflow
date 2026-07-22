@@ -124,7 +124,7 @@ export default function TodayPage() {
           {state === "generating" && "Generating a fresh brief from your sources…"}
           {state === "ready" &&
             brief &&
-            `Generated ${formatGeneratedAt(brief.generated_at, timezone)} · version ${brief.version} · ${brief.status}`}
+            `Generated ${formatGeneratedAt(brief.generated_at, timezone)} · version ${brief.version} · ${brief.status} · ${brief.generation_trigger === "scheduled" ? "scheduled" : "manual"}`}
           {state === "no-brief" && "No brief yet."}
           {state === "error" && "Could not load your brief. Is the API running?"}
         </p>
