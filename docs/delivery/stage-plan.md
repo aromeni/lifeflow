@@ -2,6 +2,8 @@
 
 **Status:** Stage 8 complete and approved (Stages 0–7 approved; Stage 7 completed and tagged `stage-7-complete` 2026-07-21) · **Date:** 2026-07-22
 
+**Stage 9 (privacy, audit UX, resilience) is in progress.** The Stage 9 Planning Gate (architecture/discovery) is approved and recorded in [ADR 0005](../architecture/adr/0005-stage9-privacy-hardening.md). Delivery is split into five phases: **Delivery Phase 1 — Privacy & Connections Control Centre** (read-only, non-destructive; the `/connections` route expanded, plus `GET /privacy/summary`) is implemented; Delivery Phase 2 (imported-data deletion, retention enforcement, account deletion), Phase 3 (audit history), Phase 4 (rate limiting), and Phase 5 (resilience + telemetry) follow. "Delivery Phase 1" always refers to the Privacy Centre, never the planning gate. Stage 8 remains complete/approved/merged (`main` `c5b60b1`; tag `stage-8-complete` → `a29d6ee`).
+
 **Stage 8 (preferences, memory, schedule) is complete and approved.** All three phases — Phase 1 (explicit preferences), Phase 2 (the scheduled brief, arq+Redis), and Phase 3 (inferred memory) — passed the committed-state closure review as one integrated milestone. Phase 3 delivered one narrow typed memory (`preferred_email_signoff`) with a full transparent lifecycle: observed edited-then-approved drafts → visible candidate with deterministic confidence and inspectable evidence → user confirm/edit/dismiss/delete → confirmed value applied only through the explicit preference registry, previewed and approved like any draft (ADR 0004 D51–D58). The Phase 3 commit is `466de179a7af1fe6410ee4e4f661402bec5b8925`, approved for remote completion. Stage 9 (privacy, audit UX, resilience) is not active and has not begun; all remaining work belongs to Stage 9.
 
 Guiding rule: *build one trustworthy end-to-end loop, prove it with tests and evidence, then expand deliberately.* The first end-to-end path is:
@@ -25,7 +27,7 @@ Gmail + Calendar → Daily Brief → Proposed Action → Approval → Execution 
 | 6 — Proposals & approval inbox (approved) | Safe, editable next steps | Inspect/edit/approve/reject/trace with zero hidden side effects | 5 |
 | 7 — Real Google integration (approved) | Proven workflow on real data | Test user connects Google, gets brief, approves draft/event, sees audit | 6 |
 | **8 — Preferences, memory, schedule** (complete, approved) | Transparent adaptation | Scheduled brief at configured time reflecting visible preferences | 7 |
-| 9 — Privacy, audit UX, resilience | Trust features operational | Users control data; product fails safely in outages | 8 |
+| **9 — Privacy, audit UX, resilience** (in progress) | Trust features operational | Users control data; product fails safely in outages | 8 |
 | 10 — Evaluation & pilot readiness | Evidence of usefulness | Acceptance targets met or exceptions documented; pilot pack ready | 9 |
 | 11 — Packaging & commercial base | Demonstrable, pilotable, extensible | Staging deploy passes smoke tests; editions via configuration | 10 |
 

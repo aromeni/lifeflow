@@ -812,6 +812,87 @@
         "title": "ConnectedAccountsResponse",
         "type": "object"
       },
+      "ConnectionSummaryView": {
+        "properties": {
+          "account_id": {
+            "title": "Account Id",
+            "type": "string"
+          },
+          "can_disconnect": {
+            "title": "Can Disconnect",
+            "type": "boolean"
+          },
+          "can_reconnect": {
+            "title": "Can Reconnect",
+            "type": "boolean"
+          },
+          "connected": {
+            "title": "Connected",
+            "type": "boolean"
+          },
+          "ever_synced": {
+            "title": "Ever Synced",
+            "type": "boolean"
+          },
+          "freshness_band": {
+            "anyOf": [
+              {
+                "enum": [
+                  "fresh",
+                  "aging",
+                  "stale"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Freshness Band"
+          },
+          "granted_scopes": {
+            "items": {
+              "$ref": "#/components/schemas/GrantedScopeView"
+            },
+            "title": "Granted Scopes",
+            "type": "array"
+          },
+          "last_synced_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Synced At"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "account_id",
+          "provider",
+          "status",
+          "connected",
+          "granted_scopes",
+          "last_synced_at",
+          "freshness_band",
+          "ever_synced",
+          "can_disconnect",
+          "can_reconnect"
+        ],
+        "title": "ConnectionSummaryView",
+        "type": "object"
+      },
       "DemoStartResponse": {
         "properties": {
           "imported": {
@@ -1132,6 +1213,24 @@
         "title": "GoogleSyncResponse",
         "type": "object"
       },
+      "GrantedScopeView": {
+        "properties": {
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "scope": {
+            "title": "Scope",
+            "type": "string"
+          }
+        },
+        "required": [
+          "scope",
+          "label"
+        ],
+        "title": "GrantedScopeView",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -1156,6 +1255,75 @@
           "status"
         ],
         "title": "HealthStatus",
+        "type": "object"
+      },
+      "InventoryView": {
+        "description": "Owner-scoped counts only \u2014 never any stored content.",
+        "properties": {
+          "action_executions": {
+            "title": "Action Executions",
+            "type": "integer"
+          },
+          "action_proposals": {
+            "title": "Action Proposals",
+            "type": "integer"
+          },
+          "audit_events": {
+            "title": "Audit Events",
+            "type": "integer"
+          },
+          "brief_versions": {
+            "title": "Brief Versions",
+            "type": "integer"
+          },
+          "briefs": {
+            "title": "Briefs",
+            "type": "integer"
+          },
+          "connected_accounts": {
+            "title": "Connected Accounts",
+            "type": "integer"
+          },
+          "memory_evidence": {
+            "title": "Memory Evidence",
+            "type": "integer"
+          },
+          "memory_items": {
+            "title": "Memory Items",
+            "type": "integer"
+          },
+          "preferences": {
+            "title": "Preferences",
+            "type": "integer"
+          },
+          "scheduled_brief_runs": {
+            "title": "Scheduled Brief Runs",
+            "type": "integer"
+          },
+          "signals": {
+            "title": "Signals",
+            "type": "integer"
+          },
+          "source_items": {
+            "title": "Source Items",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "connected_accounts",
+          "source_items",
+          "signals",
+          "briefs",
+          "brief_versions",
+          "action_proposals",
+          "action_executions",
+          "scheduled_brief_runs",
+          "preferences",
+          "memory_items",
+          "memory_evidence",
+          "audit_events"
+        ],
+        "title": "InventoryView",
         "type": "object"
       },
       "MeResponse": {
@@ -1579,6 +1747,30 @@
         "title": "PreferencesResponse",
         "type": "object"
       },
+      "PrivacySummaryResponse": {
+        "properties": {
+          "connections": {
+            "items": {
+              "$ref": "#/components/schemas/ConnectionSummaryView"
+            },
+            "title": "Connections",
+            "type": "array"
+          },
+          "inventory": {
+            "$ref": "#/components/schemas/InventoryView"
+          },
+          "retention": {
+            "$ref": "#/components/schemas/RetentionView"
+          }
+        },
+        "required": [
+          "connections",
+          "inventory",
+          "retention"
+        ],
+        "title": "PrivacySummaryResponse",
+        "type": "object"
+      },
       "ProposalApprovalRequest": {
         "additionalProperties": false,
         "properties": {
@@ -1780,6 +1972,75 @@
           "google_oauth_enabled"
         ],
         "title": "PublicConfig",
+        "type": "object"
+      },
+      "RetentionClassView": {
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "enforced": {
+            "title": "Enforced",
+            "type": "boolean"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "retention_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retention Days"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "description",
+          "retention_days",
+          "enforced"
+        ],
+        "title": "RetentionClassView",
+        "type": "object"
+      },
+      "RetentionView": {
+        "properties": {
+          "classes": {
+            "items": {
+              "$ref": "#/components/schemas/RetentionClassView"
+            },
+            "title": "Classes",
+            "type": "array"
+          },
+          "enforcement_active": {
+            "title": "Enforcement Active",
+            "type": "boolean"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "enforcement_active",
+          "classes",
+          "notes"
+        ],
+        "title": "RetentionView",
         "type": "object"
       },
       "RiskLevel": {
@@ -3304,6 +3565,24 @@
           }
         },
         "summary": "Set Preference"
+      }
+    },
+    "/privacy/summary": {
+      "get": {
+        "operationId": "get_privacy_summary_privacy_summary_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivacySummaryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Privacy Summary"
       }
     },
     "/ready": {

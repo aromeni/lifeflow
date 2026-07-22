@@ -177,6 +177,16 @@ Inferred memory (ADR 0004 D51–D58) is a new place where the system forms a bel
 - **Memory cannot widen authority.** Inferred memory is suggest-only and never read by the policy engine, approval binding, executors, or execution-context resolution. It reaches an outgoing draft only after the user confirms it into an *explicit* preference, which itself is safety-inert (ADR 0004 D46) and whose effect is limited to draft composition — the adapted body is fully previewed and part of the approval hash. So memory can never bypass approval, alter recipients/attendees/execution mode, or trigger a side effect.
 - **Data minimisation and deletion.** Memory tables store only a short normalised token, a reason code, and safe references (proposal id) — never draft bodies, recipients, tokens, or provider data. Redis carries only a user id; worker logs carry only ids and reason codes. `memory.deleted` audit records the key and fact of deletion, never the deleted value. The user can pause learning, delete one memory, delete all inferred memory, and account deletion cascades every memory row.
 
+## Privacy & Connections Control Centre (Stage 9 Delivery Phase 1, recorded 2026-07-22)
+
+The read-only Privacy Centre (ADR 0005 D65, `GET /privacy/summary`) is a new surface over already-owned data, so it gets explicit disclosure-boundary rules; all are code-enforced and regression-tested (`test_privacy_api.py`).
+
+- **T2 (cross-user aggregate leakage).** Every count and connection read is owner-scoped by `user_id`; execution counts enforce ownership through the join to the owning proposal (mirroring `ActionExecutionRepository`). Proven by an isolation test: one user's populated data yields all-zero counts and no trace for another.
+- **T1/T6 (secret & internals disclosure).** The response is counts, statuses, scope labels, and freshness bands only. It never serialises an OAuth token or ciphertext, a sync cursor, the `authorisation_revision`, a provider message/event id, a proposal payload or hash, or audit `safe_metadata` internals — proven by seeding distinctive sentinels into those columns and asserting none appear in the response body. Logs carry only user id, account id, safe event type, and correlation id.
+- **T20 (scope truthfulness).** Granted scopes render exactly as stored, mapped to human labels; unrecognised scopes become a neutral "Other access"; requested-but-not-granted scopes never appear as active. Partial grants render truthfully.
+- **T29 (scheduler/queue outage isolation).** The endpoint depends only on PostgreSQL and is proven to work against an unreachable Redis. Opening or refreshing the page never triggers a Google sync (ADR 0003 boundary preserved).
+- **T15/T16 (retention & deletion honesty).** Delivery Phase 1 is non-destructive. Retention horizons are surfaced read-only with `enforced=False` and explicit "not switched on yet" copy, so the UI can never imply enforcement that does not exist. Actual deletion, retention enforcement, and account deletion (anonymise-and-minimise, ADR 0005 D61–D63) arrive in Delivery Phase 2; rate limiting (D64) in Delivery Phase 4.
+
 ## Out-of-scope threats (recorded, revisit at Stage 11)
 
 Multi-region availability, DDoS at scale, malicious insiders with database access, and formal GDPR DPIA sign-off (draft privacy notice arrives in Stage 10 for professional review).

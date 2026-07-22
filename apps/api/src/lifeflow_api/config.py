@@ -8,6 +8,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # `.env` lives at the repo root, but this module is imported with the process
@@ -67,6 +68,32 @@ class Settings(BaseSettings):
     # scheduled-brief status surface reports reduced capability, and no
     # scheduling happens without a running worker regardless.
     redis_url: str = "redis://localhost:6380/0"
+
+    # Stage 9 Delivery Phase 1 (ADR 0005): provisional product retention
+    # defaults, in days, surfaced read-only by the Privacy Centre. These are
+    # *product* defaults for the pilot, not claimed legal mandates, and are
+    # NOT yet enforced by any job — enforcement is Delivery Phase 2. Globally
+    # configured and validated here (positive integers); there is deliberately
+    # no per-user DataRetentionPolicy table at this stage. Two categories have
+    # no fixed horizon and are therefore not represented as day counts:
+    # Signals follow their supporting SourceItem's lifecycle, and
+    # pending/uncertain executions are never auto-deleted before reconciliation
+    # (both described in words by the Privacy Centre, never as a duration).
+    retention_source_items_days: int = Field(default=30, gt=0)
+    retention_brief_versions_days: int = Field(default=90, gt=0)
+    retention_unapproved_proposals_days: int = Field(default=90, gt=0)
+    retention_approved_terminal_days: int = Field(default=365, gt=0)
+    retention_scheduled_runs_days: int = Field(default=90, gt=0)
+    retention_memory_evidence_days: int = Field(default=90, gt=0)
+    retention_audit_tombstone_days: int = Field(default=365, gt=0)
+    retention_operational_logs_days: int = Field(default=30, gt=0)
+    retention_aggregated_metrics_days: int = Field(default=90, gt=0)
+
+    # Stage 9 rate-limiting trusted-proxy allowlist (architecture approved in
+    # ADR 0005; thresholds and enforcement land in Delivery Phase 4). CIDRs
+    # whose immediate-peer proxy may set X-Forwarded-For. Empty (the default)
+    # means trust no forwarded headers — the direct peer IP is authoritative.
+    trusted_proxy_cidrs: str = ""
 
 
 @lru_cache

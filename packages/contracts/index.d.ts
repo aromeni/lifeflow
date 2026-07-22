@@ -508,6 +508,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/privacy/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Privacy Summary */
+        get: operations["get_privacy_summary_privacy_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/ready": {
         parameters: {
             query?: never;
@@ -900,6 +917,29 @@ export interface components {
             /** Accounts */
             accounts: components["schemas"]["ConnectedAccountView"][];
         };
+        /** ConnectionSummaryView */
+        ConnectionSummaryView: {
+            /** Account Id */
+            account_id: string;
+            /** Can Disconnect */
+            can_disconnect: boolean;
+            /** Can Reconnect */
+            can_reconnect: boolean;
+            /** Connected */
+            connected: boolean;
+            /** Ever Synced */
+            ever_synced: boolean;
+            /** Freshness Band */
+            freshness_band: ("fresh" | "aging" | "stale") | null;
+            /** Granted Scopes */
+            granted_scopes: components["schemas"]["GrantedScopeView"][];
+            /** Last Synced At */
+            last_synced_at: string | null;
+            /** Provider */
+            provider: string;
+            /** Status */
+            status: string;
+        };
         /** DemoStartResponse */
         DemoStartResponse: {
             /** Imported */
@@ -1034,6 +1074,13 @@ export interface components {
             /** Updated */
             updated: number;
         };
+        /** GrantedScopeView */
+        GrantedScopeView: {
+            /** Label */
+            label: string;
+            /** Scope */
+            scope: string;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -1043,6 +1090,36 @@ export interface components {
         HealthStatus: {
             /** Status */
             status: string;
+        };
+        /**
+         * InventoryView
+         * @description Owner-scoped counts only — never any stored content.
+         */
+        InventoryView: {
+            /** Action Executions */
+            action_executions: number;
+            /** Action Proposals */
+            action_proposals: number;
+            /** Audit Events */
+            audit_events: number;
+            /** Brief Versions */
+            brief_versions: number;
+            /** Briefs */
+            briefs: number;
+            /** Connected Accounts */
+            connected_accounts: number;
+            /** Memory Evidence */
+            memory_evidence: number;
+            /** Memory Items */
+            memory_items: number;
+            /** Preferences */
+            preferences: number;
+            /** Scheduled Brief Runs */
+            scheduled_brief_runs: number;
+            /** Signals */
+            signals: number;
+            /** Source Items */
+            source_items: number;
         };
         /** MeResponse */
         MeResponse: {
@@ -1204,6 +1281,13 @@ export interface components {
             /** Preferences */
             preferences: components["schemas"]["PreferenceItem"][];
         };
+        /** PrivacySummaryResponse */
+        PrivacySummaryResponse: {
+            /** Connections */
+            connections: components["schemas"]["ConnectionSummaryView"][];
+            inventory: components["schemas"]["InventoryView"];
+            retention: components["schemas"]["RetentionView"];
+        };
         /** ProposalApprovalRequest */
         ProposalApprovalRequest: {
             action_type: components["schemas"]["ActionType"];
@@ -1274,6 +1358,28 @@ export interface components {
         PublicConfig: {
             /** Google Oauth Enabled */
             google_oauth_enabled: boolean;
+        };
+        /** RetentionClassView */
+        RetentionClassView: {
+            /** Description */
+            description: string;
+            /** Enforced */
+            enforced: boolean;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Retention Days */
+            retention_days: number | null;
+        };
+        /** RetentionView */
+        RetentionView: {
+            /** Classes */
+            classes: components["schemas"]["RetentionClassView"][];
+            /** Enforcement Active */
+            enforcement_active: boolean;
+            /** Notes */
+            notes: string[];
         };
         /**
          * RiskLevel
@@ -2314,6 +2420,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_privacy_summary_privacy_summary_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrivacySummaryResponse"];
                 };
             };
         };
