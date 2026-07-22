@@ -32,7 +32,7 @@ from lifeflow_api.models import (
     SourceItem,
     SourceType,
 )
-from lifeflow_api.preferences import enabled_brief_sections
+from lifeflow_api.preferences import enabled_brief_sections, explicit_signoff
 from lifeflow_api.repositories import (
     BriefRepository,
     ConnectedAccountRepository,
@@ -566,6 +566,11 @@ class BriefService:
         briefs.add(brief)
         await self._session.flush()
         await self._session.refresh(brief)
+        # The user's confirmed explicit sign-off, if any (ADR 0004 D57). A
+        # None means "use the composer's own default" — inferred memory is
+        # never read here; only a confirmed value that has become an explicit
+        # preference reaches composition, so explicit precedence holds.
+        preferred_signoff = await explicit_signoff(self._session, self._user_id)
         proposal_generation = await ActionProposalService(
             self._session, self._user_id
         ).generate_from_brief(
@@ -574,6 +579,7 @@ class BriefService:
             sources=sources,
             timezone=timezone,
             reference=reference,
+            preferred_signoff=preferred_signoff,
         )
         brief.model_metadata = {
             **metadata,

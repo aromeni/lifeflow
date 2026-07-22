@@ -27,3 +27,7 @@ export type PublicConfig = components["schemas"]["PublicConfig"];
 export type ScheduledBriefStatus = components["schemas"]["ScheduledBriefStatusResponse"];
 export type EvidenceFreshness = components["schemas"]["EvidenceFreshnessResponse"];
 export type EvidenceFreshnessAccount = components["schemas"]["EvidenceFreshnessAccount"];
+export type MemoryItem = components["schemas"]["MemoryItemView"];
+export type MemoryList = components["schemas"]["MemoryListResponse"];
+export type MemoryEvidence = components["schemas"]["MemoryEvidenceView"];
+export type MemoryStatus = components["schemas"]["MemoryStatus"];

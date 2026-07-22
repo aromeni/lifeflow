@@ -2,7 +2,7 @@
 
 **Status:** Stage 8 in progress (Stages 0–7 approved; Stage 7 completed and tagged `stage-7-complete` 2026-07-21) · **Date:** 2026-07-21
 
-**Active stage: 8 (preferences, memory, schedule — in progress; explicitly approved 2026-07-21).** Phase 1 (explicit preferences) and Phase 2 (the scheduled brief, arq+Redis) are complete, on branch `stage-8-scheduled-briefs`; Phase 3 (inferred memory) awaits explicit approval to begin. Stage 9 is not active and cannot begin without explicit human approval of the Stage 8 completion report. Silence is never approval. Commits are made only when explicitly requested.
+**Active stage: 8 (preferences, memory, schedule — in progress; explicitly approved 2026-07-21).** Phase 1 (explicit preferences) and Phase 2 (the scheduled brief, arq+Redis) are complete. Phase 3 (inferred memory) is **implemented and fully verified on branch `stage-8-memory`, awaiting the human review of the Stage 8 completion report** — one narrow typed memory (`preferred_email_signoff`) with a full transparent lifecycle: observed edited-then-approved drafts → visible candidate with deterministic confidence and inspectable evidence → user confirm/edit/dismiss/delete → confirmed value applied only through the explicit preference registry, previewed and approved like any draft (ADR 0004 D51–D58). Stage 9 is not active and cannot begin without explicit human approval of the Stage 8 completion report. Silence is never approval. Commits are made only when explicitly requested.
 
 Guiding rule: *build one trustworthy end-to-end loop, prove it with tests and evidence, then expand deliberately.* The first end-to-end path is:
 

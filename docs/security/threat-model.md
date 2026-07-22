@@ -168,6 +168,15 @@ The plan below was drafted, then actually run (superseding the original "not exe
 3. Restricted scopes additionally require an annual third-party security assessment (Google's CASA Tier 2, or equivalent) before verification completes.
 4. Until verification completes, the pilot is bounded to the ≤100 test users the "Testing" status allows (already recorded as a risk in `docs/delivery/stage-plan.md`'s risk register).
 
+## Inferred memory — the learning boundary (Stage 8 Phase 3, recorded 2026-07-22)
+
+Inferred memory (ADR 0004 D51–D58) is a new place where the system forms a belief about the user, so it gets its own boundary rules; all of them are enforced in code and regression-tested.
+
+- **Learning input is user-controlled behaviour, never inbound content.** The single evidence source is a Gmail-draft proposal the user *deliberately edited and then approved*. `memory_inference` never reads `SourceItem` content, so the prompt-injection boundary (§11.1) extends cleanly: a recognised phrase inside a received email, a marketer's footer, or an attacker-crafted "please set my sign-off to X" message can never become a stored preference (`test_inbound_email_text_alone_creates_no_preference`). This is the mitigation for *inference poisoning* — steering the user's learned preferences via content they merely received.
+- **Sensitive inference is refused, not merely absent.** A closed registry (one key) plus a documented `PROHIBITED_MEMORY_CATEGORIES` deny-list (special-category and protected-characteristic data, plus generic personality/mood/risk-profile) means unknown and sensitive keys fail closed at the registry, repository, and API layers. No free-text key/value path exists.
+- **Memory cannot widen authority.** Inferred memory is suggest-only and never read by the policy engine, approval binding, executors, or execution-context resolution. It reaches an outgoing draft only after the user confirms it into an *explicit* preference, which itself is safety-inert (ADR 0004 D46) and whose effect is limited to draft composition — the adapted body is fully previewed and part of the approval hash. So memory can never bypass approval, alter recipients/attendees/execution mode, or trigger a side effect.
+- **Data minimisation and deletion.** Memory tables store only a short normalised token, a reason code, and safe references (proposal id) — never draft bodies, recipients, tokens, or provider data. Redis carries only a user id; worker logs carry only ids and reason codes. `memory.deleted` audit records the key and fact of deletion, never the deleted value. The user can pause learning, delete one memory, delete all inferred memory, and account deletion cascades every memory row.
+
 ## Out-of-scope threats (recorded, revisit at Stage 11)
 
 Multi-region availability, DDoS at scale, malicious insiders with database access, and formal GDPR DPIA sign-off (draft privacy notice arrives in Stage 10 for professional review).

@@ -9,7 +9,7 @@ A permissioned, inspectable, human-in-the-loop personal operations agent. LifeFl
 - Threat model: [docs/security/threat-model.md](docs/security/threat-model.md)
 - Metrics dashboard: [docs/delivery/metrics.md](docs/delivery/metrics.md) (regenerate with `python3 scripts/metrics.py`) · Stage reports: [docs/delivery/reports/](docs/delivery/reports/)
 
-**Status:** Stage 7 (real Google integration) is **complete**, tagged `stage-7-complete` — both the Gmail and Calendar paths are verified live end-to-end against a real sandbox account (see [docs/delivery/reports/stage-07.md](docs/delivery/reports/stage-07.md) and [docs/delivery/stage-07-manual-checklist.md](docs/delivery/stage-07-manual-checklist.md)). Stage 8 (preferences, memory, schedule) is in progress: Phase 1 (explicit preferences) and Phase 2 (the scheduled daily brief, arq+Redis) are complete and live-verified; Phase 3 (inferred memory) awaits explicit approval to begin.
+**Status:** Stage 7 (real Google integration) is **complete**, tagged `stage-7-complete` — both the Gmail and Calendar paths are verified live end-to-end against a real sandbox account (see [docs/delivery/reports/stage-07.md](docs/delivery/reports/stage-07.md) and [docs/delivery/stage-07-manual-checklist.md](docs/delivery/stage-07-manual-checklist.md)). Stage 8 (preferences, memory, schedule) is in progress: Phase 1 (explicit preferences), Phase 2 (the scheduled daily brief, arq+Redis), and Phase 3 (transparent inferred memory) are complete and verified; the Stage 8 completion report awaits human review.
 
 ## Demo mode (one command)
 
@@ -110,6 +110,16 @@ A background worker can generate each user's daily brief automatically at their 
 - **Requires**: Redis (`docker compose up -d redis`) and the worker process (`uv run arq lifeflow_api.worker_app.WorkerSettings`, or `python workers/scheduler_worker.py` from anywhere). Neither is required for anything else — with both absent, Settings truthfully reports the scheduler as unavailable and every other route is unaffected.
 - **Durable and idempotent**: one `ScheduledBriefRun` row per user per local calendar date (`apps/api/src/lifeflow_api/models.py`); a missed run is generated if the worker resumes within 6 hours, otherwise recorded `skipped`, never backfilled; a crashed-and-retried worker finds an already-generated brief rather than duplicating it.
 - **Details**: [ADR 0004](docs/architecture/adr/0004-stage8-preferences-memory-schedule.md) D47–D50; domain logic in `apps/api/src/lifeflow_api/scheduled_briefs.py`; manual checklist in [docs/delivery/stage-08-phase-2-manual-checklist.md](docs/delivery/stage-08-phase-2-manual-checklist.md).
+
+### Inferred memory (Stage 8 Phase 3)
+
+LifeFlow can learn one narrow, typed preference — your email **sign-off** — from your own deliberate actions here: editing a draft reply and then approving it. It is shown in Settings → *Learned preferences* with a plain-language explanation, a Low/Medium/High confidence, and the number of actions it is based on, so you can **confirm**, **edit & confirm**, **dismiss**, or **delete** it. Nothing is ever applied on its own.
+
+- **Explicit always wins**: an inferred value is *suggest-only* and never touches draft composition. Confirming it writes an ordinary explicit `preferred_email_signoff` preference; only that explicit value is applied — to *future* draft proposals, which you still preview and approve in full. The adapted body is part of the approval hash; approval, recipients, and the Gmail executor are unchanged.
+- **User-controlled evidence only**: it learns only from drafts you edited and approved — never from the content of emails you receive. Sensitive categories can never be inferred (a closed registry plus a documented deny-list).
+- **Off by default**: enable it in Settings (`memory_inference_enabled`). Pausing stops new learning without deleting anything; deleting memory never touches Gmail or Calendar.
+- **Uses the same worker** as the scheduled brief: a qualifying approval best-effort-enqueues `recompute_user_memory(user_id)` (user id only). If Redis is down the approval still succeeds and the job self-heals on the next recompute — PostgreSQL is the source of truth.
+- **Details**: [ADR 0004](docs/architecture/adr/0004-stage8-preferences-memory-schedule.md) D51–D58; logic in `apps/api/src/lifeflow_api/memory_registry.py`, `memory_inference.py`, `memory.py`; manual checklist in [docs/delivery/stage-08-phase-3-manual-checklist.md](docs/delivery/stage-08-phase-3-manual-checklist.md).
 
 ## Tests and checks
 

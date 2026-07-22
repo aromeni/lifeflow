@@ -146,6 +146,30 @@ class Provenance(StrEnum):
     inferred = "inferred"
 
 
+class MemoryStatus(StrEnum):
+    """Closed lifecycle for one inferred-memory item (ADR 0004 D55).
+
+    candidate — inferred from evidence, awaiting the user's review. Never
+    applied to any outgoing content: inferred memory is suggest-only, so a
+    candidate influences nothing until the user confirms it.
+    confirmed — the user accepted it; the corresponding explicit preference
+    was written and now carries normal explicit authority. The item stays as
+    a visible record of what was learned.
+    dismissed — the user rejected it; sticky via an evidence fingerprint so
+    the same evidence never re-surfaces it (only materially new evidence can).
+    superseded — an explicit preference now overrides it, or newer contrary
+    evidence replaced its value. Visible but inactive.
+    expired — its evidence decayed past the freshness floor with no
+    confirmation. Confirmed explicit preferences never decay.
+    """
+
+    candidate = "candidate"
+    confirmed = "confirmed"
+    dismissed = "dismissed"
+    superseded = "superseded"
+    expired = "expired"
+
+
 class ScheduledRunStatus(StrEnum):
     """Closed lifecycle for one user's one local-date scheduled brief
     attempt (ADR 0004 D48/D49).
@@ -498,6 +522,107 @@ class Preference(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+
+class MemoryItem(Base):
+    """One inferred-memory item per user per closed registry key (ADR 0004
+    D52/D55). Inferred, `provenance="inferred"` knowledge derived from the
+    user's own deliberate in-app behaviour — never applied to outgoing
+    content until the user confirms it into an explicit preference.
+
+    The `(user_id, memory_key)` unique constraint is the final guard against
+    two conflicting active memories for the same fact; the whole lifecycle is
+    a single mutating row, not a stream of competing rows."""
+
+    __tablename__ = "memory_items"
+    __table_args__ = (
+        UniqueConstraint("user_id", "memory_key", name="uq_memory_items_user_key"),
+        CheckConstraint(
+            "status IN ('candidate', 'confirmed', 'dismissed', 'superseded', 'expired')",
+            name="ck_memory_items_status",
+        ),
+        # Suggest-only is the only application mode Phase 3 ships (D55): an
+        # inferred value is never applied automatically, only after the user
+        # confirms it into an explicit preference.
+        CheckConstraint(
+            "application_mode IN ('suggest_only')",
+            name="ck_memory_items_application_mode",
+        ),
+        CheckConstraint("confidence >= 0 AND confidence <= 1", name="ck_memory_items_confidence"),
+        CheckConstraint("version >= 1", name="ck_memory_items_version"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = _user_fk()
+    memory_key: Mapped[str] = mapped_column(String(100))
+    # The normalised inferred value, e.g. {"value": "Kind regards"} — a short
+    # closing token, never the draft body it was derived from (D53).
+    value_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    status: Mapped[str] = mapped_column(String(20), default=MemoryStatus.candidate)
+    confidence: Mapped[float] = mapped_column(Float, default=0.0)
+    evidence_count: Mapped[int] = mapped_column(Integer, default=0)
+    first_observed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_observed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_evaluated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # When the item's evidence decays past the freshness floor (D54); display
+    # and expiry only, never a policy input.
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    application_mode: Mapped[str] = mapped_column(String(20), default="suggest_only")
+    # The explicit preference key a confirmation writes to (D55) — the only
+    # channel through which this memory can ever affect behaviour.
+    corresponding_preference_key: Mapped[str | None] = mapped_column(String(100))
+    # Recomputed display flag: an explicit preference for the same fact exists
+    # and takes precedence, so this inferred value is not applied (D55).
+    overridden_by_explicit: Mapped[bool] = mapped_column(default=False)
+    # Sticky-dismissal guard (D55): a hash of the contributing evidence set at
+    # dismissal. Recompute keeps the item dismissed until this fingerprint
+    # changes (materially new evidence).
+    dismissed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    dismissed_fingerprint: Mapped[str | None] = mapped_column(String(64))
+    # Optimistic-concurrency guard: user edits/confirms/dismisses carry an
+    # expected version; a stale write is a 409, never a silent overwrite.
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class MemoryEvidence(Base):
+    """A safe, deduplicated reference to one deliberate user action that
+    supports an inferred memory (ADR 0004 D53). Stores only a normalised
+    derived value (e.g. a sign-off token) and a reason code — never the draft
+    body, recipients, subject, or any inbound content.
+
+    The `(memory_item_id, source_proposal_id)` unique constraint makes
+    inference idempotent: re-running a recompute over the same proposal never
+    double-counts it."""
+
+    __tablename__ = "memory_evidence"
+    __table_args__ = (
+        UniqueConstraint(
+            "memory_item_id", "source_proposal_id", name="uq_memory_evidence_item_source"
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    memory_item_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("memory_items.id", ondelete="CASCADE"), index=True
+    )
+    user_id: Mapped[uuid.UUID] = _user_fk()
+    evidence_type: Mapped[str] = mapped_column(String(60))
+    # The proposal whose deliberate user edit + approval is the evidence.
+    # SET NULL (not CASCADE): if the proposal is ever deleted, the evidence's
+    # safe derived value survives for history; recompute tolerates the null.
+    source_proposal_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("action_proposals.id", ondelete="SET NULL")
+    )
+    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    # The normalised derived value only (e.g. "Kind regards") — never a body.
+    derived_value: Mapped[str] = mapped_column(String(100))
+    # Closed-vocabulary safe code (e.g. "approved_edited_draft").
+    reason_code: Mapped[str] = mapped_column(String(60))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class AuditEvent(Base):

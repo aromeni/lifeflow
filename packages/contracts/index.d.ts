@@ -403,6 +403,77 @@ export interface paths {
         patch: operations["update_me_me_patch"];
         trace?: never;
     };
+    "/memories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Memories */
+        get: operations["list_memories_memories_get"];
+        put?: never;
+        post?: never;
+        /** Delete All Memories */
+        delete: operations["delete_all_memories_memories_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/memories/{memory_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Memory */
+        get: operations["get_memory_memories__memory_id__get"];
+        /** Edit Memory */
+        put: operations["edit_memory_memories__memory_id__put"];
+        post?: never;
+        /** Delete Memory */
+        delete: operations["delete_memory_memories__memory_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/memories/{memory_id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm Memory */
+        post: operations["confirm_memory_memories__memory_id__confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/memories/{memory_id}/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Dismiss Memory */
+        post: operations["dismiss_memory_memories__memory_id__dismiss_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/preferences": {
         parameters: {
             query?: never;
@@ -995,6 +1066,111 @@ export interface components {
             onboarding_state?: components["schemas"]["OnboardingState"] | null;
             /** Timezone */
             timezone?: string | null;
+        };
+        /** MemoryEditRequest */
+        MemoryEditRequest: {
+            /** Expected Version */
+            expected_version: number;
+            /** Value */
+            value: string;
+        };
+        /**
+         * MemoryEvidenceView
+         * @description A safe evidence summary — the normalised token and a reason code only,
+         *     never a draft body (D53).
+         */
+        MemoryEvidenceView: {
+            /** Derived Value */
+            derived_value: string;
+            /** Evidence Type */
+            evidence_type: string;
+            /**
+             * Observed At
+             * Format: date-time
+             */
+            observed_at: string;
+            /** Reason Code */
+            reason_code: string;
+            /** Source Proposal Id */
+            source_proposal_id: string | null;
+        };
+        /** MemoryItemView */
+        MemoryItemView: {
+            /** Application Mode */
+            application_mode: string;
+            /** Applied */
+            applied: boolean;
+            /** Confidence */
+            confidence: number;
+            /** Confidence Band */
+            confidence_band: string;
+            /** Corresponding Preference Key */
+            corresponding_preference_key: string | null;
+            /** Evidence */
+            evidence: components["schemas"]["MemoryEvidenceView"][];
+            /** Evidence Count */
+            evidence_count: number;
+            /** Expires At */
+            expires_at: string | null;
+            /** Explanation */
+            explanation: string;
+            /** First Observed At */
+            first_observed_at: string | null;
+            /** Id */
+            id: string;
+            /** Last Evaluated At */
+            last_evaluated_at: string | null;
+            /** Last Observed At */
+            last_observed_at: string | null;
+            /** Memory Key */
+            memory_key: string;
+            /** Overridden By Explicit */
+            overridden_by_explicit: boolean;
+            status: components["schemas"]["MemoryStatus"];
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Value */
+            value: {
+                [key: string]: unknown;
+            };
+            /** Version */
+            version: number;
+        };
+        /** MemoryListResponse */
+        MemoryListResponse: {
+            /** Count */
+            count: number;
+            /** Inference Enabled */
+            inference_enabled: boolean;
+            /** Memories */
+            memories: components["schemas"]["MemoryItemView"][];
+        };
+        /**
+         * MemoryStatus
+         * @description Closed lifecycle for one inferred-memory item (ADR 0004 D55).
+         *
+         *     candidate — inferred from evidence, awaiting the user's review. Never
+         *     applied to any outgoing content: inferred memory is suggest-only, so a
+         *     candidate influences nothing until the user confirms it.
+         *     confirmed — the user accepted it; the corresponding explicit preference
+         *     was written and now carries normal explicit authority. The item stays as
+         *     a visible record of what was learned.
+         *     dismissed — the user rejected it; sticky via an evidence fingerprint so
+         *     the same evidence never re-surfaces it (only materially new evidence can).
+         *     superseded — an explicit preference now overrides it, or newer contrary
+         *     evidence replaced its value. Visible but inactive.
+         *     expired — its evidence decayed past the freshness floor with no
+         *     confirmation. Confirmed explicit preferences never decay.
+         * @enum {string}
+         */
+        MemoryStatus: "candidate" | "confirmed" | "dismissed" | "superseded" | "expired";
+        /** MemoryVersionRequest */
+        MemoryVersionRequest: {
+            /** Expected Version */
+            expected_version: number;
         };
         /**
          * OnboardingState
@@ -1867,6 +2043,213 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MeResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_memories_memories_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemoryListResponse"];
+                };
+            };
+        };
+    };
+    delete_all_memories_memories_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    get_memory_memories__memory_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                memory_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemoryItemView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    edit_memory_memories__memory_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                memory_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemoryEditRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemoryItemView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_memory_memories__memory_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                memory_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_memory_memories__memory_id__confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                memory_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemoryVersionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemoryItemView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dismiss_memory_memories__memory_id__dismiss_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                memory_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemoryVersionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemoryItemView"];
                 };
             };
             /** @description Validation Error */

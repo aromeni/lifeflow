@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import { api, ApiError } from "@/lib/api";
-import type { EvidenceFreshness, ScheduledBriefStatus } from "@/lib/types";
+import type { EvidenceFreshness, MemoryItem, MemoryList, ScheduledBriefStatus } from "@/lib/types";
 
 type LoadState = "loading" | "ready" | "unauthenticated" | "error";
 
@@ -40,6 +40,31 @@ const FRESHNESS_LABELS: Record<string, string> = {
   stale: "old — consider syncing again from Connections",
 };
 
+const BAND_LABELS: Record<string, string> = {
+  low: "Low",
+  medium: "Medium",
+  high: "High",
+};
+
+function memoryStatusLabel(item: MemoryItem): string {
+  if (item.applied) return "Applied to your future drafts";
+  if (item.overridden_by_explicit) return "Overridden by your explicit sign-off";
+  switch (item.status) {
+    case "candidate":
+      return "Suggested — not applied until you confirm it";
+    case "confirmed":
+      return "Confirmed";
+    case "superseded":
+      return "Overridden — no longer applied";
+    case "dismissed":
+      return "Dismissed";
+    case "expired":
+      return "Expired";
+    default:
+      return item.status;
+  }
+}
+
 const PROVIDER_LABELS: Record<string, string> = {
   google: "Google (Gmail + Calendar)",
 };
@@ -68,18 +93,26 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [memories, setMemories] = useState<MemoryItem[]>([]);
+  const [memoryEnabled, setMemoryEnabled] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
+  const [memoryMessage, setMemoryMessage] = useState("");
 
   const load = useCallback(async () => {
     try {
-      const [me, prefs, status, freshness] = await Promise.all([
+      const [me, prefs, status, freshness, memoryList] = await Promise.all([
         api<MeResponse>("/me"),
         api<PreferencesResponse>("/preferences"),
         api<ScheduledBriefStatus>("/scheduled-briefs/status"),
         api<EvidenceFreshness>("/evidence-freshness"),
+        api<MemoryList>("/memories"),
       ]);
       setTimezone(me.timezone);
       setScheduleStatus(status);
       setEvidenceFreshness(freshness);
+      setMemories(memoryList.memories);
+      setMemoryEnabled(memoryList.inference_enabled);
       for (const item of prefs.preferences) {
         if (item.key === "briefing_time") {
           setBriefingTime(String(item.value.value ?? "07:30"));
@@ -143,6 +176,96 @@ export default function SettingsPage() {
   function toggleSection(key: string) {
     setSections((current) =>
       current.includes(key) ? current.filter((item) => item !== key) : [...current, key],
+    );
+  }
+
+  const reloadMemories = useCallback(async () => {
+    const list = await api<MemoryList>("/memories");
+    setMemories(list.memories);
+    setMemoryEnabled(list.inference_enabled);
+  }, []);
+
+  async function toggleMemoryInference(enabled: boolean) {
+    setMemoryMessage("");
+    setError("");
+    try {
+      await api("/preferences/memory_inference_enabled", {
+        method: "PUT",
+        body: JSON.stringify({ value: { enabled } }),
+      });
+      setMemoryEnabled(enabled);
+      setMemoryMessage(
+        enabled
+          ? "Learning turned on. LifeFlow will only learn from actions you take here."
+          : "Learning paused. Existing memory is kept until you delete it.",
+      );
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not update memory learning.");
+    }
+  }
+
+  async function runMemoryAction(action: () => Promise<unknown>, successCopy: string) {
+    setMemoryMessage("");
+    setError("");
+    try {
+      await action();
+      await reloadMemories();
+      setMemoryMessage(successCopy);
+    } catch (err) {
+      setError(
+        err instanceof ApiError ? err.message : "That memory action could not be completed.",
+      );
+    }
+  }
+
+  function confirmMemory(item: MemoryItem) {
+    void runMemoryAction(
+      () =>
+        api(`/memories/${item.id}/confirm`, {
+          method: "POST",
+          body: JSON.stringify({ expected_version: item.version }),
+        }),
+      "Confirmed. Your future draft replies will use this sign-off.",
+    );
+  }
+
+  function saveEditedMemory(item: MemoryItem) {
+    const value = editValue.trim();
+    void runMemoryAction(
+      () =>
+        api(`/memories/${item.id}`, {
+          method: "PUT",
+          body: JSON.stringify({ expected_version: item.version, value }),
+        }),
+      "Saved and confirmed.",
+    ).then(() => {
+      setEditingId(null);
+      setEditValue("");
+    });
+  }
+
+  function dismissMemory(item: MemoryItem) {
+    void runMemoryAction(
+      () =>
+        api(`/memories/${item.id}/dismiss`, {
+          method: "POST",
+          body: JSON.stringify({ expected_version: item.version }),
+        }),
+      "Dismissed. LifeFlow won't suggest this again unless your behaviour clearly changes.",
+    );
+  }
+
+  function deleteMemory(item: MemoryItem) {
+    void runMemoryAction(
+      () => api(`/memories/${item.id}`, { method: "DELETE" }),
+      "Deleted. This did not delete anything in Gmail or Calendar.",
+    );
+  }
+
+  function deleteAllMemories() {
+    void runMemoryAction(
+      () => api("/memories", { method: "DELETE" }),
+      "All inferred memory deleted. Your Gmail, Calendar, and history are untouched.",
     );
   }
 
@@ -336,6 +459,176 @@ export default function SettingsPage() {
             {label}
           </label>
         ))}
+      </section>
+
+      <section aria-labelledby="settings-memory" className="flex flex-col gap-3">
+        <h2 id="settings-memory" className="text-xl font-medium">
+          Learned preferences (memory)
+        </h2>
+        <div className="flex flex-col gap-1 text-sm text-neutral-600 dark:text-neutral-300">
+          <p>
+            LifeFlow can learn small preferences from actions you take here — like the sign-off you
+            use when you edit and approve a draft reply. It learns <strong>only</strong> from your
+            own deliberate actions inside LifeFlow.
+          </p>
+          <ul className="list-disc pl-5">
+            <li>Content of emails you receive is never treated as your preference.</li>
+            <li>Your explicit settings always take priority over anything learned.</li>
+            <li>
+              Inferred memory never approves or sends anything — you still review every draft.
+            </li>
+            <li>Deleting memory here does not delete anything in Gmail or Calendar.</li>
+            <li>Pausing stops new learning; it does not delete what was already learned.</li>
+          </ul>
+        </div>
+
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            data-testid="settings-memory-enabled"
+            checked={memoryEnabled}
+            onChange={(event) => void toggleMemoryInference(event.target.checked)}
+          />
+          Let LifeFlow learn preferences from my actions here
+        </label>
+
+        {memories.length === 0 ? (
+          <p
+            data-testid="settings-memory-empty"
+            className="text-sm text-neutral-600 dark:text-neutral-300"
+          >
+            Nothing learned yet.
+            {memoryEnabled
+              ? " Edit and approve a few draft replies with the same sign-off and it will appear here for review."
+              : " Turn on learning above to let LifeFlow suggest preferences from your actions."}
+          </p>
+        ) : (
+          <ul className="flex flex-col gap-3">
+            {memories.map((item) => (
+              <li
+                key={item.id}
+                data-testid={`memory-item-${item.id}`}
+                className="flex flex-col gap-2 rounded border border-current/20 px-3 py-2 text-sm"
+              >
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <span className="font-medium" data-testid={`memory-value-${item.id}`}>
+                    Sign-off: “{String((item.value as { value?: string }).value ?? "")}”
+                  </span>
+                  <span
+                    data-testid={`memory-status-${item.id}`}
+                    className="text-neutral-600 dark:text-neutral-300"
+                  >
+                    {memoryStatusLabel(item)}
+                  </span>
+                </div>
+                <p data-testid={`memory-explanation-${item.id}`}>{item.explanation}</p>
+                <p className="text-neutral-600 dark:text-neutral-300">
+                  Confidence: {BAND_LABELS[item.confidence_band] ?? item.confidence_band} (
+                  {item.confidence.toFixed(2)}) · based on {item.evidence_count}{" "}
+                  {item.evidence_count === 1 ? "action" : "actions"} you took
+                  {item.last_observed_at
+                    ? ` · last seen ${formatInTimezone(item.last_observed_at, timezone)}`
+                    : ""}
+                </p>
+
+                {editingId === item.id ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="flex items-center gap-2">
+                      <span className="sr-only">New sign-off</span>
+                      <input
+                        data-testid={`memory-edit-input-${item.id}`}
+                        className="w-48 rounded border px-2 py-1"
+                        value={editValue}
+                        onChange={(event) => setEditValue(event.target.value)}
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      data-testid={`memory-save-${item.id}`}
+                      onClick={() => saveEditedMemory(item)}
+                      className="rounded bg-neutral-900 px-3 py-1 text-white dark:bg-white dark:text-neutral-900"
+                    >
+                      Save &amp; confirm
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingId(null);
+                        setEditValue("");
+                      }}
+                      className="rounded border px-3 py-1"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {(item.status === "candidate" || item.status === "superseded") && (
+                      <>
+                        <button
+                          type="button"
+                          data-testid={`memory-confirm-${item.id}`}
+                          onClick={() => confirmMemory(item)}
+                          className="rounded bg-neutral-900 px-3 py-1 text-white dark:bg-white dark:text-neutral-900"
+                        >
+                          Use this sign-off
+                        </button>
+                        <button
+                          type="button"
+                          data-testid={`memory-edit-${item.id}`}
+                          onClick={() => {
+                            setEditingId(item.id);
+                            setEditValue(String((item.value as { value?: string }).value ?? ""));
+                          }}
+                          className="rounded border px-3 py-1"
+                        >
+                          Edit &amp; confirm
+                        </button>
+                        <button
+                          type="button"
+                          data-testid={`memory-dismiss-${item.id}`}
+                          onClick={() => dismissMemory(item)}
+                          className="rounded border px-3 py-1"
+                        >
+                          Dismiss
+                        </button>
+                      </>
+                    )}
+                    <button
+                      type="button"
+                      data-testid={`memory-delete-${item.id}`}
+                      onClick={() => deleteMemory(item)}
+                      className="rounded border border-red-700/40 px-3 py-1 text-red-700 dark:text-red-400"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {memories.length > 0 ? (
+          <button
+            type="button"
+            data-testid="settings-memory-delete-all"
+            onClick={deleteAllMemories}
+            className="self-start rounded border border-red-700/40 px-3 py-1 text-sm text-red-700 dark:text-red-400"
+          >
+            Delete all inferred memory
+          </button>
+        ) : null}
+
+        {memoryMessage ? (
+          <p
+            role="status"
+            data-testid="settings-memory-message"
+            className="text-sm text-green-700 dark:text-green-400"
+          >
+            {memoryMessage}
+          </p>
+        ) : null}
       </section>
 
       <div className="flex items-center gap-4">

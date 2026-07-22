@@ -1234,6 +1234,269 @@
         "title": "MeUpdateRequest",
         "type": "object"
       },
+      "MemoryEditRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_version": {
+            "minimum": 1.0,
+            "title": "Expected Version",
+            "type": "integer"
+          },
+          "value": {
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "expected_version",
+          "value"
+        ],
+        "title": "MemoryEditRequest",
+        "type": "object"
+      },
+      "MemoryEvidenceView": {
+        "description": "A safe evidence summary \u2014 the normalised token and a reason code only,\nnever a draft body (D53).",
+        "properties": {
+          "derived_value": {
+            "title": "Derived Value",
+            "type": "string"
+          },
+          "evidence_type": {
+            "title": "Evidence Type",
+            "type": "string"
+          },
+          "observed_at": {
+            "format": "date-time",
+            "title": "Observed At",
+            "type": "string"
+          },
+          "reason_code": {
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "source_proposal_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Proposal Id"
+          }
+        },
+        "required": [
+          "evidence_type",
+          "derived_value",
+          "reason_code",
+          "observed_at",
+          "source_proposal_id"
+        ],
+        "title": "MemoryEvidenceView",
+        "type": "object"
+      },
+      "MemoryItemView": {
+        "properties": {
+          "application_mode": {
+            "title": "Application Mode",
+            "type": "string"
+          },
+          "applied": {
+            "title": "Applied",
+            "type": "boolean"
+          },
+          "confidence": {
+            "title": "Confidence",
+            "type": "number"
+          },
+          "confidence_band": {
+            "title": "Confidence Band",
+            "type": "string"
+          },
+          "corresponding_preference_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Corresponding Preference Key"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/MemoryEvidenceView"
+            },
+            "title": "Evidence",
+            "type": "array"
+          },
+          "evidence_count": {
+            "title": "Evidence Count",
+            "type": "integer"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "explanation": {
+            "title": "Explanation",
+            "type": "string"
+          },
+          "first_observed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Observed At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "last_evaluated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Evaluated At"
+          },
+          "last_observed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Observed At"
+          },
+          "memory_key": {
+            "title": "Memory Key",
+            "type": "string"
+          },
+          "overridden_by_explicit": {
+            "title": "Overridden By Explicit",
+            "type": "boolean"
+          },
+          "status": {
+            "$ref": "#/components/schemas/MemoryStatus"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "value": {
+            "additionalProperties": true,
+            "title": "Value",
+            "type": "object"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "memory_key",
+          "value",
+          "status",
+          "confidence",
+          "confidence_band",
+          "evidence_count",
+          "first_observed_at",
+          "last_observed_at",
+          "last_evaluated_at",
+          "expires_at",
+          "application_mode",
+          "corresponding_preference_key",
+          "applied",
+          "overridden_by_explicit",
+          "explanation",
+          "version",
+          "updated_at",
+          "evidence"
+        ],
+        "title": "MemoryItemView",
+        "type": "object"
+      },
+      "MemoryListResponse": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "inference_enabled": {
+            "title": "Inference Enabled",
+            "type": "boolean"
+          },
+          "memories": {
+            "items": {
+              "$ref": "#/components/schemas/MemoryItemView"
+            },
+            "title": "Memories",
+            "type": "array"
+          }
+        },
+        "required": [
+          "memories",
+          "count",
+          "inference_enabled"
+        ],
+        "title": "MemoryListResponse",
+        "type": "object"
+      },
+      "MemoryStatus": {
+        "description": "Closed lifecycle for one inferred-memory item (ADR 0004 D55).\n\ncandidate \u2014 inferred from evidence, awaiting the user's review. Never\napplied to any outgoing content: inferred memory is suggest-only, so a\ncandidate influences nothing until the user confirms it.\nconfirmed \u2014 the user accepted it; the corresponding explicit preference\nwas written and now carries normal explicit authority. The item stays as\na visible record of what was learned.\ndismissed \u2014 the user rejected it; sticky via an evidence fingerprint so\nthe same evidence never re-surfaces it (only materially new evidence can).\nsuperseded \u2014 an explicit preference now overrides it, or newer contrary\nevidence replaced its value. Visible but inactive.\nexpired \u2014 its evidence decayed past the freshness floor with no\nconfirmation. Confirmed explicit preferences never decay.",
+        "enum": [
+          "candidate",
+          "confirmed",
+          "dismissed",
+          "superseded",
+          "expired"
+        ],
+        "title": "MemoryStatus",
+        "type": "string"
+      },
+      "MemoryVersionRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_version": {
+            "minimum": 1.0,
+            "title": "Expected Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "expected_version"
+        ],
+        "title": "MemoryVersionRequest",
+        "type": "object"
+      },
       "OnboardingState": {
         "enum": [
           "new",
@@ -2718,6 +2981,262 @@
           }
         },
         "summary": "Update Me"
+      }
+    },
+    "/memories": {
+      "delete": {
+        "operationId": "delete_all_memories_memories_delete",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Delete All Memories"
+      },
+      "get": {
+        "operationId": "list_memories_memories_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Memories"
+      }
+    },
+    "/memories/{memory_id}": {
+      "delete": {
+        "operationId": "delete_memory_memories__memory_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "memory_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Memory Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Memory"
+      },
+      "get": {
+        "operationId": "get_memory_memories__memory_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "memory_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Memory Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryItemView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Memory"
+      },
+      "put": {
+        "operationId": "edit_memory_memories__memory_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "memory_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Memory Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemoryEditRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryItemView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Edit Memory"
+      }
+    },
+    "/memories/{memory_id}/confirm": {
+      "post": {
+        "operationId": "confirm_memory_memories__memory_id__confirm_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "memory_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Memory Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemoryVersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryItemView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Confirm Memory"
+      }
+    },
+    "/memories/{memory_id}/dismiss": {
+      "post": {
+        "operationId": "dismiss_memory_memories__memory_id__dismiss_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "memory_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Memory Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemoryVersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryItemView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Dismiss Memory"
       }
     },
     "/preferences": {

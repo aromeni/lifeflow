@@ -113,8 +113,12 @@ def test_worker_settings_uses_json_serialization_and_a_single_retry_authority() 
     assert WorkerSettings.job_deserializer is job_deserializer
     assert WorkerSettings.max_tries == 1  # arq never auto-retries; scheduled_briefs owns retries
     assert generate_scheduled_brief in WorkerSettings.functions
-    assert len(WorkerSettings.cron_jobs) == 1
-    assert WorkerSettings.cron_jobs[0].name == "cron:dispatch_scheduled_briefs"
+    # Stage 8 Phase 3 (ADR 0004 D54/D56) added the memory recompute task and a
+    # daily memory-expiry cron on the same worker; no new queue.
+    function_names = {getattr(fn, "__name__", "") for fn in WorkerSettings.functions}
+    assert "recompute_user_memory" in function_names
+    cron_names = {job.name for job in WorkerSettings.cron_jobs}
+    assert cron_names == {"cron:dispatch_scheduled_briefs", "cron:expire_stale_memory"}
 
 
 def test_job_serializer_round_trips_a_plain_identifier_payload() -> None:

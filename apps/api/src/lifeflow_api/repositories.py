@@ -9,8 +9,9 @@ append-only by construction — it exposes no update or delete.
 import builtins
 import uuid
 from datetime import date, datetime
+from typing import Any, cast
 
-from sqlalchemy import func, select
+from sqlalchemy import CursorResult, delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from lifeflow_api.models import (
@@ -19,6 +20,8 @@ from lifeflow_api.models import (
     AuditEvent,
     Brief,
     ConnectedAccount,
+    MemoryEvidence,
+    MemoryItem,
     Preference,
     ProposalStatus,
     ScheduledBriefRun,
@@ -346,6 +349,26 @@ class ActionProposalRepository:
         result = await self._session.execute(query)
         return list(result.scalars())
 
+    async def list_user_edited_by_type(
+        self, *, action_type: str, statuses: builtins.list[ProposalStatus], limit: int = 100
+    ) -> builtins.list[ActionProposal]:
+        """The user's own proposals of one action type that they deliberately
+        edited (`user_edited_at` set) and that reached one of `statuses` —
+        the evidence source for inferred memory (ADR 0004 D53). Owner-scoped
+        like every query here; newest first, bounded."""
+        result = await self._session.execute(
+            select(ActionProposal)
+            .where(
+                ActionProposal.user_id == self._user_id,
+                ActionProposal.action_type == action_type,
+                ActionProposal.user_edited_at.is_not(None),
+                ActionProposal.status.in_([str(status) for status in statuses]),
+            )
+            .order_by(ActionProposal.user_edited_at.desc(), ActionProposal.id)
+            .limit(limit)
+        )
+        return list(result.scalars())
+
     async def list_due_for_expiry(self, now: datetime) -> builtins.list[ActionProposal]:
         result = await self._session.execute(
             select(ActionProposal)
@@ -403,6 +426,104 @@ class ActionExecutionRepository:
         if proposal.user_id != self._user_id or execution.proposal_id != proposal.id:
             raise ValueError("Action execution does not belong to this repository's user.")
         self._session.add(execution)
+
+
+class MemoryItemRepository:
+    """One row per user per closed registry key (ADR 0004 D52/D55). Owner-
+    scoped like every repository here; the `(user_id, memory_key)` unique
+    constraint is the final guard against two conflicting active memories."""
+
+    def __init__(self, session: AsyncSession, user_id: uuid.UUID) -> None:
+        self._session = session
+        self._user_id = user_id
+
+    async def get(self, item_id: uuid.UUID, *, for_update: bool = False) -> MemoryItem | None:
+        query = select(MemoryItem).where(
+            MemoryItem.id == item_id, MemoryItem.user_id == self._user_id
+        )
+        if for_update:
+            query = query.with_for_update()
+        result = await self._session.execute(query)
+        return result.scalar_one_or_none()
+
+    async def get_by_key(self, memory_key: str, *, for_update: bool = False) -> MemoryItem | None:
+        query = select(MemoryItem).where(
+            MemoryItem.memory_key == memory_key, MemoryItem.user_id == self._user_id
+        )
+        if for_update:
+            query = query.with_for_update()
+        result = await self._session.execute(query)
+        return result.scalar_one_or_none()
+
+    async def list(
+        self, *, statuses: builtins.list[str] | None = None
+    ) -> builtins.list[MemoryItem]:
+        query = select(MemoryItem).where(MemoryItem.user_id == self._user_id)
+        if statuses is not None:
+            query = query.where(MemoryItem.status.in_(statuses))
+        query = query.order_by(MemoryItem.updated_at.desc(), MemoryItem.id)
+        result = await self._session.execute(query)
+        return list(result.scalars())
+
+    def add(self, item: MemoryItem) -> None:
+        if item.user_id != self._user_id:
+            raise ValueError("Memory item does not belong to this repository's user.")
+        self._session.add(item)
+
+    async def delete(self, item: MemoryItem) -> None:
+        if item.user_id != self._user_id:
+            raise ValueError("Memory item does not belong to this repository's user.")
+        # DB-level ON DELETE CASCADE removes the item's evidence rows too.
+        await self._session.delete(item)
+
+    async def delete_all(self) -> int:
+        """Erase every inferred-memory item (and, by DB cascade, its evidence)
+        for this user. Atomic single statement; returns the count removed."""
+        result = cast(
+            "CursorResult[Any]",
+            await self._session.execute(
+                delete(MemoryItem).where(MemoryItem.user_id == self._user_id)
+            ),
+        )
+        return int(result.rowcount or 0)
+
+
+class MemoryEvidenceRepository:
+    """Safe, deduplicated references to the deliberate user actions that
+    support an inferred memory (ADR 0004 D53). Owner-scoped; never stores a
+    draft body, only a normalised derived value and a reason code."""
+
+    def __init__(self, session: AsyncSession, user_id: uuid.UUID) -> None:
+        self._session = session
+        self._user_id = user_id
+
+    async def list_for_item(self, memory_item_id: uuid.UUID) -> builtins.list[MemoryEvidence]:
+        result = await self._session.execute(
+            select(MemoryEvidence)
+            .where(
+                MemoryEvidence.memory_item_id == memory_item_id,
+                MemoryEvidence.user_id == self._user_id,
+            )
+            .order_by(MemoryEvidence.observed_at, MemoryEvidence.id)
+        )
+        return list(result.scalars())
+
+    async def existing_proposal_ids(self, memory_item_id: uuid.UUID) -> set[uuid.UUID]:
+        """The proposal ids already recorded as evidence for this item — used
+        to make recompute idempotent (never double-count a proposal)."""
+        result = await self._session.execute(
+            select(MemoryEvidence.source_proposal_id).where(
+                MemoryEvidence.memory_item_id == memory_item_id,
+                MemoryEvidence.user_id == self._user_id,
+                MemoryEvidence.source_proposal_id.is_not(None),
+            )
+        )
+        return {pid for (pid,) in result.all() if pid is not None}
+
+    def add(self, evidence: MemoryEvidence) -> None:
+        if evidence.user_id != self._user_id:
+            raise ValueError("Memory evidence does not belong to this repository's user.")
+        self._session.add(evidence)
 
 
 class AuditEventRepository:

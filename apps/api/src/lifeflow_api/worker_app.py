@@ -25,6 +25,8 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from lifeflow_api.config import get_settings
 from lifeflow_api.db import create_engine
+from lifeflow_api.memory_inference import expire_all_stale_memory
+from lifeflow_api.memory_inference import recompute_user_memory as run_recompute
 from lifeflow_api.scheduled_briefs import (
     dispatch_tick,
     job_deserializer,
@@ -92,17 +94,57 @@ async def generate_scheduled_brief(ctx: dict[str, Any], run_id: str) -> None:
         )
 
 
+async def recompute_user_memory(ctx: dict[str, Any], user_id: str) -> None:
+    """Stage 8 Phase 3 (ADR 0004 D56): recompute one user's inferred memory.
+
+    Named to match `memory_inference.JOB_FUNCTION_NAME` so arq routes the
+    enqueued job here (the same convention `generate_scheduled_brief` uses).
+    `user_id` is the only argument — never draft content — and every fact is
+    reloaded from PostgreSQL. Best-effort and idempotent: the recompute
+    rescans the user's recent eligible proposals, so a missed enqueue
+    self-heals here; it commits its own work and never approves or executes
+    anything."""
+    sessionmaker = ctx["sessionmaker"]
+    now = datetime.now(UTC)
+    async with sessionmaker() as session:
+        await run_recompute(session, uuid.UUID(user_id), now=now)
+        await session.commit()
+    logger.info("memory.recompute_done user_id=%s", user_id)
+
+
+async def expire_stale_memory(ctx: dict[str, Any]) -> None:
+    """Daily maintenance (ADR 0004 D54): expire inferred-memory candidates
+    whose confidence has decayed below the floor, for every user — so a stale
+    candidate is never represented as active even if its owner never opens
+    Settings again (expiry must not depend on a user action). Idempotent and
+    safe to run repeatedly; confirmed explicit preferences are never touched."""
+    sessionmaker = ctx["sessionmaker"]
+    now = datetime.now(UTC)
+    async with sessionmaker() as session:
+        expired = await expire_all_stale_memory(session, now=now)
+    logger.info("memory.expire_stale_done expired=%s", expired)
+
+
 def _redis_settings() -> RedisSettings:
     return RedisSettings.from_dsn(get_settings().redis_url)
 
 
 class WorkerSettings:
-    functions: ClassVar[list[Callable[..., Awaitable[None]]]] = [generate_scheduled_brief]
+    functions: ClassVar[list[Callable[..., Awaitable[None]]]] = [
+        generate_scheduled_brief,
+        recompute_user_memory,
+    ]
     cron_jobs: ClassVar[list[CronJob]] = [
         # `second=0` (the arq default) fires once per minute, at :00 —
         # matching ADR 0004 D48's "a modest interval, preferably once per
         # minute", not a per-user schedule registered dynamically.
-        cron(dispatch_scheduled_briefs, second=0, run_at_startup=True, max_tries=1)
+        cron(dispatch_scheduled_briefs, second=0, run_at_startup=True, max_tries=1),
+        # Once a day at 03:00 UTC — inferred-memory decay is a 30-day
+        # half-life, so daily maintenance is ample to keep stale candidates
+        # from being shown as active (ADR 0004 D54). Read-time expiry on the
+        # memory API is the fast path between runs; this guarantees expiry even
+        # for a user who never opens Settings again.
+        cron(expire_stale_memory, hour=3, minute=0, second=0, max_tries=1),
     ]
     redis_settings = _redis_settings()
     on_startup = on_startup
@@ -116,4 +158,10 @@ class WorkerSettings:
     max_tries = 1
 
 
-__all__ = ["WorkerSettings", "dispatch_scheduled_briefs", "generate_scheduled_brief"]
+__all__ = [
+    "WorkerSettings",
+    "dispatch_scheduled_briefs",
+    "expire_stale_memory",
+    "generate_scheduled_brief",
+    "recompute_user_memory",
+]
