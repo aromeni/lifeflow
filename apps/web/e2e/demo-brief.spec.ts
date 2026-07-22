@@ -1,12 +1,36 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+
+const API_URL = "http://localhost:8010";
+const MUTATION_HEADERS = { "X-LifeFlow-CSRF": "1" };
+
+// Each test gets its OWN demo user (a unique dev-login email), never the shared
+// `dev-login {}` singleton the "Try demo" button uses. Separate spec files run
+// on parallel Playwright workers, and demo-brief + demo-approvals both drove the
+// same singleton row — one spec's brief generation raced the other's proposal
+// execution, so this journey's "Waiting for" section was intermittently empty
+// (a fresh demo import is fully deterministic — always ≥1 unanswered follow-up).
+// This mirrors the isolated pattern demo-approvals.spec already uses.
+async function signInAndStartDemo(page: Page) {
+  await page.goto("/");
+  const login = await page.request.post(`${API_URL}/auth/dev-login`, {
+    headers: MUTATION_HEADERS,
+    data: {
+      email: `playwright-brief-${Date.now()}-${Math.random().toString(36).slice(2)}@example.com`,
+      display_name: "Playwright Brief User",
+    },
+  });
+  expect(login.ok()).toBeTruthy();
+  const demo = await page.request.post(`${API_URL}/demo/start`, { headers: MUTATION_HEADERS });
+  expect(demo.ok()).toBeTruthy();
+}
 
 // The required Stage 5 journey: demo start → onboarding → brief generation →
 // evidence inspection. Everything runs against synthetic data; no credentials.
 test("demo user generates a brief and inspects the evidence behind an item", async ({ page }) => {
-  await page.goto("/");
-  await page.getByRole("button", { name: /Try demo/ }).click();
+  await signInAndStartDemo(page);
 
   // Onboarding explains permissions and approval; finishing lands on Today.
+  await page.goto("/onboarding");
   await expect(page.getByRole("heading", { name: "Set up your demo" })).toBeVisible();
   await expect(
     page.getByText(/nothing is ever sent or changed without your explicit/),
@@ -45,8 +69,8 @@ test("demo user generates a brief and inspects the evidence behind an item", asy
 });
 
 test("regenerating creates a new persisted version", async ({ page }) => {
-  await page.goto("/");
-  await page.getByRole("button", { name: /Try demo/ }).click();
+  await signInAndStartDemo(page);
+  await page.goto("/onboarding");
   await page.getByRole("button", { name: "Finish and open Today" }).click();
   const status = page.getByTestId("brief-status");
   await expect(status).not.toHaveText("Loading your brief…");
