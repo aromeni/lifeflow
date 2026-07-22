@@ -1,0 +1,10 @@
+title = "lifeflow gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "detect-secrets' own baseline file stores SHA-256 hashes of already-reviewed findings; those hashes look like high-entropy secrets to gitleaks' generic-api-key rule but are not secrets themselves. Verified this does not suppress a genuinely reintroduced secret (only this exact path is excluded)."
+paths = [
+    '''\.secrets\.baseline$''',
+]
