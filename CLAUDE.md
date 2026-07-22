@@ -2,7 +2,7 @@
 
 LifeFlow AI is a permissioned, inspectable, human-in-the-loop personal operations agent. Before making product or architecture decisions, read the North Star: [docs/project/project-foundation.md](docs/project/project-foundation.md). The build follows a stage-gated protocol ([docs/delivery/stage-plan.md](docs/delivery/stage-plan.md)); work only within the active stage.
 
-**Current stage: 8 (preferences, memory, schedule) — in progress, Phase 2 (scheduled brief, arq+Redis) complete, awaiting approval for Phase 3 (inferred memory). Stages 0–7 are approved (`stage-7-complete` tag); Stage 9 is not active.**
+**Current stage: 8 (preferences, memory, schedule) — complete and approved. All three phases (explicit preferences; scheduled brief, arq+Redis; transparent inferred memory) passed the committed-state closure review; the Phase 3 commit is `466de179a7af1fe6410ee4e4f661402bec5b8925`, approved for remote completion. Stages 0–7 are approved (`stage-7-complete` tag). Stage 9 (privacy, audit UX, resilience) has not begun; all remaining work belongs to Stage 9.**
 
 ## Commands
 

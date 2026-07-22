@@ -93,5 +93,8 @@ pnpm web:dev   # Settings → Learned preferences
 
 ## Gate
 
-Stage 8 (all three phases) is complete and fully verified. Stop here and wait
-for explicit human approval before beginning Stage 9.
+Stage 8 (all three phases) is complete and fully verified. All three phases
+passed the committed-state closure review as one integrated milestone, and
+Stage 8 has been **approved for remote completion**. The Phase 3 commit is
+`466de179a7af1fe6410ee4e4f661402bec5b8925`. Stage 9 (privacy, audit UX,
+resilience) has not begun; all remaining work belongs to Stage 9.
