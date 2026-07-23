@@ -15,7 +15,7 @@ Run locally with:
 import logging
 import uuid
 from collections.abc import Awaitable, Callable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any, ClassVar
 
 from arq import cron
@@ -25,8 +25,14 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from lifeflow_api.config import get_settings
 from lifeflow_api.db import create_engine
+from lifeflow_api.deletion import (
+    build_settings_horizons,
+    recover_stale_operations,
+    run_operation,
+)
 from lifeflow_api.memory_inference import expire_all_stale_memory
 from lifeflow_api.memory_inference import recompute_user_memory as run_recompute
+from lifeflow_api.retention import scan_and_create_retention_operations
 from lifeflow_api.scheduled_briefs import (
     dispatch_tick,
     job_deserializer,
@@ -49,6 +55,24 @@ async def on_startup(ctx: dict[str, Any]) -> None:
         ctx["llm_provider"] = AnthropicProvider(
             settings.anthropic_api_key, model=settings.anthropic_model
         )
+    # Real, best-effort provider revocation for account deletion (Stage 9
+    # Delivery Phase 2). Wired only when Google is genuinely configured; demo/CI
+    # leave it None, so local credential erasure still happens and nothing ever
+    # blocks on a provider call. This is the production composition root for the
+    # revoker — mirroring how the disconnect route obtains its OAuth client.
+    ctx["google_http_client"] = None
+    ctx["revoker"] = None
+    if settings.google_oauth_enabled and settings.token_key:
+        import httpx
+
+        from lifeflow_api.google.oauth import GoogleOAuthClient
+        from lifeflow_api.google_wiring import build_account_revoker
+        from lifeflow_api.security.token_cipher import AesGcmTokenCipher
+
+        http = httpx.AsyncClient(timeout=10.0)
+        ctx["google_http_client"] = http
+        cipher = AesGcmTokenCipher(settings.token_key, settings.token_key_id)
+        ctx["revoker"] = build_account_revoker(cipher, GoogleOAuthClient(http))
     logger.info("scheduled_briefs.worker_started")
 
 
@@ -56,6 +80,9 @@ async def on_shutdown(ctx: dict[str, Any]) -> None:
     engine = ctx.get("engine")
     if engine is not None:
         await engine.dispose()
+    http = ctx.get("google_http_client")
+    if http is not None:
+        await http.aclose()
     logger.info("scheduled_briefs.worker_stopped")
 
 
@@ -125,6 +152,66 @@ async def expire_stale_memory(ctx: dict[str, Any]) -> None:
     logger.info("memory.expire_stale_done expired=%s", expired)
 
 
+async def run_deletion_operation(ctx: dict[str, Any], operation_id: str) -> None:
+    """Stage 9 Delivery Phase 2 (ADR 0005): run one durable deletion operation
+    to completion in bounded batches. `operation_id` is the only argument — an
+    internal identifier, never scope, counts, or personal data — and every
+    other fact is reloaded from PostgreSQL. Idempotent and resumable: a crash
+    leaves the operation `running` for the cron to recover."""
+    sessionmaker = ctx["sessionmaker"]
+    settings = get_settings()
+    now = datetime.now(UTC)
+    async with sessionmaker() as session:
+        await run_operation(
+            session,
+            uuid.UUID(operation_id),
+            now=now,
+            horizons=build_settings_horizons(settings),
+            batch_size=settings.deletion_batch_size,
+            max_attempts=settings.deletion_max_attempts,
+            # The real best-effort provider revoker (built in on_startup when
+            # Google is configured; None otherwise — local erasure still runs).
+            revoker=ctx.get("revoker"),
+        )
+    logger.info("deletion.operation_done operation_id=%s", operation_id)
+
+
+async def dispatch_deletion_operations(ctx: dict[str, Any]) -> None:
+    """Per-minute cron: create today's retention operations (when enabled),
+    then drain any `pending` operations that were never enqueued (Redis was
+    down at confirm time) and recover `running` operations whose worker died.
+    One static cron job, never one entry per user."""
+    redis: ArqRedis = ctx["redis"]
+    sessionmaker = ctx["sessionmaker"]
+    settings = get_settings()
+    now = datetime.now(UTC)
+    async with sessionmaker() as session:
+        if settings.retention_enforcement_enabled:
+            result, _ = await scan_and_create_retention_operations(
+                session,
+                horizons=build_settings_horizons(settings),
+                now=now,
+                max_operations=settings.retention_max_operations_per_tick,
+            )
+            await session.commit()
+            logger.info(
+                "deletion.retention_scan created=%s reused=%s", result.created, result.reused
+            )
+        recovery = await recover_stale_operations(
+            session,
+            redis,
+            now=now,
+            heartbeat_timeout=timedelta(minutes=settings.deletion_heartbeat_timeout_minutes),
+            max_attempts=settings.deletion_max_attempts,
+        )
+    logger.info(
+        "deletion.dispatch_tick drained=%s requeued=%s failed=%s",
+        recovery.drained,
+        recovery.requeued,
+        recovery.failed,
+    )
+
+
 def _redis_settings() -> RedisSettings:
     return RedisSettings.from_dsn(get_settings().redis_url)
 
@@ -133,12 +220,16 @@ class WorkerSettings:
     functions: ClassVar[list[Callable[..., Awaitable[None]]]] = [
         generate_scheduled_brief,
         recompute_user_memory,
+        run_deletion_operation,
     ]
     cron_jobs: ClassVar[list[CronJob]] = [
         # `second=0` (the arq default) fires once per minute, at :00 —
         # matching ADR 0004 D48's "a modest interval, preferably once per
         # minute", not a per-user schedule registered dynamically.
         cron(dispatch_scheduled_briefs, second=0, run_at_startup=True, max_tries=1),
+        # Stage 9 Delivery Phase 2 (ADR 0005): retention scan + pending-drain +
+        # stale-operation recovery, once a minute. One static job.
+        cron(dispatch_deletion_operations, second=0, run_at_startup=True, max_tries=1),
         # Once a day at 03:00 UTC — inferred-memory decay is a 30-day
         # half-life, so daily maintenance is ample to keep stale candidates
         # from being shown as active (ADR 0004 D54). Read-time expiry on the
@@ -160,8 +251,10 @@ class WorkerSettings:
 
 __all__ = [
     "WorkerSettings",
+    "dispatch_deletion_operations",
     "dispatch_scheduled_briefs",
     "expire_stale_memory",
     "generate_scheduled_brief",
     "recompute_user_memory",
+    "run_deletion_operation",
 ]
