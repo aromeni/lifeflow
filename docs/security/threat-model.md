@@ -187,6 +187,18 @@ The read-only Privacy Centre (ADR 0005 D65, `GET /privacy/summary`) is a new sur
 - **T29 (scheduler/queue outage isolation).** The endpoint depends only on PostgreSQL and is proven to work against an unreachable Redis. Opening or refreshing the page never triggers a Google sync (ADR 0003 boundary preserved).
 - **T15/T16 (retention & deletion honesty).** Delivery Phase 1 is non-destructive. Retention horizons are surfaced read-only with `enforced=False` and explicit "not switched on yet" copy, so the UI can never imply enforcement that does not exist. Actual deletion, retention enforcement, and account deletion (anonymise-and-minimise, ADR 0005 D61–D63) arrive in Delivery Phase 2; rate limiting (D64) in Delivery Phase 4.
 
+## Durable deletion engine (Stage 9 Delivery Phase 2, recorded 2026-07-23)
+
+The destructive engine (ADR 0005 D66–D72) introduces a new class of privileged, irreversible operations, so it gets explicit safety rules; all are code-enforced and regression-tested (`test_deletion_engine.py`, `test_privacy_deletion_api.py`, `test_deletion_queue.py`).
+
+- **T2 (cross-user destruction).** Every preview/confirm/cancel/status is owner-scoped; a cross-user operation returns 404 without ownership leakage. The worker's cross-user recovery/scan create only owner-scoped operations. Anonymisation preserves ownership isolation for retained tombstones.
+- **T12 (duplicate/concurrent destruction).** A partial unique index guarantees at most one active operation per (user, type, scope); the worker claim is an atomic conditional `UPDATE … RETURNING` (only one worker wins); re-running a completed operation is a no-op. Idempotent across crash-resume (durable cursor + fresh DB query authoritative; re-minimising yields the identical tombstone).
+- **T15 (retention honesty & preservation).** Enforcement is opt-in (`RETENTION_ENFORCEMENT_ENABLED`), bounded (per-day scope key, per-tick cap), and reuses the one planner; it never deletes pending/uncertain executions or confirmed explicit preferences. The Privacy Centre flips to "enforced" only when it genuinely is.
+- **T16 (deletion correctness & scope).** Imported-data deletion removes only LifeFlow's copy for one account within the snapshot boundary (`SourceItem.created_at`); it never calls a provider content API (the engine imports no Gmail/Calendar client — proven). Gmail draft-only / Calendar create-only invariants are untouched; uncertain outcomes are never auto-retried.
+- **T1/T6 (content-free by construction).** Operation responses, audit metadata, worker logs, and the Redis payload (operation id only) carry no token, payload, recipient, subject, provider id, or confirmation phrase — only ids, counts, states, and safe reason codes. Retained proposal/execution/audit tombstones are minimised (payloads cleared).
+- **Authorisation & session invalidation.** A typed confirmation phrase gates each user-requested operation; a `deletion_pending`/`deleted` account is blocked from sync/brief/proposal mutations (`require_active_account`), and a `deleted` account can never authenticate again (`get_current_user`), invalidating existing sessions. The same Google identity may create a genuinely new account without reviving the anonymised one.
+- **T29 (queue outage).** Preview/confirm never touch Redis; a confirmed operation persists as `pending` and is drained by the per-minute cron when Redis returns — ordinary API routes stay available throughout.
+
 ## Out-of-scope threats (recorded, revisit at Stage 11)
 
 Multi-region availability, DDoS at scale, malicious insiders with database access, and formal GDPR DPIA sign-off (draft privacy notice arrives in Stage 10 for professional review).
