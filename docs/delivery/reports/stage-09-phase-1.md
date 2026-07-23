@@ -2,7 +2,8 @@
 
 **Branch:** `stage-9-privacy-hardening` (base `c5b60b1`). **Date:** 2026-07-22.
 **Scope:** the read-only, non-destructive Privacy & Connections Control Centre.
-Not committed, tagged, or pushed. Delivery Phase 2 not begun.
+Remotely preserved at `49f121a`. Delivery Phase 2 was subsequently remotely
+finalised at `fdb4636`; this report remains the Phase 1 boundary record.
 
 ## Outcome
 
@@ -105,9 +106,13 @@ the surface triggers no sync. Gmail/Calendar provider content is never touched
 (the route only clears local tokens; the executor is draft/create-only). The
 real Google-connected account was not used.
 
-## Delivery Phase 2 boundaries (not built here)
+## Delivery Phase 2 boundaries (not built in this phase)
 
 Imported-data deletion (durable `DataDeletionOperation` engine, preview, typed
 confirmation), retention enforcement job, and account deletion
 (anonymise-and-minimise) — all per ADR 0005 D61–D63. Audit history is Phase 3,
 rate limiting Phase 4, resilience/telemetry Phase 5.
+
+Delivery Phase 2 was subsequently completed at `fdb4636`. Delivery Phases 3–5
+have not begun; Stage 9 is not complete, has no `stage-9-complete` tag, and has
+not been merged to `main`.

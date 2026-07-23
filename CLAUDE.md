@@ -2,7 +2,7 @@
 
 LifeFlow AI is a permissioned, inspectable, human-in-the-loop personal operations agent. Before making product or architecture decisions, read the North Star: [docs/project/project-foundation.md](docs/project/project-foundation.md). The build follows a stage-gated protocol ([docs/delivery/stage-plan.md](docs/delivery/stage-plan.md)); work only within the active stage.
 
-**Current stage: 8 (preferences, memory, schedule) — complete and approved. All three phases (explicit preferences; scheduled brief, arq+Redis; transparent inferred memory) passed the committed-state closure review; the Phase 3 commit is `466de179a7af1fe6410ee4e4f661402bec5b8925`, approved for remote completion. Stages 0–7 are approved (`stage-7-complete` tag). Stage 9 (privacy, audit UX, resilience) has not begun; all remaining work belongs to Stage 9.**
+**Current stage: 9 (privacy, audit UX, resilience) — in progress, not complete. Delivery Phase 1 is remotely preserved at `49f121a`; Delivery Phase 2 is remotely finalised at `fdb4636` on `origin/stage-9-deletion-retention`; and the current `stage-9-audit-history` branch starts at that immutable Phase 2 boundary. Delivery Phase 3 (audit history), Phase 4 (rate limiting), and Phase 5 (resilience and telemetry) have not begun. No `stage-9-complete` tag exists, and Stage 9 has not been merged to `main`.**
 
 ## Commands
 
@@ -10,13 +10,13 @@ Prerequisites: Docker, uv, pnpm, Node 22+.
 
 ```bash
 cp .env.example .env                  # once; never commit .env
-docker compose up -d db redis --wait  # PostgreSQL on 5433, Redis on 6380 (Redis optional — Stage 8 Phase 2 only)
+docker compose up -d db redis --wait  # PostgreSQL on 5433, Redis on 6380 (background jobs only)
 
 # Backend (from apps/api)
 uv sync                         # install deps (Python 3.12 auto-provisioned)
 uv run alembic upgrade head     # migrations
 uv run uvicorn --app-dir src lifeflow_api.main:app --reload --port 8010
-uv run arq lifeflow_api.worker_app.WorkerSettings  # scheduled-brief worker (Stage 8 Phase 2; needs redis)
+uv run arq lifeflow_api.worker_app.WorkerSettings  # scheduled-brief, memory, deletion and retention worker
 uv run pytest                   # all tests (integration needs the db container; a few also need redis)
 uv run pytest -m "not integration"
 uv run ruff format . && uv run ruff check . && uv run mypy

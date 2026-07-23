@@ -3,22 +3,25 @@
 **Branch:** `stage-9-deletion-retention` (base `49f121a`). **Date:** 2026-07-23.
 **Scope:** the durable deletion engine — imported-data deletion, retention
 enforcement, and account deletion (anonymise-and-minimise) — behind one model,
-one planner, and one worker. Not committed, tagged, or pushed. Delivery Phase 3
-not begun.
+one planner, and one worker. Remotely finalised at `fdb4636` on
+`origin/stage-9-deletion-retention`. The `stage-9-audit-history` branch starts
+at that immutable boundary. Delivery Phase 3 has not begun.
 
 ## Executive verdict
 
-**APPROVE DELIVERY PHASE 2 FOR REVIEW.**
+**DELIVERY PHASE 2 APPROVED AND REMOTELY FINALISED.**
 
 Every capability in §1 of the brief is implemented against the ratified policy,
 with accurate previews, typed confirmation, durable/bounded/resumable execution,
 explicit derived-data handling, preserved pending/uncertain evidence, retention
 enforcement using the same planner, and privacy-minimised account tombstones.
 All existing tests pass, 35 focused backend tests and 6 focused frontend tests
-were added, and every automated gate that this environment can run is green.
-Two honest limitations are documented below (real provider *revoke* during
-account deletion is wired as a no-op in demo/CI; the Playwright/eval suites are
-listed with their run status) — neither is a defect in the shipped behaviour.
+were added. The focused D73–D74 remediation later in this report supersedes the
+earlier provider-revocation limitation. The pre-Phase-3 reconciliation also
+found that the repository-supported Prettier check had not been included in the
+recorded frontend gate: it reproducibly reported three Phase 2 frontend files.
+The follow-on formatting-only commit `dc06b41` corrects only their layout on
+`stage-9-audit-history`; no Phase 2 history was amended.
 
 ## Ratified policy implementation
 
@@ -169,6 +172,7 @@ imported by the deletion engine (`test_deletion_never_calls_provider`).
 | Ruff check / format | clean |
 | Frontend vitest | **64 passed** (17 in the connections suite) |
 | Frontend tsc / eslint / build | pass / pass / pass |
+| Frontend Prettier | **FAIL at `fdb4636`** — `pnpm web:format:check` (Prettier 3.9.5) reported `DeletionControls.tsx`, `page.test.tsx`, and `page.tsx`; corrected formatting-only in follow-on commit `dc06b41` without amending Phase 2 |
 | Playwright e2e | **4 passed** (connections + demo-brief ×2 + demo-approvals) |
 | Evals (det, actions) | baseline: precision 1.00, recall 0.94, **0 unsafe / 0 injection / 0 grounding** |
 | Alembic 0010→0011→0010→0011 | verified; single head `0011` |
@@ -250,9 +254,11 @@ present — no audit timeline, no rate-limit middleware, no export-my-data, no n
 connectors/scopes, no Gmail send, no Calendar update/delete, and no automatic
 retry of uncertain provider outcomes.
 
-## Commit recommendation
+## Remote completion
 
-Recommend committing as the Delivery Phase 2 boundary on
-`stage-9-deletion-retention` **after review**, in coherent commits (migration +
-model; engine; API + guards; worker; frontend; docs/tests). Do not push, tag, or
-begin Delivery Phase 3 until explicitly approved.
+Delivery Phase 2 is remotely finalised at `fdb4636` on
+`origin/stage-9-deletion-retention`. The `stage-9-audit-history` branch starts
+at that immutable boundary. Delivery Phase 3 (audit history), Delivery Phase 4
+(rate limiting), and Delivery Phase 5 (resilience and telemetry) have not begun.
+Stage 9 is not complete, no `stage-9-complete` tag exists, and Stage 9 has not
+been merged to `main`.

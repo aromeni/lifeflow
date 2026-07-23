@@ -21,13 +21,19 @@ project instructions even though they were originally created for Claude Code.
 
 ## Current build status
 
-Stages 0–5 are complete.
+Stages 0–8 are complete and approved. Stage 8 is merged to `main`
+(`c5b60b1`) and tagged `stage-8-complete`.
 
-The active stage is:
+**Stage 9 — privacy, audit UX, and resilience — is in progress but is not
+complete.** Delivery Phase 1 is remotely preserved at `49f121a`. Delivery
+Phase 2 is remotely finalised at `fdb4636` on
+`origin/stage-9-deletion-retention`. The current
+`stage-9-audit-history` branch starts at that immutable Phase 2 boundary.
 
-**Stage 6 — Action proposals and approval inbox**
-
-Do not implement Stage 7 or later functionality.
+Delivery Phase 3 (audit history), Delivery Phase 4 (rate limiting), and
+Delivery Phase 5 (resilience and telemetry) have not begun. No
+`stage-9-complete` tag exists, and Stage 9 has not been merged to `main`.
+Do not begin a Delivery Phase without explicit approval.
 
 ## Permanent rules
 
@@ -36,8 +42,9 @@ Do not implement Stage 7 or later functionality.
 - Prefer explicit, readable and testable code.
 - Do not introduce new frameworks without a measured need.
 - Do not allow LLM output to execute external actions directly.
-- Do not send emails or create real calendar events.
-- Use simulated executors during Stage 6.
+- Do not send email; Gmail writes remain draft-only.
+- Preserve the approval-bound Stage 7 calendar-event creation path and the
+  simulated demo executors; do not add external side effects in Stage 9.
 - External side effects always require exact user approval.
 - Edited payloads invalidate previous approval.
 - Approved and executed payloads must match exactly.
@@ -47,7 +54,8 @@ Do not implement Stage 7 or later functionality.
 - Run tests before and after implementation.
 - Never disable or weaken tests to make the build pass.
 - Do not create a commit unless explicitly instructed.
-- Stop after the Stage 6 Completion Report.
+- Complete only the explicitly approved Delivery Phase, produce its completion
+  report, and stop for explicit approval.
 
 ## Stage-gated behaviour
 
@@ -56,9 +64,10 @@ Before editing:
 1. Inspect the repository.
 2. Run the existing baseline checks.
 3. Summarise the current architecture.
-4. Explain the Stage 6 implementation plan.
+4. Explain the approved Delivery Phase implementation plan.
 5. Identify security and migration risks.
-6. Confirm that no Stage 7 functionality is included.
+6. Confirm that no later Delivery Phase functionality is included.
 
-Then implement Stage 6, run every required quality gate, produce the defined
-Stage 6 Completion Report and stop for explicit approval.
+Then implement only the explicitly approved Delivery Phase, run every required
+quality gate, produce its defined completion report, and stop for explicit
+approval.

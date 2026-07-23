@@ -9,7 +9,7 @@ A permissioned, inspectable, human-in-the-loop personal operations agent. LifeFl
 - Threat model: [docs/security/threat-model.md](docs/security/threat-model.md)
 - Metrics dashboard: [docs/delivery/metrics.md](docs/delivery/metrics.md) (regenerate with `python3 scripts/metrics.py`) · Stage reports: [docs/delivery/reports/](docs/delivery/reports/)
 
-**Status:** Stage 7 (real Google integration) is **complete**, tagged `stage-7-complete` — both the Gmail and Calendar paths are verified live end-to-end against a real sandbox account (see [docs/delivery/reports/stage-07.md](docs/delivery/reports/stage-07.md) and [docs/delivery/stage-07-manual-checklist.md](docs/delivery/stage-07-manual-checklist.md)). Stage 8 (preferences, memory, schedule) is **complete and approved**: Phase 1 (explicit preferences), Phase 2 (the scheduled daily brief, arq+Redis), and Phase 3 (transparent inferred memory, commit `466de179a7af1fe6410ee4e4f661402bec5b8925`) all passed the committed-state closure review and are approved for remote completion (see [docs/delivery/reports/stage-08.md](docs/delivery/reports/stage-08.md)). Stage 8 is merged to `main` (`c5b60b1`). Stage 9 (privacy, audit UX, resilience) is **in progress**: the Planning Gate is approved ([ADR 0005](docs/architecture/adr/0005-stage9-privacy-hardening.md)); **Delivery Phase 1 — the read-only Privacy & Connections Control Centre** is implemented (the `/connections` page expanded, plus `GET /privacy/summary`; see [docs/delivery/reports/stage-09-phase-1.md](docs/delivery/reports/stage-09-phase-1.md)); and **Delivery Phase 2 — the durable deletion engine** (imported-data deletion, retention enforcement, account deletion via one `DataDeletionOperation` model, one shared planner, one bounded/resumable worker; preview → typed confirmation → durable progress; see [docs/delivery/reports/stage-09-phase-2.md](docs/delivery/reports/stage-09-phase-2.md)) is implemented. Delivery Phases 3–5 (audit history, rate limiting, resilience) follow.
+**Status:** Stages 0–8 are complete and approved; Stage 8 is merged to `main` (`c5b60b1`) and tagged `stage-8-complete`. Stage 9 (privacy, audit UX, resilience) is **in progress and is not complete**: the Planning Gate is approved ([ADR 0005](docs/architecture/adr/0005-stage9-privacy-hardening.md)); **Delivery Phase 1 — the read-only Privacy & Connections Control Centre** is remotely preserved at `49f121a`; and **Delivery Phase 2 — the durable deletion engine** is remotely finalised at `fdb4636` on `origin/stage-9-deletion-retention`. The current `stage-9-audit-history` branch starts at that immutable Phase 2 boundary. Delivery Phase 3 (audit history), Delivery Phase 4 (rate limiting), and Delivery Phase 5 (resilience and telemetry) have not begun. No `stage-9-complete` tag exists, and Stage 9 has not been merged to `main`. See the [Phase 1](docs/delivery/reports/stage-09-phase-1.md) and [Phase 2](docs/delivery/reports/stage-09-phase-2.md) reports.
 
 ## Your privacy & data
 
@@ -40,7 +40,7 @@ apps/api            FastAPI backend (Python 3.12, SQLAlchemy 2, Alembic)
 packages/contracts  OpenAPI-generated shared types, consumed by apps/web
 prompts/            Versioned prompts and output contracts for LLM-assisted extraction and brief composition
 evals/              Golden datasets and scoring for signals, briefs, and actions
-workers/            Background job entry points (scheduled-brief worker live, Stage 8 Phase 2; retention still Stage 8/9)
+workers/            Background jobs for scheduled briefs, memory, deletion, and retention
 infra/              Deployment configuration beyond local Docker Compose — Stage 11, not yet populated
 docs/               Product, architecture, security, and delivery docs
 ```
@@ -66,8 +66,8 @@ docs/               Product, architecture, security, and delivery docs
 ```bash
 cp .env.example .env                    # local config; never commit .env
 docker compose up -d db redis --wait    # PostgreSQL 16 on 5433, Redis 7 on 6380
-# Redis is optional: only the Stage 8 Phase 2 scheduled-brief worker needs
-# it, exactly like the LLM provider — everything else works without it.
+# Redis is optional for ordinary API routes; scheduled brief, memory, deletion,
+# and retention background jobs require the worker and Redis.
 
 # Backend
 cd apps/api
@@ -79,7 +79,7 @@ uv run uvicorn --app-dir src lifeflow_api.main:app --reload --port 8010
 # → http://localhost:8010/docs    (OpenAPI UI, development only)
 # Port 8010 by default: 8000 is commonly taken by other local apps.
 
-# Scheduled-brief worker (new terminal; Stage 8 Phase 2, optional)
+# Background worker (new terminal; optional for ordinary API routes)
 uv run arq lifeflow_api.worker_app.WorkerSettings
 # or, from anywhere: python workers/scheduler_worker.py
 # Generates each opted-in user's brief at their configured briefing_time —
@@ -111,7 +111,7 @@ Real Google sign-in and data access are entirely opt-in and require explicit con
 A background worker can generate each user's daily brief automatically at their configured `briefing_time`, in their timezone — the same brief pipeline the manual "Generate brief" button uses, tagged `generation_trigger: "scheduled"`. It never syncs Google (sync stays user-triggered only) and never approves or executes anything; any suggested actions still land in the ordinary approval inbox.
 
 - **Off by default**: a user must explicitly enable it in Settings (`scheduled_briefs_enabled`) — an existing deployment never starts scheduling for everyone just because `briefing_time` has a default.
-- **Requires**: Redis (`docker compose up -d redis`) and the worker process (`uv run arq lifeflow_api.worker_app.WorkerSettings`, or `python workers/scheduler_worker.py` from anywhere). Neither is required for anything else — with both absent, Settings truthfully reports the scheduler as unavailable and every other route is unaffected.
+- **Requires**: Redis (`docker compose up -d redis`) and the worker process (`uv run arq lifeflow_api.worker_app.WorkerSettings`, or `python workers/scheduler_worker.py` from anywhere). With both absent, Settings truthfully reports the scheduler as unavailable and ordinary API routes remain available; Stage 9 deletion and retention operations also remain durably pending until the worker is available.
 - **Durable and idempotent**: one `ScheduledBriefRun` row per user per local calendar date (`apps/api/src/lifeflow_api/models.py`); a missed run is generated if the worker resumes within 6 hours, otherwise recorded `skipped`, never backfilled; a crashed-and-retried worker finds an already-generated brief rather than duplicating it.
 - **Details**: [ADR 0004](docs/architecture/adr/0004-stage8-preferences-memory-schedule.md) D47–D50; domain logic in `apps/api/src/lifeflow_api/scheduled_briefs.py`; manual checklist in [docs/delivery/stage-08-phase-2-manual-checklist.md](docs/delivery/stage-08-phase-2-manual-checklist.md).
 
