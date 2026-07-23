@@ -37,3 +37,5 @@ export type GrantedScope = components["schemas"]["GrantedScopeView"];
 export type PrivacyInventory = components["schemas"]["InventoryView"];
 export type RetentionView = components["schemas"]["RetentionView"];
 export type RetentionClass = components["schemas"]["RetentionClassView"];
+export type DeletionOperation = components["schemas"]["DeletionOperationView"];
+export type DeletionOperationsResponse = components["schemas"]["DeletionOperationsResponse"];

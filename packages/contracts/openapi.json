@@ -758,6 +758,24 @@
         "title": "CalendarEventCreatePayload",
         "type": "object"
       },
+      "ConfirmRequest": {
+        "properties": {
+          "confirmation_phrase": {
+            "title": "Confirmation Phrase",
+            "type": "string"
+          },
+          "expected_version": {
+            "title": "Expected Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "expected_version",
+          "confirmation_phrase"
+        ],
+        "title": "ConfirmRequest",
+        "type": "object"
+      },
       "ConnectedAccountView": {
         "properties": {
           "granted_scopes": {
@@ -891,6 +909,178 @@
           "can_reconnect"
         ],
         "title": "ConnectionSummaryView",
+        "type": "object"
+      },
+      "DeletionOperationView": {
+        "properties": {
+          "completed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "confirmation_phrase": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmation Phrase"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "deleted_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Deleted Counts",
+            "type": "object"
+          },
+          "in_progress": {
+            "title": "In Progress",
+            "type": "boolean"
+          },
+          "is_terminal": {
+            "title": "Is Terminal",
+            "type": "boolean"
+          },
+          "operation_id": {
+            "title": "Operation Id",
+            "type": "string"
+          },
+          "operation_type": {
+            "title": "Operation Type",
+            "type": "string"
+          },
+          "preserved_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Preserved Counts",
+            "type": "object"
+          },
+          "preview_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Preview Counts",
+            "type": "object"
+          },
+          "preview_expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preview Expires At"
+          },
+          "requester_type": {
+            "title": "Requester Type",
+            "type": "string"
+          },
+          "safe_error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Safe Error Code"
+          },
+          "scope_label": {
+            "title": "Scope Label",
+            "type": "string"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "operation_id",
+          "operation_type",
+          "scope_label",
+          "state",
+          "version",
+          "requester_type",
+          "confirmation_phrase",
+          "preview_expires_at",
+          "preview_counts",
+          "preserved_counts",
+          "deleted_counts",
+          "warnings",
+          "is_terminal",
+          "in_progress",
+          "safe_error_code",
+          "created_at",
+          "started_at",
+          "completed_at"
+        ],
+        "title": "DeletionOperationView",
+        "type": "object"
+      },
+      "DeletionOperationsResponse": {
+        "properties": {
+          "operations": {
+            "items": {
+              "$ref": "#/components/schemas/DeletionOperationView"
+            },
+            "title": "Operations",
+            "type": "array"
+          }
+        },
+        "required": [
+          "operations"
+        ],
+        "title": "DeletionOperationsResponse",
         "type": "object"
       },
       "DemoStartResponse": {
@@ -3565,6 +3755,212 @@
           }
         },
         "summary": "Set Preference"
+      }
+    },
+    "/privacy/account-deletion/preview": {
+      "post": {
+        "operationId": "preview_account_deletion_privacy_account_deletion_preview_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletionOperationView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Preview Account Deletion"
+      }
+    },
+    "/privacy/deletion-operations": {
+      "get": {
+        "operationId": "list_deletion_operations_privacy_deletion_operations_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletionOperationsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Deletion Operations"
+      }
+    },
+    "/privacy/deletion-operations/{operation_id}": {
+      "get": {
+        "operationId": "get_deletion_operation_privacy_deletion_operations__operation_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "operation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Operation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletionOperationView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Deletion Operation"
+      }
+    },
+    "/privacy/deletion-operations/{operation_id}/cancel": {
+      "post": {
+        "operationId": "cancel_deletion_operation_privacy_deletion_operations__operation_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "operation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Operation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletionOperationView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel Deletion Operation"
+      }
+    },
+    "/privacy/deletion-operations/{operation_id}/confirm": {
+      "post": {
+        "operationId": "confirm_deletion_operation_privacy_deletion_operations__operation_id__confirm_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "operation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Operation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletionOperationView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Confirm Deletion Operation"
+      }
+    },
+    "/privacy/imported-data/{account_id}/preview": {
+      "post": {
+        "operationId": "preview_imported_data_deletion_privacy_imported_data__account_id__preview_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Account Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletionOperationView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Imported Data Deletion"
       }
     },
     "/privacy/summary": {

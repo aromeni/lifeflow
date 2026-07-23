@@ -2,7 +2,12 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, test, vi } from "vitest";
 
-import type { ConnectionSummary, GoogleSyncResult, PrivacySummary } from "@/lib/types";
+import type {
+  ConnectionSummary,
+  DeletionOperation,
+  GoogleSyncResult,
+  PrivacySummary,
+} from "@/lib/types";
 
 import ConnectionsPage from "./page";
 
@@ -93,12 +98,44 @@ function syncResult(overrides: Partial<GoogleSyncResult>): GoogleSyncResult {
   };
 }
 
+function deletionOp(overrides: Partial<DeletionOperation> = {}): DeletionOperation {
+  return {
+    operation_id: "op-1",
+    operation_type: "imported_data",
+    scope_label: "Imported google data",
+    state: "previewed",
+    version: 1,
+    requester_type: "user",
+    confirmation_phrase: "DELETE IMPORTED DATA",
+    preview_expires_at: "2026-07-21T07:00:00Z",
+    preview_counts: { source_items: 12, signals: 3, action_proposals: 2 },
+    preserved_counts: {
+      minimised_proposal_history: 1,
+      preserved_pending_uncertain_executions: 1,
+    },
+    deleted_counts: {},
+    warnings: [
+      "This deletes only LifeFlow's imported copy — your Gmail and Google Calendar content is never touched.",
+    ],
+    is_terminal: false,
+    in_progress: false,
+    safe_error_code: null,
+    created_at: "2026-07-21T06:30:00Z",
+    started_at: null,
+    completed_at: null,
+    ...overrides,
+  };
+}
+
 /** Route the mocked `api` by path so the page can fetch /privacy/summary and,
- *  independently, POST sync/disconnect — mirroring the real client. */
+ *  independently, POST sync/disconnect/deletion — mirroring the real client. */
 function mockApi(options: {
   summary: PrivacySummary | (() => PrivacySummary);
   sync?: GoogleSyncResult;
   summaryError?: boolean;
+  preview?: DeletionOperation;
+  confirm?: DeletionOperation;
+  status?: DeletionOperation;
 }) {
   apiMock.mockImplementation(async (path: string) => {
     if (path === "/privacy/summary") {
@@ -107,6 +144,11 @@ function mockApi(options: {
     }
     if (path === "/connected-accounts/google/sync") return options.sync ?? syncResult({});
     if (path === "/connected-accounts/google/disconnect") return undefined;
+    if (path.endsWith("/preview")) return options.preview ?? deletionOp();
+    if (path.endsWith("/confirm")) return options.confirm ?? deletionOp({ state: "pending" });
+    if (path.endsWith("/cancel")) return options.confirm ?? deletionOp({ state: "cancelled" });
+    if (path.startsWith("/privacy/deletion-operations/"))
+      return options.status ?? deletionOp({ state: "succeeded" });
     throw new Error(`unexpected path ${path}`);
   });
 }
@@ -165,25 +207,90 @@ test("retention copy makes clear enforcement is not switched on yet", async () =
   );
 });
 
-test("the four data controls are distinct and imported-data/account deletion have no active button", async () => {
+test("the data controls stay distinct: disconnect, delete-imported, delete-memory, delete-account", async () => {
   mockApi({ summary: summaryWith([googleConnection()]) });
   render(<ConnectionsPage />);
 
   await screen.findByTestId("data-controls");
-  // 28 four distinct controls
-  expect(screen.getByTestId("control-disconnect")).toBeInTheDocument();
-  expect(screen.getByTestId("control-delete-imported")).toBeInTheDocument();
-  expect(screen.getByTestId("control-delete-memory")).toBeInTheDocument();
-  expect(screen.getByTestId("control-delete-account")).toBeInTheDocument();
-  // 27 disconnect explains imported data remains
+  // Disconnect and delete remain separate operations (§18 test 87).
   expect(screen.getByTestId("control-disconnect")).toHaveTextContent(/already imported stays/i);
-  // 29 no active destructive buttons
-  expect(
-    screen.getByTestId("control-delete-imported").querySelector("button"),
-  ).toBeNull();
-  expect(
-    screen.getByTestId("control-delete-account").querySelector("button"),
-  ).toBeNull();
+  expect(screen.getByTestId("delete-imported-control")).toBeInTheDocument();
+  expect(screen.getByTestId("control-delete-memory")).toBeInTheDocument();
+  expect(screen.getByTestId("delete-account-control")).toBeInTheDocument();
+  // No audit-history timeline appears (§18 test 94).
+  expect(screen.queryByTestId("audit-history")).toBeNull();
+  // No deletion runs on page load (§18 test 95): only the summary was fetched.
+  expect(apiMock).toHaveBeenCalledWith("/privacy/summary");
+  expect(apiMock).not.toHaveBeenCalledWith(expect.stringContaining("/preview"), expect.anything());
+});
+
+test("imported-data deletion: preview renders counts, exact phrase gates the button", async () => {
+  mockApi({ summary: summaryWith([googleConnection()]) });
+  render(<ConnectionsPage />);
+  const user = userEvent.setup();
+
+  await user.click(await screen.findByTestId("delete-imported-preview"));
+
+  // Preview counts and preserved (pending/uncertain distinguished) render.
+  await waitFor(() =>
+    expect(screen.getByTestId("delete-imported-preview-counts")).toHaveTextContent(/12/),
+  );
+  expect(screen.getByTestId("delete-imported-preserved-counts")).toHaveTextContent(
+    /always preserved/i,
+  );
+  // Provider-content-not-deleted copy is visible.
+  expect(screen.getByTestId("delete-imported-warnings")).toHaveTextContent(
+    /never touched|never deletes anything in your Gmail/i,
+  );
+
+  const confirmButton = screen.getByTestId("delete-imported-confirm");
+  expect(confirmButton).toBeDisabled(); // no phrase typed yet
+
+  // Wrong phrase keeps it disabled.
+  await user.type(screen.getByTestId("delete-imported-confirm-input"), "delete imported data");
+  expect(confirmButton).toBeDisabled();
+
+  // Exact phrase enables it; confirming shows a truthful status.
+  await user.clear(screen.getByTestId("delete-imported-confirm-input"));
+  await user.type(screen.getByTestId("delete-imported-confirm-input"), "DELETE IMPORTED DATA");
+  expect(confirmButton).toBeEnabled();
+  await user.click(confirmButton);
+  await waitFor(() => expect(screen.getByTestId("operation-status")).toBeInTheDocument());
+});
+
+test("account deletion is a distinct, stronger control with its own phrase", async () => {
+  mockApi({
+    summary: summaryWith([googleConnection()]),
+    preview: deletionOp({
+      operation_type: "account_deletion",
+      confirmation_phrase: "DELETE MY LIFEFLOW ACCOUNT",
+      scope_label: "Your LifeFlow account",
+      preview_counts: { source_items: 12, connected_accounts: 1 },
+      preserved_counts: { retained_audit_tombstones: 5 },
+      warnings: ["Your LifeFlow sign-in will stop working and this cannot be undone."],
+    }),
+  });
+  render(<ConnectionsPage />);
+  const user = userEvent.setup();
+
+  await user.click(await screen.findByTestId("delete-account-preview"));
+  await waitFor(() =>
+    expect(screen.getByTestId("delete-account-preview-counts")).toBeInTheDocument(),
+  );
+  // Its confirmation input requires the stronger, distinct phrase.
+  const input = screen.getByTestId("delete-account-confirm-input");
+  await user.type(input, "DELETE MY LIFEFLOW ACCOUNT");
+  expect(screen.getByTestId("delete-account-confirm")).toBeEnabled();
+  // Retained tombstone explanation is visible.
+  expect(screen.getByTestId("delete-account-preserved-counts")).toHaveTextContent(/content-free/i);
+});
+
+test("retention copy stays 'not enforced' while enforcement is off", async () => {
+  mockApi({ summary: summaryWith([googleConnection()]) });
+  render(<ConnectionsPage />);
+  expect(await screen.findByTestId("retention-not-enforced")).toHaveTextContent(
+    /not switched on yet/i,
+  );
 });
 
 test("preferences and learned-preferences links point at settings", async () => {

@@ -14,6 +14,8 @@ import { useCallback, useEffect, useState } from "react";
 import { API_URL, api, ApiError } from "@/lib/api";
 import type { GoogleSyncResult, PrivacySummary } from "@/lib/types";
 
+import DeletionControls from "./DeletionControls";
+
 type LoadState = "loading" | "ready" | "unauthenticated" | "error";
 
 const FRESHNESS_COPY: Record<string, string> = {
@@ -319,20 +321,10 @@ export default function ConnectionsPage() {
               </p>
             </div>
 
-            <div
-              data-testid="control-delete-imported"
-              className="rounded border border-current/20 p-4 opacity-80"
-            >
-              <h3 className="text-sm font-semibold">Delete imported provider data</h3>
-              <p className="mt-1 text-sm">
-                Removes LifeFlow&apos;s imported copy and eligible derived data. It{" "}
-                <strong>never deletes anything in your Gmail or Google Calendar</strong>. Coming in a
-                later update, with an impact preview and typed confirmation.
-              </p>
-              <p className="mt-2 text-xs font-medium uppercase tracking-wide opacity-60">
-                Coming soon
-              </p>
-            </div>
+            <DeletionControls
+              googleAccountId={google && google.connected ? google.account_id : null}
+              onChanged={load}
+            />
 
             <div data-testid="control-delete-memory" className="rounded border border-current/20 p-4">
               <h3 className="text-sm font-semibold">Delete learned preferences</h3>
@@ -346,21 +338,6 @@ export default function ConnectionsPage() {
               </p>
             </div>
 
-            <div
-              data-testid="control-delete-account"
-              className="rounded border border-current/20 p-4 opacity-80"
-            >
-              <h3 className="text-sm font-semibold">Delete the LifeFlow account</h3>
-              <p className="mt-1 text-sm">
-                Revokes connections and removes your personal product data, keeping only
-                privacy-minimised, content-free records needed for integrity. It{" "}
-                <strong>never deletes your Gmail or Google account</strong>. Coming in a later
-                update.
-              </p>
-              <p className="mt-2 text-xs font-medium uppercase tracking-wide opacity-60">
-                Coming soon
-              </p>
-            </div>
           </section>
 
           {/* 8. Links out */}
