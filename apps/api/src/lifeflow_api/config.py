@@ -89,6 +89,22 @@ class Settings(BaseSettings):
     retention_operational_logs_days: int = Field(default=30, gt=0)
     retention_aggregated_metrics_days: int = Field(default=90, gt=0)
 
+    # Stage 9 Delivery Phase 2 (ADR 0005): the durable deletion engine. Bounded
+    # batch size so no single destructive transaction is unbounded (validated
+    # positive). Preview TTL after which a typed confirmation is refused.
+    # Heartbeat timeout after which a `running` operation is considered stale
+    # and recovered. Daily retention work is bounded (max operations enqueued
+    # per tick) so an initial rollout never triggers a multi-year backfill
+    # storm. Enforcement is opt-in per deployment exactly like the scheduler:
+    # the API (preview/confirm) is always available, but retention only runs
+    # when both a worker and this flag are active.
+    deletion_batch_size: int = Field(default=200, gt=0)
+    deletion_preview_ttl_minutes: int = Field(default=30, gt=0)
+    deletion_heartbeat_timeout_minutes: int = Field(default=10, gt=0)
+    deletion_max_attempts: int = Field(default=3, gt=0)
+    retention_enforcement_enabled: bool = False
+    retention_max_operations_per_tick: int = Field(default=50, gt=0)
+
     # Stage 9 rate-limiting trusted-proxy allowlist (architecture approved in
     # ADR 0005; thresholds and enforcement land in Delivery Phase 4). CIDRs
     # whose immediate-peer proxy may set X-Forwarded-For. Empty (the default)

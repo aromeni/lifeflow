@@ -30,6 +30,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -170,6 +171,104 @@ class MemoryStatus(StrEnum):
     expired = "expired"
 
 
+class UserAccountState(StrEnum):
+    """Closed lifecycle for a LifeFlow account (Stage 9 Delivery Phase 2,
+    ADR 0005 D61).
+
+    active — an ordinary usable account.
+    deletion_pending — account deletion was confirmed; the durable operation
+    is queued or running. New sync, proposal creation, approval, and
+    execution are all blocked, but the account is not yet anonymised (the
+    worker has not finished).
+    deleted — terminal, anonymised. Direct identity fields are cleared, a
+    random non-reversible `deletion_subject_id` replaces the identity, and
+    the row can never authenticate again. The same Google identity may create
+    a genuinely new account later without reviving this one.
+    """
+
+    active = "active"
+    deletion_pending = "deletion_pending"
+    deleted = "deleted"
+
+
+class DeletionOperationType(StrEnum):
+    """Closed set of destructive operations the shared deletion engine runs
+    (ADR 0005 D61-D63). No free-form type is representable."""
+
+    imported_data = "imported_data"
+    retention = "retention"
+    account_deletion = "account_deletion"
+
+
+class DeletionRequesterType(StrEnum):
+    user = "user"
+    system = "system"
+
+
+class DeletionOperationState(StrEnum):
+    """Closed lifecycle for one durable deletion operation (ADR 0005).
+
+    previewed — a durable, owner-scoped preview exists with captured counts
+    and a snapshot cutoff, awaiting typed confirmation. Nothing destructive
+    has happened. Cancellable.
+    pending — confirmed and durably recorded; queued for the worker (or
+    awaiting a queue that is temporarily down). No destructive batch has
+    committed. Cancellable.
+    running — the worker has claimed it and at least started; once any
+    destructive batch commits, cancellation is refused.
+    succeeded — every in-scope batch completed.
+    partially_failed — some batches completed but the operation could not
+    finish cleanly (e.g. a best-effort provider revoke failed during account
+    deletion, or attempts were exhausted mid-run); a safe error code records
+    why. Never silently retried.
+    failed — a permanent validation failure or exhausted attempts before any
+    destructive work, recorded with a safe code.
+    cancelled — cancelled while still previewed or pending; never after a
+    destructive batch committed.
+    """
+
+    previewed = "previewed"
+    pending = "pending"
+    running = "running"
+    succeeded = "succeeded"
+    partially_failed = "partially_failed"
+    failed = "failed"
+    cancelled = "cancelled"
+
+
+# Cancellation is allowed only before any destructive batch could have
+# committed (ADR 0005 §4): while the operation is still previewed or pending.
+CANCELLABLE_DELETION_STATES: frozenset[str] = frozenset(
+    {DeletionOperationState.previewed, DeletionOperationState.pending}
+)
+# States in which an operation still occupies the per-(user, type, scope)
+# active slot — the partial-unique-index predicate below mirrors this exactly.
+ACTIVE_DELETION_STATES: frozenset[str] = frozenset(
+    {
+        DeletionOperationState.previewed,
+        DeletionOperationState.pending,
+        DeletionOperationState.running,
+    }
+)
+TERMINAL_DELETION_STATES: frozenset[str] = frozenset(
+    {
+        DeletionOperationState.succeeded,
+        DeletionOperationState.partially_failed,
+        DeletionOperationState.failed,
+        DeletionOperationState.cancelled,
+    }
+)
+
+
+class DeletionConfirmationKind(StrEnum):
+    """Which typed confirmation phrase gates a user-requested operation.
+    `retention` operations are system-initiated and carry no typed
+    confirmation (absent from this enum by construction)."""
+
+    delete_imported_data = "delete_imported_data"
+    delete_account = "delete_account"
+
+
 class ScheduledRunStatus(StrEnum):
     """Closed lifecycle for one user's one local-date scheduled brief
     attempt (ADR 0004 D48/D49).
@@ -210,8 +309,19 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     # Google ID token `sub` claim — the sole identity key for Google sign-in
     # (ADR 0003 D15). NULL for dev-login users. Never matched by email; no
-    # automatic account linking.
+    # automatic account linking. Cleared on account deletion (ADR 0005 D61) so
+    # the same Google identity can create a genuinely new account later.
     google_subject: Mapped[str | None] = mapped_column(String(255), unique=True)
+    # Account deletion lifecycle (Stage 9 Delivery Phase 2, ADR 0005 D61).
+    # `active` for every ordinary account; `deletion_pending` once deletion is
+    # confirmed; `deleted` once anonymisation completes. A non-active account
+    # cannot authenticate (`get_current_user`) or use ordinary APIs.
+    account_state: Mapped[str] = mapped_column(String(20), default=UserAccountState.active)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # A random, non-reversible identifier assigned at deletion. It replaces the
+    # user identity in retained content-free tombstones; it is never derived
+    # from the email, Google subject, or original id.
+    deletion_subject_id: Mapped[uuid.UUID | None] = mapped_column(unique=True)
 
 
 class ConnectedAccount(Base):
@@ -264,6 +374,11 @@ class SourceItem(Base):
     metadata_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     content_fingerprint: Mapped[str] = mapped_column(String(64))
     retention_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # When LifeFlow imported/observed this item (Stage 9 Delivery Phase 2). This
+    # is the import instant, distinct from `occurred_at` (the email/event's own
+    # date): imported-data deletion snapshots on this column so provider data
+    # synced *after* an operation begins is never silently swept into its scope.
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class Signal(Base):
@@ -642,3 +757,101 @@ class AuditEvent(Base):
     timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     safe_metadata_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     correlation_id: Mapped[str] = mapped_column(String(128))
+
+
+class DataDeletionOperation(Base):
+    """One durable, owner-scoped destructive operation (Stage 9 Delivery
+    Phase 2, ADR 0005). The single engine behind imported-data deletion,
+    retention enforcement, and account deletion.
+
+    The row is content-free by construction: it never stores message bodies,
+    recipients, payloads, provider ids, or the typed confirmation phrase — only
+    a scope descriptor (account id / retention bucket), counts, safe reason
+    codes, and resume state. It survives worker crashes: the durable state
+    (`state`, `resume_cursor_json`, `deleted_counts_json`) plus a fresh
+    database query is authoritative on resume — never the queue payload, which
+    carries only this row's id.
+
+    `scope_key` is a short deterministic descriptor of the scope
+    (`account:<uuid>` / `account` / `retention:<date>`) used by the partial
+    unique index to guarantee at most one *active* operation per
+    (user, type, scope). `version` is the optimistic-concurrency guard a
+    confirmation must match.
+    """
+
+    __tablename__ = "data_deletion_operations"
+    __table_args__ = (
+        CheckConstraint(
+            "operation_type IN ('imported_data', 'retention', 'account_deletion')",
+            name="ck_data_deletion_operations_type",
+        ),
+        CheckConstraint(
+            "requester_type IN ('user', 'system')",
+            name="ck_data_deletion_operations_requester",
+        ),
+        CheckConstraint(
+            "state IN ('previewed', 'pending', 'running', 'succeeded', "
+            "'partially_failed', 'failed', 'cancelled')",
+            name="ck_data_deletion_operations_state",
+        ),
+        CheckConstraint("version >= 1", name="ck_data_deletion_operations_version"),
+        CheckConstraint("attempt_count >= 0", name="ck_data_deletion_operations_attempts"),
+        Index("ix_data_deletion_operations_user_state", "user_id", "state"),
+        Index("ix_data_deletion_operations_type_state", "operation_type", "state"),
+        # At most one active operation per (user, type, scope). The predicate
+        # mirrors `ACTIVE_DELETION_STATES` exactly: a terminal operation frees
+        # the slot so the user can start a fresh one for the same scope.
+        Index(
+            "uq_data_deletion_operations_active_scope",
+            "user_id",
+            "operation_type",
+            "scope_key",
+            unique=True,
+            postgresql_where=text(
+                "state IN ('previewed', 'pending', 'running')"  # pragma: allowlist secret
+            ),
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = _user_fk()
+    operation_type: Mapped[str] = mapped_column(String(20))
+    requester_type: Mapped[str] = mapped_column(String(10))
+    source_account_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("connected_accounts.id", ondelete="SET NULL")
+    )
+    scope_key: Mapped[str] = mapped_column(String(80))
+    scope_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    snapshot_cutoff: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    state: Mapped[str] = mapped_column(String(20), default=DeletionOperationState.previewed)
+    # NULL for system-initiated retention operations (no typed confirmation).
+    typed_confirmation_kind: Mapped[str | None] = mapped_column(String(30))
+    preview_counts_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    preserved_counts_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    deleted_counts_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    # Content-free binding of the confirmation to the reviewed plan (Stage 9
+    # Delivery Phase 2 focused remediation): a deterministic sha256 of the
+    # affected record ids + their planned dispositions, plus the plan-policy
+    # version. At confirmation the plan is recomputed against the same snapshot
+    # and compared; a material change refreshes the preview and refuses to run.
+    plan_fingerprint: Mapped[str | None] = mapped_column(String(64))
+    plan_policy_version: Mapped[str | None] = mapped_column(String(16))
+    resume_cursor_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    attempt_count: Mapped[int] = mapped_column(Integer, default=0)
+    # A user preview goes stale after this instant and can no longer be
+    # confirmed (ADR 0005 §5). System retention operations set it far ahead.
+    preview_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    enqueued_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    cancellation_requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Closed-vocabulary safe codes only (e.g. "provider_revoke_failed",
+    # "worker_stale_timeout") — never a stack trace or personal content.
+    safe_error_code: Mapped[str | None] = mapped_column(String(64))
+    safe_error_message: Mapped[str | None] = mapped_column(String(500))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+    version: Mapped[int] = mapped_column(Integer, default=1)
