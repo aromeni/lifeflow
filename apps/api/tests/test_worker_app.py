@@ -117,8 +117,16 @@ def test_worker_settings_uses_json_serialization_and_a_single_retry_authority() 
     # daily memory-expiry cron on the same worker; no new queue.
     function_names = {getattr(fn, "__name__", "") for fn in WorkerSettings.functions}
     assert "recompute_user_memory" in function_names
+    # Stage 9 Delivery Phase 2 (ADR 0005) added the deletion-operation job and a
+    # per-minute deletion cron (retention scan + pending-drain + stale recovery)
+    # on the same worker; still no new queue.
+    assert "run_deletion_operation" in function_names
     cron_names = {job.name for job in WorkerSettings.cron_jobs}
-    assert cron_names == {"cron:dispatch_scheduled_briefs", "cron:expire_stale_memory"}
+    assert cron_names == {
+        "cron:dispatch_scheduled_briefs",
+        "cron:expire_stale_memory",
+        "cron:dispatch_deletion_operations",
+    }
 
 
 def test_job_serializer_round_trips_a_plain_identifier_payload() -> None:

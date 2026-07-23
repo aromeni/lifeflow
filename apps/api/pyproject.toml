@@ -59,6 +59,11 @@ select = [
 # cipher tests, including as default parameter values (e.g. a seed helper's
 # `refresh_token="refresh-1"`).
 "tests/**" = ["S101", "E501", "S105", "S106", "S107"]
+# Exact-file, non-secret only: the smoke script shells out to Alembic via a
+# fixed argv (`uv run alembic …`); S603/S607's line attribution varies by ruff
+# version so an inline noqa is not portable. No secret rule is exempted here and
+# no wildcard is used, so future scripts are not covered.
+"scripts/smoke_phase2.py" = ["S603", "S607"]
 
 [tool.mypy]
 python_version = "3.12"
