@@ -13,7 +13,7 @@ from lifeflow_api.brief_composition import (
     BriefService,
     parse_brief_document,
 )
-from lifeflow_api.deps import CurrentUser, DbSession
+from lifeflow_api.deps import ActiveUser, CurrentUser, DbSession
 from lifeflow_api.models import Brief, BriefStatus
 from lifeflow_api.repositories import BriefRepository
 
@@ -82,7 +82,7 @@ def _to_version_response(brief: Brief) -> BriefVersionResponse:
 
 
 @router.post("/generate", response_model=BriefResponse)
-async def generate_brief(request: Request, user: CurrentUser, session: DbSession) -> BriefResponse:
+async def generate_brief(request: Request, user: ActiveUser, session: DbSession) -> BriefResponse:
     brief = await BriefService(
         session,
         user.id,

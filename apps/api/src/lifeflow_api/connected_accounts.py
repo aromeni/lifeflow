@@ -18,7 +18,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel
 
 from lifeflow_api.accounts import ConnectedAccountService, ReauthorisationRequiredError
-from lifeflow_api.deps import CurrentUser, DbSession
+from lifeflow_api.deps import ActiveUser, CurrentUser, DbSession
 from lifeflow_api.errors import error_response
 from lifeflow_api.google.errors import GoogleApiError
 from lifeflow_api.google.oauth import build_authorization_url
@@ -177,7 +177,7 @@ class GoogleSyncResponse(BaseModel):
 
 @router.post("/google/sync", response_model=GoogleSyncResponse)
 async def sync_google(
-    request: Request, user: CurrentUser, session: DbSession
+    request: Request, user: ActiveUser, session: DbSession
 ) -> GoogleSyncResponse | JSONResponse:
     """User-triggered, on-demand sync (never automatic on page load — see
     threat model and ADR 0003): pulls the connected user's own Gmail/Calendar

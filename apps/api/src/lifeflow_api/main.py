@@ -33,6 +33,7 @@ from lifeflow_api.me import router as me_router
 from lifeflow_api.memory import router as memory_router
 from lifeflow_api.preferences import router as preferences_router
 from lifeflow_api.privacy import router as privacy_router
+from lifeflow_api.privacy_deletion import router as privacy_deletion_router
 from lifeflow_api.scheduled_brief_status import router as scheduled_brief_status_router
 from lifeflow_api.security.csrf import CSRF_HEADER, CsrfProtectionMiddleware
 from lifeflow_api.security.token_cipher import AesGcmTokenCipher
@@ -160,6 +161,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(action_proposals_router)
     app.include_router(connected_accounts_router)
     app.include_router(privacy_router)
+    app.include_router(privacy_deletion_router)
     return app
 
 

@@ -20,7 +20,7 @@ from lifeflow_api.action_proposal_service import (
     ProposalConflictError,
     effective_execution_status,
 )
-from lifeflow_api.deps import CurrentUser, DbSession
+from lifeflow_api.deps import ActiveUser, CurrentUser, DbSession
 from lifeflow_api.errors import error_response
 from lifeflow_api.execution_context import (
     ExecutionContext,
@@ -377,7 +377,7 @@ async def get_action_proposal(
 async def edit_action_proposal(
     proposal_id: uuid.UUID,
     body: ProposalEditRequest,
-    user: CurrentUser,
+    user: ActiveUser,
     session: DbSession,
 ) -> ActionProposalResponse | JSONResponse:
     try:
@@ -403,7 +403,7 @@ async def approve_action_proposal(
     request: Request,
     proposal_id: uuid.UUID,
     body: ProposalApprovalRequest,
-    user: CurrentUser,
+    user: ActiveUser,
     session: DbSession,
 ) -> ActionProposalResponse | JSONResponse:
     try:
@@ -462,7 +462,7 @@ async def reject_action_proposal(
 
 @router.post("/{proposal_id}/execute", response_model=ActionProposalResponse)
 async def execute_action_proposal(
-    request: Request, proposal_id: uuid.UUID, user: CurrentUser, session: DbSession
+    request: Request, proposal_id: uuid.UUID, user: ActiveUser, session: DbSession
 ) -> ActionProposalResponse | JSONResponse:
     google_executors = build_google_executor_registry(request, session, user.id)
     # Test-only seam (Stage 7 focused remediation): only ever set directly on
