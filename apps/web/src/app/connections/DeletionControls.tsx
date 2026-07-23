@@ -262,9 +262,7 @@ function DeletionFlow({
               onClick={confirm}
               disabled={busy || !phraseMatches}
               className={`w-fit rounded px-4 py-2 text-sm font-medium disabled:opacity-40 ${
-                highRisk
-                  ? "bg-red-700 text-white"
-                  : "bg-foreground text-background"
+                highRisk ? "bg-red-700 text-white" : "bg-foreground text-background"
               }`}
             >
               {busy ? "Working…" : "Delete permanently"}

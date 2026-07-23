@@ -118,9 +118,8 @@ export default function ConnectionsPage() {
           <h1 className="text-3xl font-semibold tracking-tight">Privacy &amp; Connections</h1>
           <p className="mt-2 max-w-2xl" data-testid="privacy-overview">
             One place to see what LifeFlow is connected to, exactly what access you granted, what it
-            has stored, and how long it is ordinarily kept. Everything here is read-only —
-            LifeFlow never sends email, never changes your calendar, and never deletes anything on
-            this page.
+            has stored, and how long it is ordinarily kept. Everything here is read-only — LifeFlow
+            never sends email, never changes your calendar, and never deletes anything on this page.
           </p>
         </div>
         <p aria-live="polite" className="text-sm opacity-70">
@@ -326,7 +325,10 @@ export default function ConnectionsPage() {
               onChanged={load}
             />
 
-            <div data-testid="control-delete-memory" className="rounded border border-current/20 p-4">
+            <div
+              data-testid="control-delete-memory"
+              className="rounded border border-current/20 p-4"
+            >
               <h3 className="text-sm font-semibold">Delete learned preferences</h3>
               <p className="mt-1 text-sm opacity-80">
                 Clears what LifeFlow inferred from your own actions. It does not touch imported
@@ -337,7 +339,6 @@ export default function ConnectionsPage() {
                 .
               </p>
             </div>
-
           </section>
 
           {/* 8. Links out */}

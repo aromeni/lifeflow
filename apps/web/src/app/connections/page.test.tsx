@@ -198,9 +198,7 @@ test("retention copy makes clear enforcement is not switched on yet", async () =
   mockApi({ summary: summaryWith([googleConnection()]) });
   render(<ConnectionsPage />);
   await waitFor(() =>
-    expect(screen.getByTestId("retention-not-enforced")).toHaveTextContent(
-      /not switched on yet/i,
-    ),
+    expect(screen.getByTestId("retention-not-enforced")).toHaveTextContent(/not switched on yet/i),
   );
   expect(screen.getByTestId("retention-not-enforced")).toHaveTextContent(
     /not.*deleted automatically/i,
@@ -296,7 +294,9 @@ test("retention copy stays 'not enforced' while enforcement is off", async () =>
 test("preferences and learned-preferences links point at settings", async () => {
   mockApi({ summary: summaryWith([googleConnection()]) });
   render(<ConnectionsPage />);
-  await waitFor(() => expect(screen.getByTestId("preferences-link")).toHaveAttribute("href", "/settings"));
+  await waitFor(() =>
+    expect(screen.getByTestId("preferences-link")).toHaveAttribute("href", "/settings"),
+  );
   expect(screen.getByTestId("learned-preferences-link")).toHaveAttribute("href", "/settings");
 });
 
@@ -332,7 +332,10 @@ test("Gmail messages excluded for being outside Inbox/Sent are disclosed as by-d
 });
 
 test("Gmail messages that could not be fetched are disclosed as a genuine failure", async () => {
-  mockApi({ summary: summaryWith([googleConnection()]), sync: syncResult({ gmail_incomplete: 1 }) });
+  mockApi({
+    summary: summaryWith([googleConnection()]),
+    sync: syncResult({ gmail_incomplete: 1 }),
+  });
   render(<ConnectionsPage />);
   await userEvent.setup().click(await screen.findByTestId("sync-google-now"));
 
