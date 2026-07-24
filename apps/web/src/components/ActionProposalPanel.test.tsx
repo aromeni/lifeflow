@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, test, vi } from "vitest";
 
+import { RateLimitError } from "@/lib/api";
 import type { ActionProposal } from "@/lib/types";
 
 import { ActionProposalPanel } from "./ActionProposalPanel";
@@ -362,6 +363,58 @@ test("approval request binds the displayed type, hash, and version", async () =>
     displayed_execution_context_hash: "e".repeat(64),
   });
   expect(onChanged).toHaveBeenCalledWith(approved);
+});
+
+test("a rate-limited approval leaves the proposal status unchanged and re-enables the button", async () => {
+  apiMock.mockRejectedValue(new RateLimitError(30, "Too many requests. Try again later."));
+  const onChanged = vi.fn();
+  render(
+    <ActionProposalPanel proposal={proposal} timezone="Europe/London" onChanged={onChanged} />,
+  );
+
+  const button = screen.getByRole("button", { name: "Approve exact payload" });
+  await userEvent.setup().click(button);
+
+  const alert = await screen.findByRole("alert");
+  expect(alert).toHaveTextContent(/Try again in about 30 seconds/);
+  expect(onChanged).not.toHaveBeenCalled();
+  expect(button).toBeEnabled();
+  expect(screen.getByTestId(`proposal-status-${proposal.action_type}`)).toHaveTextContent(
+    "proposed",
+  );
+});
+
+test("a rate-limited execution is never shown as an uncertain outcome", async () => {
+  const approvedNotYetExecuted: ActionProposal = {
+    ...proposal,
+    status: "approved",
+    approval: {
+      action_type: proposal.action_type,
+      proposal_version: proposal.version,
+      payload: proposal.payload,
+      payload_hash: proposal.payload_hash,
+      binding_hash: "c".repeat(64),
+      approved_at: "2026-07-16T09:00:00Z",
+      execution_context: { mode: "simulation", provider: "synthetic", required_scope: null },
+    },
+  };
+  apiMock.mockRejectedValue(new RateLimitError(15, "Too many requests. Try again later."));
+  const onChanged = vi.fn();
+  render(
+    <ActionProposalPanel
+      proposal={approvedNotYetExecuted}
+      timezone="Europe/London"
+      onChanged={onChanged}
+    />,
+  );
+
+  await userEvent.setup().click(screen.getByRole("button", { name: "Run approved simulation" }));
+
+  const alert = await screen.findByRole("alert");
+  expect(alert).toHaveTextContent(/Try again in about 15 seconds/);
+  expect(screen.queryByTestId("execution-uncertain-warning")).not.toBeInTheDocument();
+  expect(screen.queryByTestId("execution-result")).not.toBeInTheDocument();
+  expect(onChanged).not.toHaveBeenCalled();
 });
 
 test("editing an approved preview sends the current version and removes approval", async () => {

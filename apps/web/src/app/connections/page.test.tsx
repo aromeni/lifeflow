@@ -2,6 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, test, vi } from "vitest";
 
+import { RateLimitError } from "@/lib/api";
 import type {
   ConnectionSummary,
   DeletionOperation,
@@ -281,6 +282,104 @@ test("account deletion is a distinct, stronger control with its own phrase", asy
   expect(screen.getByTestId("delete-account-confirm")).toBeEnabled();
   // Retained tombstone explanation is visible.
   expect(screen.getByTestId("delete-account-preserved-counts")).toHaveTextContent(/content-free/i);
+});
+
+test("a rate-limited sync shows accessible retry guidance and re-enables the button", async () => {
+  apiMock.mockImplementation(async (path: string) => {
+    if (path === "/privacy/summary") return summaryWith([googleConnection()]);
+    if (path === "/connected-accounts/google/sync") {
+      throw new RateLimitError(20, "Too many requests. Try again later.");
+    }
+    throw new Error(`unexpected path ${path}`);
+  });
+  render(<ConnectionsPage />);
+  const user = userEvent.setup();
+  const syncButton = await screen.findByTestId("sync-google-now");
+
+  await user.click(syncButton);
+
+  const alert = await screen.findByRole("alert");
+  expect(alert).toHaveTextContent(/Try again in about 20 seconds/);
+  expect(syncButton).toBeEnabled();
+  expect(screen.queryByTestId("sync-result")).not.toBeInTheDocument();
+});
+
+test("a rate-limited imported-data preview creates no operation UI", async () => {
+  apiMock.mockImplementation(async (path: string) => {
+    if (path === "/privacy/summary") return summaryWith([googleConnection()]);
+    if (path.endsWith("/preview")) {
+      throw new RateLimitError(25, "Too many requests. Try again later.");
+    }
+    throw new Error(`unexpected path ${path}`);
+  });
+  render(<ConnectionsPage />);
+  const user = userEvent.setup();
+
+  await user.click(await screen.findByTestId("delete-imported-preview"));
+
+  const alert = await screen.findByRole("alert");
+  expect(alert).toHaveTextContent(/Try again in about 25 seconds/);
+  expect(screen.queryByTestId("delete-imported-preview-counts")).not.toBeInTheDocument();
+  expect(screen.getByTestId("delete-imported-preview")).toBeEnabled();
+});
+
+test("a rate-limited deletion confirmation preserves the reviewed preview and typed phrase", async () => {
+  apiMock.mockImplementation(async (path: string) => {
+    if (path === "/privacy/summary") return summaryWith([googleConnection()]);
+    if (path.endsWith("/preview")) return deletionOp();
+    if (path.endsWith("/confirm")) {
+      throw new RateLimitError(30, "Too many requests. Try again later.");
+    }
+    throw new Error(`unexpected path ${path}`);
+  });
+  render(<ConnectionsPage />);
+  const user = userEvent.setup();
+
+  await user.click(await screen.findByTestId("delete-imported-preview"));
+  await waitFor(() =>
+    expect(screen.getByTestId("delete-imported-preview-counts")).toBeInTheDocument(),
+  );
+  const input = screen.getByTestId("delete-imported-confirm-input");
+  await user.type(input, "DELETE IMPORTED DATA");
+  await user.click(screen.getByTestId("delete-imported-confirm"));
+
+  const alert = await screen.findByRole("alert");
+  expect(alert).toHaveTextContent(/Try again in about 30 seconds/);
+  // The fingerprint/version and typed phrase are unchanged — safe to retry.
+  expect(input).toHaveValue("DELETE IMPORTED DATA");
+  expect(screen.getByTestId("delete-imported-confirm")).toBeEnabled();
+  expect(screen.getByTestId("delete-imported-preview-counts")).toBeInTheDocument();
+});
+
+test("a rate-limited account-deletion confirmation does not sign the user out", async () => {
+  apiMock.mockImplementation(async (path: string) => {
+    if (path === "/privacy/summary") return summaryWith([googleConnection()]);
+    if (path === "/privacy/account-deletion/preview") {
+      return deletionOp({
+        operation_type: "account_deletion",
+        confirmation_phrase: "DELETE MY LIFEFLOW ACCOUNT",
+      });
+    }
+    if (path.endsWith("/confirm")) {
+      throw new RateLimitError(60, "Too many requests. Try again later.");
+    }
+    throw new Error(`unexpected path ${path}`);
+  });
+  render(<ConnectionsPage />);
+  const user = userEvent.setup();
+
+  await user.click(await screen.findByTestId("delete-account-preview"));
+  await waitFor(() =>
+    expect(screen.getByTestId("delete-account-preview-counts")).toBeInTheDocument(),
+  );
+  await user.type(screen.getByTestId("delete-account-confirm-input"), "DELETE MY LIFEFLOW ACCOUNT");
+  await user.click(screen.getByTestId("delete-account-confirm"));
+
+  const alert = await screen.findByRole("alert");
+  expect(alert).toHaveTextContent(/Try again in about 1 minute/);
+  // Still on the Connections page, control still present — never redirected
+  // to the signed-out experience just because a request was throttled.
+  expect(screen.getByTestId("delete-account-control")).toBeInTheDocument();
 });
 
 test("retention copy stays 'not enforced' while enforcement is off", async () => {
