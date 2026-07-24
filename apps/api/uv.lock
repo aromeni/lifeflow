@@ -497,6 +497,7 @@ dependencies = [
     { name = "itsdangerous" },
     { name = "pydantic", extra = ["email"] },
     { name = "pydantic-settings" },
+    { name = "redis" },
     { name = "sqlalchemy", extra = ["asyncio"] },
     { name = "uvicorn", extra = ["standard"] },
 ]
@@ -524,6 +525,7 @@ requires-dist = [
     { name = "itsdangerous", specifier = ">=2.2" },
     { name = "pydantic", extras = ["email"], specifier = ">=2.10" },
     { name = "pydantic-settings", specifier = ">=2.7" },
+    { name = "redis", specifier = ">=5.0" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.36" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.34" },
 ]

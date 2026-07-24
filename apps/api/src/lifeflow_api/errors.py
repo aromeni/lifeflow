@@ -39,20 +39,56 @@ class ErrorBody(BaseModel):
     code: str
     message: str
     correlation_id: str
+    # Present only on a 429 (Stage 9 Delivery Phase 4, ADR 0005 D64/D81) — a
+    # bounded, non-negative number of seconds, never a raw bucket timestamp,
+    # policy code, or subject digest.
+    retry_after_seconds: int | None = None
 
 
 class ErrorResponse(BaseModel):
     error: ErrorBody
 
 
-def error_response(status_code: int, code: str, message: str) -> JSONResponse:
+def error_response(
+    status_code: int, code: str, message: str, *, retry_after_seconds: int | None = None
+) -> JSONResponse:
     body = ErrorResponse(
-        error=ErrorBody(code=code, message=message, correlation_id=get_correlation_id())
+        error=ErrorBody(
+            code=code,
+            message=message,
+            correlation_id=get_correlation_id(),
+            retry_after_seconds=retry_after_seconds,
+        )
     )
-    return JSONResponse(status_code=status_code, content=body.model_dump())
+    response = JSONResponse(status_code=status_code, content=body.model_dump())
+    if retry_after_seconds is not None:
+        response.headers["Retry-After"] = str(retry_after_seconds)
+    return response
+
+
+class RateLimitExceededError(Exception):
+    """Raised by the rate-limit dependency (`rate_limit_deps.py`) when a
+    bucket is exhausted. Carries only a registered policy code and a bounded
+    retry-after value — never a subject, digest, or bucket state."""
+
+    def __init__(self, policy_code: str, retry_after_seconds: int) -> None:
+        super().__init__(policy_code)
+        self.policy_code = policy_code
+        self.retry_after_seconds = retry_after_seconds
 
 
 def register_error_handlers(app: FastAPI) -> None:
+    @app.exception_handler(RateLimitExceededError)
+    async def rate_limit_exception_handler(
+        request: Request, exc: RateLimitExceededError
+    ) -> JSONResponse:
+        return error_response(
+            429,
+            "rate_limited",
+            "Too many requests. Try again later.",
+            retry_after_seconds=exc.retry_after_seconds,
+        )
+
     @app.exception_handler(StarletteHTTPException)
     async def http_exception_handler(request: Request, exc: StarletteHTTPException) -> JSONResponse:
         code = _STATUS_CODES.get(exc.status_code, "error")

@@ -111,6 +111,29 @@ class Settings(BaseSettings):
     # means trust no forwarded headers — the direct peer IP is authoritative.
     trusted_proxy_cidrs: str = ""
 
+    # Stage 9 Delivery Phase 4 (ADR 0005 D64): Redis-backed rate limiting.
+    # Off by default, matching every other Stage 8/9 feature flag (scheduled
+    # briefs, retention enforcement, LLM extraction, Google OAuth) — existing
+    # deployments and the whole test suite are unaffected until a deployment
+    # opts in. When enabled, requests are keyed by an HMAC digest (never a raw
+    # user id or IP) using this secret; production refuses to start with a
+    # missing or short secret, but development/test may leave it blank (an
+    # ephemeral secret is generated at startup, exactly like SESSION_SECRET).
+    rate_limiting_enabled: bool = False
+    rate_limit_key_secret: str = ""
+    rate_limit_redis_prefix: str = "ratelimit:v1"
+    # A JSON object of {policy_code: {"capacity": int, "refill_amount": int,
+    # "refill_window_seconds": int}} overriding individual registered
+    # policies' defaults (rate_limit_policy.py). Empty string means no
+    # overrides. Unknown policy codes or out-of-range numeric fields fail
+    # configuration validation at startup, never silently.
+    rate_limit_policy_overrides_json: str = ""
+    # A malformed/overlong X-Forwarded-For chain must not grant a caller a
+    # fresh identity — bounded so a pathological chain fails safely instead of
+    # being walked indefinitely.
+    rate_limit_max_forwarded_hops: int = Field(default=10, gt=0)
+    rate_limit_redis_timeout_seconds: float = Field(default=0.2, gt=0)
+
 
 @lru_cache
 def get_settings() -> Settings:

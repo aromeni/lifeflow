@@ -17,6 +17,7 @@ dependencies = [
     "httpx>=0.28",
     "google-auth>=2.36",
     "arq>=0.28.0",
+    "redis>=5.0",
 ]
 
 [dependency-groups]
@@ -64,6 +65,10 @@ select = [
 # version so an inline noqa is not portable. No secret rule is exempted here and
 # no wildcard is used, so future scripts are not covered.
 "scripts/smoke_phase2.py" = ["S603", "S607"]
+# Exact-file, non-secret only: the real-Uvicorn regression shells out to the
+# repository's own `uv run uvicorn …` via a fixed argv, the same pattern as
+# smoke_phase2.py above.
+"tests/test_rate_limit_uvicorn_regression.py" = ["S603", "S607"]
 
 [tool.mypy]
 python_version = "3.12"

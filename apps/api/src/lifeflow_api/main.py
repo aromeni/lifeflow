@@ -1,7 +1,13 @@
 """Application factory.
 
 Run locally with:
-    uv run uvicorn --app-dir src lifeflow_api.main:app --reload --port 8010
+    uv run uvicorn --app-dir src lifeflow_api.main:app --reload --port 8010 --forwarded-allow-ips=""
+
+`--forwarded-allow-ips=""` is required: uvicorn's own default trusts
+X-Forwarded-For from any loopback connection, which would silently override
+this app's own `TRUSTED_PROXY_CIDRS` rate-limiting trust boundary
+(ADR 0005 D64/D81) — with the flag unset, any local process could spoof its
+rate-limit identity.
 """
 
 import secrets
@@ -9,6 +15,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 import httpx
+import redis.asyncio as aioredis
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import async_sessionmaker
@@ -35,11 +42,15 @@ from lifeflow_api.memory import router as memory_router
 from lifeflow_api.preferences import router as preferences_router
 from lifeflow_api.privacy import router as privacy_router
 from lifeflow_api.privacy_deletion import router as privacy_deletion_router
+from lifeflow_api.rate_limit_policy import InvalidPolicyOverrideError, parse_policy_overrides
+from lifeflow_api.rate_limiter import RateLimiter
 from lifeflow_api.scheduled_brief_status import router as scheduled_brief_status_router
 from lifeflow_api.security.csrf import CSRF_HEADER, CsrfProtectionMiddleware
 from lifeflow_api.security.token_cipher import AesGcmTokenCipher
 from lifeflow_api.signals import router as signals_router
 from lifeflow_api.source_items import router as source_items_router
+
+_MIN_PRODUCTION_RATE_LIMIT_SECRET_LENGTH = 32
 
 
 def _session_secret(settings: Settings) -> str:
@@ -65,6 +76,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             await app.state.engine.dispose()
             if app.state.google_http_client is not None:
                 await app.state.google_http_client.aclose()
+            if app.state.rate_limiter is not None:
+                await app.state.rate_limiter.aclose()
 
     app = FastAPI(
         title="LifeFlow AI API",
@@ -125,6 +138,39 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.google_oauth_client = GoogleOAuthClient(app.state.google_http_client)
         app.state.gmail_client = GmailDraftClient(app.state.google_http_client)
         app.state.calendar_client = CalendarEventClient(app.state.google_http_client)
+
+    # Stage 9 Delivery Phase 4 (ADR 0005 D64/D81): off by default, matching
+    # every other Stage 8/9 feature flag. A missing/short key secret in
+    # production is a hard failure (a weak or empty HMAC key would make the
+    # bucket digest guessable or collide across subjects); development/test
+    # may leave it blank — an ephemeral secret is generated, exactly like
+    # SESSION_SECRET, since rate-limit buckets are not required to survive a
+    # restart.
+    app.state.rate_limiter = None
+    app.state.rate_limit_key_secret = ""
+    app.state.rate_limit_policy_overrides = {}
+    if settings.rate_limiting_enabled:
+        if (
+            settings.environment == "production"
+            and len(settings.rate_limit_key_secret) < _MIN_PRODUCTION_RATE_LIMIT_SECRET_LENGTH
+        ):
+            raise RuntimeError(
+                "RATE_LIMITING_ENABLED=true in production requires RATE_LIMIT_KEY_SECRET "
+                f"to be at least {_MIN_PRODUCTION_RATE_LIMIT_SECRET_LENGTH} characters."
+            )
+        try:
+            app.state.rate_limit_policy_overrides = parse_policy_overrides(
+                settings.rate_limit_policy_overrides_json
+            )
+        except InvalidPolicyOverrideError as exc:
+            raise RuntimeError(f"Invalid RATE_LIMIT_POLICY_OVERRIDES_JSON: {exc}") from exc
+        app.state.rate_limit_key_secret = settings.rate_limit_key_secret or secrets.token_urlsafe(
+            32
+        )
+        redis_client: aioredis.Redis = aioredis.from_url(settings.redis_url)  # type: ignore[no-untyped-call]
+        app.state.rate_limiter = RateLimiter(
+            redis_client, socket_timeout_seconds=settings.rate_limit_redis_timeout_seconds
+        )
 
     # Middleware runs outermost-last-added: correlation IDs wrap everything,
     # then CSRF rejects forged writes, then the session is available inside.
