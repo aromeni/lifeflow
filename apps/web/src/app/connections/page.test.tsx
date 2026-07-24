@@ -300,6 +300,12 @@ test("preferences and learned-preferences links point at settings", async () => 
   expect(screen.getByTestId("learned-preferences-link")).toHaveAttribute("href", "/settings");
 });
 
+test("the Privacy & Connections centre links to the canonical audit history", async () => {
+  mockApi({ summary: summaryWith([googleConnection()]) });
+  render(<ConnectionsPage />);
+  expect(await screen.findByTestId("audit-history-link")).toHaveAttribute("href", "/audit-history");
+});
+
 test("a load error is announced accessibly", async () => {
   mockApi({ summary: summaryWith([]), summaryError: true });
   render(<ConnectionsPage />);

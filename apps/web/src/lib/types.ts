@@ -39,3 +39,7 @@ export type RetentionView = components["schemas"]["RetentionView"];
 export type RetentionClass = components["schemas"]["RetentionClassView"];
 export type DeletionOperation = components["schemas"]["DeletionOperationView"];
 export type DeletionOperationsResponse = components["schemas"]["DeletionOperationsResponse"];
+export type AuditHistoryItem = components["schemas"]["AuditHistoryItem"];
+export type AuditHistoryResponse = components["schemas"]["AuditHistoryResponse"];
+export type AuditHistoryCategory = components["schemas"]["AuditHistoryCategory"];
+export type AuditHistoryPeriod = components["schemas"]["AuditHistoryPeriod"];

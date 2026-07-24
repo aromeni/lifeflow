@@ -1,12 +1,8 @@
 "use client";
 
-// Stage 9 Delivery Phase 1: the consolidated, read-only Privacy & Connections
-// Control Centre. Driven by GET /privacy/summary (connection status, granted
-// scopes, evidence freshness, owner-scoped inventory counts, provisional
-// retention defaults). Disconnect/reconnect/sync reuse the existing
-// /connected-accounts routes unchanged. This surface is non-destructive:
-// delete-imported-data and delete-account are described but NOT actionable
-// here (they arrive in Delivery Phase 2).
+// Stage 9 Privacy & Connections Control Centre. GET /privacy/summary remains
+// the privacy-safe read projection; existing connection controls, Phase 2
+// deletion controls, and the Phase 3 audit-history link stay distinct.
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
@@ -343,6 +339,9 @@ export default function ConnectionsPage() {
 
           {/* 8. Links out */}
           <section className="flex flex-wrap gap-4 text-sm">
+            <Link href="/audit-history" data-testid="audit-history-link" className="underline">
+              View audit history
+            </Link>
             <Link href="/settings" data-testid="preferences-link" className="underline">
               Explicit preferences
             </Link>
