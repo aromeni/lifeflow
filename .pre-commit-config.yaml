@@ -36,3 +36,9 @@ repos:
         language: system
         files: ^\.env\.example$
         pass_filenames: false
+      - id: check-uvicorn-launch-safety
+        name: check Uvicorn launch sites set a safe proxy posture
+        entry: python3 scripts/check_uvicorn_launch_safety.py
+        language: system
+        pass_filenames: false
+        always_run: true

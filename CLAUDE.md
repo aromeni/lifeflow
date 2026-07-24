@@ -2,7 +2,7 @@
 
 LifeFlow AI is a permissioned, inspectable, human-in-the-loop personal operations agent. Before making product or architecture decisions, read the North Star: [docs/project/project-foundation.md](docs/project/project-foundation.md). The build follows a stage-gated protocol ([docs/delivery/stage-plan.md](docs/delivery/stage-plan.md)); work only within the active stage.
 
-**Current stage: 9 (privacy, audit UX, resilience) — in progress, not complete. Delivery Phase 1 is remotely preserved at `49f121a`; Delivery Phase 2 is remotely finalised at `fdb4636` on `origin/stage-9-deletion-retention`; and the current `stage-9-audit-history` branch starts at that immutable Phase 2 boundary. Delivery Phase 3 (audit history) is committed locally as five commits on `stage-9-audit-history` from approved preparatory HEAD `eedd69d`, is not pushed, and awaits remote finalisation. Phase 4 (rate limiting) and Phase 5 (resilience and telemetry) have not begun. No `stage-9-complete` tag exists, and Stage 9 has not been merged to `main`.**
+**Current stage: 9 (privacy, audit UX, resilience) — in progress, not complete. Delivery Phase 1 is remotely preserved at `49f121a`; Delivery Phase 2 is remotely finalised at `fdb4636` on `origin/stage-9-deletion-retention`; and Delivery Phase 3 (audit history) is remotely finalised at `a50cf06` on `origin/stage-9-audit-history`. Delivery Phase 4 (rate limiting) is implemented and verified on the local `stage-9-rate-limiting` branch, not yet committed or pushed. Phase 5 (resilience and telemetry) has not begun. No `stage-9-complete` tag exists, and Stage 9 has not been merged to `main`.**
 
 ## Commands
 
@@ -15,7 +15,7 @@ docker compose up -d db redis --wait  # PostgreSQL on 5433, Redis on 6380 (backg
 # Backend (from apps/api)
 uv sync                         # install deps (Python 3.12 auto-provisioned)
 uv run alembic upgrade head     # migrations
-uv run uvicorn --app-dir src lifeflow_api.main:app --reload --port 8010
+uv run uvicorn --app-dir src lifeflow_api.main:app --reload --port 8010 --forwarded-allow-ips=""  # required: see rate-limiting note below
 uv run arq lifeflow_api.worker_app.WorkerSettings  # scheduled-brief, memory, deletion and retention worker
 uv run pytest                   # all tests (integration needs the db container; a few also need redis)
 uv run pytest -m "not integration"
@@ -41,6 +41,13 @@ uvx detect-secrets scan --baseline .secrets.baseline
 
 docker compose down             # stop the stack (add -v to drop dev data)
 ```
+
+`--forwarded-allow-ips=""` is required on every uvicorn launch of this app (dev,
+demo, e2e, and any production deployment not sitting directly behind a real
+reverse proxy on `127.0.0.1`): uvicorn's own default trusts `X-Forwarded-For`
+from any loopback connection, which silently overrides this app's
+`TRUSTED_PROXY_CIDRS` rate-limiting trust boundary (ADR 0005 D64/D81) — with
+the flag unset, any local process can spoof its rate-limit identity.
 
 ## Architecture boundaries
 

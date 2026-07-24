@@ -9,7 +9,7 @@ A permissioned, inspectable, human-in-the-loop personal operations agent. LifeFl
 - Threat model: [docs/security/threat-model.md](docs/security/threat-model.md)
 - Metrics dashboard: [docs/delivery/metrics.md](docs/delivery/metrics.md) (regenerate with `python3 scripts/metrics.py`) · Stage reports: [docs/delivery/reports/](docs/delivery/reports/)
 
-**Status:** Stages 0–8 are complete and approved; Stage 8 is merged to `main` (`c5b60b1`) and tagged `stage-8-complete`. Stage 9 (privacy, audit UX, resilience) is **in progress and is not complete**: the Planning Gate is approved ([ADR 0005](docs/architecture/adr/0005-stage9-privacy-hardening.md)); **Delivery Phase 1 — the read-only Privacy & Connections Control Centre** is remotely preserved at `49f121a`; and **Delivery Phase 2 — the durable deletion engine** is remotely finalised at `fdb4636` on `origin/stage-9-deletion-retention`. The current `stage-9-audit-history` branch starts at that immutable Phase 2 boundary. **Delivery Phase 3 — audit history** is committed locally as five commits on `stage-9-audit-history` from approved preparatory HEAD `eedd69d`, is not pushed, and awaits remote finalisation. Delivery Phase 4 (rate limiting) and Delivery Phase 5 (resilience and telemetry) have not begun. No `stage-9-complete` tag exists, and Stage 9 has not been merged to `main`. See the [Phase 1](docs/delivery/reports/stage-09-phase-1.md), [Phase 2](docs/delivery/reports/stage-09-phase-2.md), and [Phase 3](docs/delivery/reports/stage-09-phase-3.md) reports.
+**Status:** Stages 0–8 are complete and approved; Stage 8 is merged to `main` (`c5b60b1`) and tagged `stage-8-complete`. Stage 9 (privacy, audit UX, resilience) is **in progress and is not complete**: the Planning Gate is approved ([ADR 0005](docs/architecture/adr/0005-stage9-privacy-hardening.md)); **Delivery Phase 1 — the read-only Privacy & Connections Control Centre** is remotely preserved at `49f121a`; **Delivery Phase 2 — the durable deletion engine** is remotely finalised at `fdb4636` on `origin/stage-9-deletion-retention`; and **Delivery Phase 3 — audit history** is remotely finalised at `a50cf06` on `origin/stage-9-audit-history`. **Delivery Phase 4 — rate limiting** is implemented and verified on the local `stage-9-rate-limiting` branch, not yet committed or pushed. Delivery Phase 5 (resilience and telemetry) has not begun. No `stage-9-complete` tag exists, and Stage 9 has not been merged to `main`. See the [Phase 1](docs/delivery/reports/stage-09-phase-1.md), [Phase 2](docs/delivery/reports/stage-09-phase-2.md), [Phase 3](docs/delivery/reports/stage-09-phase-3.md), and [Phase 4](docs/delivery/reports/stage-09-phase-4.md) reports.
 
 ## Your privacy & data
 
@@ -79,11 +79,14 @@ docker compose up -d db redis --wait    # PostgreSQL 16 on 5433, Redis 7 on 6380
 cd apps/api
 uv sync                           # installs Python 3.12 + dependencies
 uv run alembic upgrade head       # apply migrations (works from empty state)
-uv run uvicorn --app-dir src lifeflow_api.main:app --reload --port 8010
+uv run uvicorn --app-dir src lifeflow_api.main:app --reload --port 8010 --forwarded-allow-ips=""
 # → http://localhost:8010/health  (liveness)
 # → http://localhost:8010/ready   (readiness: checks the database)
 # → http://localhost:8010/docs    (OpenAPI UI, development only)
 # Port 8010 by default: 8000 is commonly taken by other local apps.
+# --forwarded-allow-ips="" is required: uvicorn otherwise trusts X-Forwarded-For
+# from any loopback connection by default, overriding this app's own
+# TRUSTED_PROXY_CIDRS rate-limiting trust boundary (ADR 0005 D64/D81).
 
 # Background worker (new terminal; optional for ordinary API routes)
 uv run arq lifeflow_api.worker_app.WorkerSettings
