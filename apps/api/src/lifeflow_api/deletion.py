@@ -16,6 +16,7 @@ import logging
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from typing import Any
 
 from arq.connections import ArqRedis
 from sqlalchemy import select, update
@@ -116,9 +117,63 @@ def _event_type(operation_type: str, suffix: str) -> str:
     return f"retention.operation_{suffix}"
 
 
+# Only these suffixes represent a state where deletion actually ran (fully or
+# partially) — previewed/requested/cancelled/started never invent counts for
+# work that hasn't happened yet.
+_TERMINAL_COUNT_SUFFIXES = frozenset({"completed", "partially_failed", "failed"})
+
+# Generous for any single personal LifeFlow account (source items, signals,
+# proposals, executions, memory evidence combined); guards the aggregate
+# against a corrupt or attacker-controlled counts structure rather than
+# reflecting any real expected volume.
+_MAX_SAFE_AGGREGATE_COUNT = 1_000_000
+
+
+def _sum_safe_counts(counts_json: object) -> int | None:
+    """Sum a per-category counts dict into one bounded, non-negative total, or
+    None if the structure is missing or any entry is malformed. A single bad
+    entry invalidates the whole total rather than silently under-counting —
+    this is a presentation-safety total, never a partial guess."""
+    if not isinstance(counts_json, dict) or not counts_json:
+        return None
+    total = 0
+    for value in counts_json.values():
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            return None
+        total += value
+    if total > _MAX_SAFE_AGGREGATE_COUNT:
+        return None
+    return total
+
+
+def safe_aggregate_counts(operation: DataDeletionOperation) -> dict[str, int]:
+    """Derive content-free, presentation-safe aggregate totals from the
+    operation's durable per-category counts (never the per-category
+    breakdown, never a record id, scope, or provider identifier). There is no
+    per-record failure count anywhere in this engine — a batch either deletes
+    an item or defers it to a later batch — so no `failed_count` key is ever
+    produced; "failure" here is an operation-level state, already surfaced
+    through the existing `reason` field."""
+    result: dict[str, int] = {}
+    deleted_total = _sum_safe_counts(operation.deleted_counts_json)
+    if deleted_total is not None:
+        result["deleted_count"] = deleted_total
+    preserved_total = _sum_safe_counts(operation.preserved_counts_json)
+    if preserved_total is not None:
+        result["preserved_count"] = preserved_total
+    return result
+
+
 def _audit(
     session: AsyncSession, operation: DataDeletionOperation, suffix: str, actor: str
 ) -> None:
+    metadata: dict[str, Any] = {
+        "operation_type": operation.operation_type,
+        "state": operation.state,
+        **({"error_code": operation.safe_error_code} if operation.safe_error_code else {}),
+    }
+    if suffix in _TERMINAL_COUNT_SUFFIXES:
+        metadata.update(safe_aggregate_counts(operation))
     record_audit_event(
         session,
         user_id=operation.user_id,
@@ -126,11 +181,7 @@ def _audit(
         event_type=_event_type(operation.operation_type, suffix),
         entity_type="data_deletion_operation",
         entity_id=str(operation.id),
-        metadata={
-            "operation_type": operation.operation_type,
-            "state": operation.state,
-            **({"error_code": operation.safe_error_code} if operation.safe_error_code else {}),
-        },
+        metadata=metadata,
     )
 
 

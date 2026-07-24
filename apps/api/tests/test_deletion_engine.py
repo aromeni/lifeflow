@@ -18,6 +18,10 @@ from tests.conftest import TEST_DB_URL
 
 from lifeflow_api.account_deletion import run_account_deletion_step
 from lifeflow_api.deletion import (
+    _MAX_SAFE_AGGREGATE_COUNT,
+    _TERMINAL_COUNT_SUFFIXES,
+    _audit,
+    _sum_safe_counts,
     cancel_operation,
     claim_operation,
     confirm_operation,
@@ -25,6 +29,7 @@ from lifeflow_api.deletion import (
     create_imported_data_preview,
     recover_stale_operations,
     run_operation,
+    safe_aggregate_counts,
 )
 from lifeflow_api.deletion_ops import (
     CONFIRM_ACCOUNT,
@@ -1066,3 +1071,279 @@ async def test_claim_is_atomic(session: AsyncSession) -> None:
     second = await claim_operation(session, confirmed.id, now=NOW)
     assert first is not None
     assert second is None  # only one worker wins
+
+
+# --- safe aggregate audit counts (presentation completeness correction) ----
+
+
+def test_sum_safe_counts_rejects_malformed_structures() -> None:
+    assert _sum_safe_counts({"source_items": 3, "signals": 2}) == 5
+    assert _sum_safe_counts({}) is None
+    assert _sum_safe_counts(None) is None
+    assert _sum_safe_counts("not-a-dict") is None
+    assert _sum_safe_counts({"source_items": -1}) is None  # negative
+    assert _sum_safe_counts({"source_items": True}) is None  # bool, not int
+    assert _sum_safe_counts({"source_items": "3"}) is None  # string
+    assert _sum_safe_counts({"source_items": 3.5}) is None  # float
+    assert _sum_safe_counts({"source_items": _MAX_SAFE_AGGREGATE_COUNT + 1}) is None  # excessive
+    # One malformed entry invalidates the whole total rather than under-counting.
+    assert _sum_safe_counts({"source_items": 3, "signals": -1}) is None
+
+
+def test_safe_aggregate_counts_reads_only_the_two_approved_totals() -> None:
+    op = DataDeletionOperation(
+        user_id=uuid.uuid4(),
+        operation_type=DeletionOperationType.imported_data,
+        requester_type="user",
+        scope_key="account:x",
+        snapshot_cutoff=NOW,
+        deleted_counts_json={"source_items": 4, "signals": 1},
+        preserved_counts_json={"action_executions": 1},
+    )
+    counts = safe_aggregate_counts(op)
+    assert counts == {"deleted_count": 5, "preserved_count": 1}
+    # Never the per-category breakdown or any other structure.
+    assert "source_items" not in counts
+    assert "signals" not in counts
+    assert "action_executions" not in counts
+
+
+def test_safe_aggregate_counts_omits_absent_or_malformed_fields() -> None:
+    op = DataDeletionOperation(
+        user_id=uuid.uuid4(),
+        operation_type=DeletionOperationType.retention,
+        requester_type="system",
+        scope_key="retention:2026-07-24",
+        snapshot_cutoff=NOW,
+        deleted_counts_json={"source_items": -1},  # malformed
+        preserved_counts_json={},  # absent
+    )
+    assert safe_aggregate_counts(op) == {}
+
+
+async def test_completed_deletion_records_safe_aggregate_counts(session: AsyncSession) -> None:
+    """End-to-end: after a real run, the completed audit event's metadata
+    carries only the two flat safe totals — never the raw per-category JSON,
+    a record id, an account id, or the operation's scope."""
+    data = await _seed_imported_dataset(session)
+    user: User = data["user"]  # type: ignore[assignment]
+    account_a: ConnectedAccount = data["account_a"]  # type: ignore[assignment]
+    op = await create_imported_data_preview(
+        session, user, source_account_id=account_a.id, now=NOW, ttl_minutes=30
+    )
+    confirmed = await confirm_operation(
+        session,
+        user,
+        op.id,
+        expected_version=op.version,
+        phrase=CONFIRM_IMPORTED_DATA,
+        now=NOW,
+        preview_ttl_minutes=30,
+    )
+    await session.commit()
+    final = await _run_to_completion(session, confirmed.id)
+    assert final.state == DeletionOperationState.succeeded
+
+    completed = (
+        await session.execute(
+            select(AuditEvent).where(
+                AuditEvent.user_id == user.id,
+                AuditEvent.event_type == "data.import_deletion_completed",
+            )
+        )
+    ).scalar_one()
+    metadata = completed.safe_metadata_json
+    assert isinstance(metadata["deleted_count"], int) and metadata["deleted_count"] > 0
+    assert set(metadata) == {"operation_type", "state", "deleted_count", "preserved_count"}
+    assert str(account_a.id) not in str(metadata)
+    assert str(op.id) not in str(metadata)
+
+
+async def test_retention_completion_records_safe_aggregate_counts(session: AsyncSession) -> None:
+    user = await _user(session)
+    account = await _account(session, user.id)
+    old = NOW - timedelta(days=40)
+    await _source(session, user.id, account.id, "old-1", created_at=old)
+    await _source(session, user.id, account.id, "fresh-1", created_at=NOW)
+    await session.commit()
+
+    bucket = NOW.date().isoformat()
+    op = DataDeletionOperation(
+        user_id=user.id,
+        operation_type=DeletionOperationType.retention,
+        requester_type="system",
+        scope_key=scope_key_for(DeletionOperationType.retention, retention_bucket=bucket),
+        scope_json={"bucket": bucket},
+        snapshot_cutoff=NOW,
+        state=DeletionOperationState.pending,
+    )
+    session.add(op)
+    await session.flush()
+    await session.commit()
+
+    final = await _run_to_completion(session, op.id)
+    assert final.state == DeletionOperationState.succeeded
+
+    completed = (
+        await session.execute(
+            select(AuditEvent).where(
+                AuditEvent.user_id == user.id,
+                AuditEvent.event_type == "retention.operation_completed",
+            )
+        )
+    ).scalar_one()
+    metadata = completed.safe_metadata_json
+    assert isinstance(metadata["deleted_count"], int) and metadata["deleted_count"] > 0
+    # retention.py never populates preserved_counts_json (a pre-existing,
+    # unrelated data gap outside this correction's scope) — correctly absent
+    # rather than fabricated.
+    assert set(metadata) == {"operation_type", "state", "deleted_count"}
+    assert bucket not in str(metadata)
+    assert str(account.id) not in str(metadata)
+
+
+async def test_account_deletion_completion_records_only_content_free_totals(
+    session: AsyncSession,
+) -> None:
+    data = await _seed_imported_dataset(session)
+    user: User = data["user"]  # type: ignore[assignment]
+    op = await create_account_deletion_preview(session, user, now=NOW, ttl_minutes=30)
+    confirmed = await confirm_operation(
+        session,
+        user,
+        op.id,
+        expected_version=op.version,
+        phrase=CONFIRM_ACCOUNT,
+        now=NOW,
+        preview_ttl_minutes=30,
+    )
+    await session.commit()
+    final = await _run_to_completion(session, confirmed.id)
+    assert final.state == DeletionOperationState.succeeded
+
+    completed = (
+        await session.execute(
+            select(AuditEvent).where(
+                AuditEvent.user_id == user.id,
+                AuditEvent.event_type == "account.deletion_completed",
+            )
+        )
+    ).scalar_one()
+    metadata = completed.safe_metadata_json
+    assert isinstance(metadata["deleted_count"], int) and metadata["deleted_count"] > 0
+    assert set(metadata) == {"operation_type", "state", "deleted_count", "preserved_count"}
+    # Content-free: no email, subject, provider id, or operation id anywhere.
+    assert user.email not in str(metadata)
+    assert str(op.id) not in str(metadata)
+
+
+async def test_partially_failed_account_deletion_distinguishes_deleted_and_preserved(
+    session: AsyncSession,
+) -> None:
+    """A provider-revoke failure still completes local erasure in full — the
+    partially_failed event's counts reflect that real, non-zero progress, not
+    a fabricated zero."""
+    data = await _seed_imported_dataset(session)
+    user: User = data["user"]  # type: ignore[assignment]
+    account_a: ConnectedAccount = data["account_a"]  # type: ignore[assignment]
+    # The revoker is only invoked when a refresh token exists to revoke.
+    account_a.encrypted_refresh_token = "ciphertext"
+    await session.commit()
+    op = await create_account_deletion_preview(session, user, now=NOW, ttl_minutes=30)
+    confirmed = await confirm_operation(
+        session,
+        user,
+        op.id,
+        expected_version=op.version,
+        phrase=CONFIRM_ACCOUNT,
+        now=NOW,
+        preview_ttl_minutes=30,
+    )
+    await session.commit()
+
+    async def _failing_revoker(_account: ConnectedAccount) -> None:
+        raise RuntimeError("SENTINEL-PROVIDER-FAILURE")
+
+    await run_operation(
+        session,
+        confirmed.id,
+        now=NOW,
+        horizons=HORIZONS,
+        batch_size=50,
+        max_attempts=3,
+        revoker=_failing_revoker,
+    )
+    final = await session.get(DataDeletionOperation, confirmed.id, populate_existing=True)
+    assert final is not None and final.state == DeletionOperationState.partially_failed
+
+    partially_failed = (
+        await session.execute(
+            select(AuditEvent).where(
+                AuditEvent.user_id == user.id,
+                AuditEvent.event_type == "account.deletion_partially_failed",
+            )
+        )
+    ).scalar_one()
+    metadata = partially_failed.safe_metadata_json
+    assert metadata["error_code"] == "provider_revoke_failed"
+    assert isinstance(metadata["deleted_count"], int) and metadata["deleted_count"] > 0
+    assert "SENTINEL-PROVIDER-FAILURE" not in str(metadata)
+
+
+async def test_previewed_event_never_carries_counts(session: AsyncSession) -> None:
+    """End-to-end: create_imported_data_preview's own "previewed" audit call
+    never includes counts, even though preserved_counts_json is already
+    populated by preview time."""
+    data = await _seed_imported_dataset(session)
+    user: User = data["user"]  # type: ignore[assignment]
+    account_a: ConnectedAccount = data["account_a"]  # type: ignore[assignment]
+    await create_imported_data_preview(
+        session, user, source_account_id=account_a.id, now=NOW, ttl_minutes=30
+    )
+    await session.commit()
+
+    previewed = (
+        await session.execute(
+            select(AuditEvent).where(
+                AuditEvent.user_id == user.id,
+                AuditEvent.event_type == "data.import_deletion_previewed",
+            )
+        )
+    ).scalar_one()
+    assert "deleted_count" not in previewed.safe_metadata_json
+    assert "preserved_count" not in previewed.safe_metadata_json
+
+
+@pytest.mark.parametrize("suffix", ["previewed", "requested", "cancelled", "started"])
+async def test_non_terminal_suffixes_never_carry_counts(session: AsyncSession, suffix: str) -> None:
+    """Direct proof of the exclusion `_audit()` itself enforces: even when an
+    operation already has non-empty, fully valid counts, the non-terminal
+    suffixes never attach them — a deliberate suffix check, not an accident of
+    missing data."""
+    assert suffix not in _TERMINAL_COUNT_SUFFIXES
+    user = await _user(session)
+    op = DataDeletionOperation(
+        user_id=user.id,
+        operation_type=DeletionOperationType.imported_data,
+        requester_type="user",
+        scope_key="account:x",
+        snapshot_cutoff=NOW,
+        deleted_counts_json={"source_items": 4},
+        preserved_counts_json={"signals": 1},
+    )
+    session.add(op)
+    await session.flush()
+
+    _audit(session, op, suffix, actor="system:test")
+    await session.commit()
+
+    event = (
+        await session.execute(
+            select(AuditEvent).where(
+                AuditEvent.user_id == user.id,
+                AuditEvent.event_type == f"data.import_deletion_{suffix}",
+            )
+        )
+    ).scalar_one()
+    assert "deleted_count" not in event.safe_metadata_json
+    assert "preserved_count" not in event.safe_metadata_json
