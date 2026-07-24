@@ -9,7 +9,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { api, ApiError } from "@/lib/api";
+import { rateLimitMessage } from "@/components/RateLimitNotice";
+import { api, ApiError, RateLimitError } from "@/lib/api";
 import type { DeletionOperation } from "@/lib/types";
 
 const TERMINAL = new Set(["succeeded", "partially_failed", "failed", "cancelled"]);
@@ -111,7 +112,12 @@ function DeletionFlow({
       setTyped("");
       notifiedTerminal.current = false;
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not build the preview.");
+      if (err instanceof RateLimitError) {
+        // No preview/operation was created — the button stays available.
+        setError(rateLimitMessage(err.retryAfterSeconds));
+      } else {
+        setError(err instanceof ApiError ? err.message : "Could not build the preview.");
+      }
     } finally {
       setBusy(false);
     }
@@ -137,7 +143,13 @@ function DeletionFlow({
       );
       setOperation(op);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not confirm.");
+      if (err instanceof RateLimitError) {
+        // The reviewed preview, its fingerprint/version, and the typed
+        // phrase are all left exactly as they were — safe for a manual retry.
+        setError(rateLimitMessage(err.retryAfterSeconds));
+      } else {
+        setError(err instanceof ApiError ? err.message : "Could not confirm.");
+      }
     } finally {
       setBusy(false);
     }
@@ -153,7 +165,11 @@ function DeletionFlow({
       );
       setOperation(op);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not cancel.");
+      if (err instanceof RateLimitError) {
+        setError(rateLimitMessage(err.retryAfterSeconds));
+      } else {
+        setError(err instanceof ApiError ? err.message : "Could not cancel.");
+      }
     } finally {
       setBusy(false);
     }

@@ -3,7 +3,8 @@
 import { useMemo, useState } from "react";
 
 import { EvidenceDrawer } from "@/components/EvidenceDrawer";
-import { api, ApiError } from "@/lib/api";
+import { rateLimitMessage } from "@/components/RateLimitNotice";
+import { api, ApiError, RateLimitError } from "@/lib/api";
 import type { ActionPayload, ActionProposal } from "@/lib/types";
 
 const ACTION_LABELS: Record<ActionProposal["action_type"], string> = {
@@ -183,7 +184,16 @@ export function ActionProposalPanel({
       setDraft(JSON.stringify(changed.payload, null, 2));
       setEditing(false);
     } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : "The proposal could not be updated.");
+      if (caught instanceof RateLimitError) {
+        // Distinct from a provider failure or an uncertain outcome — the
+        // request never reached the proposal service. Form/editor state,
+        // and the proposal's own status, are left exactly as they were.
+        setError(rateLimitMessage(caught.retryAfterSeconds));
+      } else {
+        setError(
+          caught instanceof ApiError ? caught.message : "The proposal could not be updated.",
+        );
+      }
     } finally {
       setPending(null);
     }
@@ -213,7 +223,11 @@ export function ActionProposalPanel({
       setDraft(JSON.stringify(changed.payload, null, 2));
       setEditing(false);
     } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : "The proposal could not be edited.");
+      if (caught instanceof RateLimitError) {
+        setError(rateLimitMessage(caught.retryAfterSeconds));
+      } else {
+        setError(caught instanceof ApiError ? caught.message : "The proposal could not be edited.");
+      }
     } finally {
       setPending(null);
     }

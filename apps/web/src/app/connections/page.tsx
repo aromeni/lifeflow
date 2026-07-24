@@ -7,7 +7,8 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
-import { API_URL, api, ApiError } from "@/lib/api";
+import { rateLimitMessage } from "@/components/RateLimitNotice";
+import { API_URL, api, ApiError, RateLimitError } from "@/lib/api";
 import type { GoogleSyncResult, PrivacySummary } from "@/lib/types";
 
 import DeletionControls from "./DeletionControls";
@@ -88,7 +89,13 @@ export default function ConnectionsPage() {
       setSyncResult(result);
       await load();
     } catch (error) {
-      setSyncError(error instanceof ApiError ? error.message : "Google sync could not complete.");
+      if (error instanceof RateLimitError) {
+        // Never shown as a sync failure or provider outcome — the request
+        // never reached Google. Evidence-freshness state is untouched.
+        setSyncError(rateLimitMessage(error.retryAfterSeconds));
+      } else {
+        setSyncError(error instanceof ApiError ? error.message : "Google sync could not complete.");
+      }
     } finally {
       setSyncing(false);
     }
