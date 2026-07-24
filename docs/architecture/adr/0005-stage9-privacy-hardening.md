@@ -1,6 +1,6 @@
 # ADR 0005 — Stage 9: privacy, deletion, retention, audit UX, resilience
 
-**Status:** accepted (planning gate approved 2026-07-22); Delivery Phase 1 implemented 2026-07-22; Delivery Phase 2 implemented 2026-07-23; Delivery Phase 3 committed locally 2026-07-24 (D75–D78) and awaiting remote finalisation; a typed-detail presentation completeness correction (D79 action-type/reason, D80 safe aggregate counts) is implemented and verified in the working tree, pending review and commit as two further commits.
+**Status:** accepted (planning gate approved 2026-07-22); Delivery Phase 1 implemented 2026-07-22; Delivery Phase 2 implemented 2026-07-23; Delivery Phase 3 committed and pushed 2026-07-24 (`origin/stage-9-audit-history` at `a50cf06`, D75–D80); Delivery Phase 4 (rate limiting, D81) is implemented, verified, and committed locally as six commits on `stage-9-rate-limiting` from the approved parent `a50cf06`, awaiting remote finalisation (not pushed, not tagged, not merged).
 **Context:** Stage 8 is complete and merged to `main` (`c5b60b1`). Stage 9's
 exit theme is *"trust features operational — users control their data; the
 product fails safely in outages."* This ADR records the ratified Stage 9
@@ -342,6 +342,121 @@ sentence ("36 records deleted", "1 record preserved for reconciliation") with
 correct singular/plural wording, omits zero-value counts as noise, and never
 implies a preserved record was also deleted.
 
+## Delivery Phase 4 implementation decisions (D81)
+
+Implemented on `stage-9-rate-limiting` (base: the final Phase 3 tip
+`a50cf06`), verified in the working tree 2026-07-24, pending review and
+commit. See `docs/delivery/reports/stage-09-phase-4.md`.
+
+### D81 — Layered, privacy-conscious rate limiting (thresholds from D64, now enforced)
+
+D64's architecture (authenticated key = user id, anonymous key = securely
+resolved client IP, `TRUSTED_PROXY_CIDRS`-gated forwarded-header trust,
+Redis-backed limits that never replace database guards) is now implemented
+and enforced, closing threat model T21.
+
+- **Closed policy registry** (`rate_limit_policy.py`): sixteen named token-bucket
+  policies (`capacity` = safe burst allowance and initial fill;
+  `refill_amount`/`refill_window_seconds` = the steady-state rate), covering
+  every state-changing route plus the two stronger read buckets
+  (`authenticated_read`, `privacy_audit_read`). Unregistered codes raise at
+  lookup; `RATE_LIMIT_POLICY_OVERRIDES_JSON` is validated once at startup
+  (unknown policy, unknown field, non-positive or non-integer value all fail
+  configuration validation, never apply silently).
+- **Trusted-proxy client IP** (`rate_limit_ip.py`): the immediate socket peer
+  is the sole trust anchor; `X-Forwarded-For` is consulted only when that peer
+  is itself within `TRUSTED_PROXY_CIDRS` (empty, the default, trusts nothing).
+  A trusted chain is walked right-to-left, skipping trusted hops, to the first
+  untrusted address; a malformed or overlong chain (bounded by
+  `RATE_LIMIT_MAX_FORWARDED_HOPS`) falls back to the immediate peer rather
+  than granting a fresh identity. IPv4-mapped IPv6 normalises to IPv4.
+- **The Uvicorn proxy-boundary defect (found, fixed, and now regression-tested).**
+  This resolver only ever sees `request.client.host` — but Uvicorn's own
+  `--proxy-headers`/`--forwarded-allow-ips` machinery runs *before* the ASGI
+  app does, and its default trusts `X-Forwarded-For` from any loopback
+  connection, rewriting `request.client` itself. The Phase 4 manual smoke
+  test (not any automated test — `httpx.ASGITransport`, used by every other
+  test in this suite, never runs Uvicorn's `ProxyHeadersMiddleware` at all)
+  found this: with `TRUSTED_PROXY_CIDRS` empty, a spoofed
+  `X-Forwarded-For: 9.9.9.9` from `127.0.0.1` was still honoured, because
+  Uvicorn had already substituted it into `request.client` upstream of
+  `rate_limit_ip.py`. **Fix:** every launch site now passes
+  `--forwarded-allow-ips=""` (empty — Uvicorn itself trusts nothing;
+  `TRUSTED_PROXY_CIDRS` inside the application is the only real trust
+  boundary), enforced by `scripts/check_uvicorn_launch_safety.py` (wired into
+  pre-commit and `secret-scan.yml`) and proven end-to-end by a real-Uvicorn
+  regression, `test_rate_limit_uvicorn_regression.py` (not
+  `ASGITransport`-based, so it actually exercises Uvicorn's header handling).
+  **Deployment guidance:** a real deployment sitting behind a genuine
+  reverse proxy (a load balancer, Cloud Run, nginx) must still launch Uvicorn
+  with `--forwarded-allow-ips=""` — never rely on Uvicorn's own independent
+  forwarded-header trust as the security boundary — and instead set
+  `TRUSTED_PROXY_CIDRS` to the proxy's actual address/CIDR, so the
+  application's own resolver (audited, tested, privacy-safe) is what decides
+  whether a forwarded address is trusted, with Uvicorn itself always passing
+  the unmodified real TCP peer through.
+- **Privacy-safe Redis keys** (`rate_limiter.py`): a bucket key is
+  `{prefix}:{policy_code}:{digest}`, where `digest` is
+  `HMAC-SHA256(RATE_LIMIT_KEY_SECRET, "{subject_type}:{subject}")` — never a
+  raw user id, IP, or path parameter. `RATE_LIMIT_KEY_SECRET` is independent
+  of user data, never logged; production refuses to start with
+  `RATE_LIMITING_ENABLED=true` and a secret under 32 characters, while
+  development/test may leave it blank (an ephemeral secret is generated,
+  exactly like `SESSION_SECRET`).
+- **Atomic Redis token bucket**: one Lua script performs the entire
+  read-refill-consume-write cycle inside a single Redis command (no
+  read-then-write race), using Redis's own `TIME` command as the clock so
+  every API instance agrees regardless of local clock skew. A bucket's TTL is
+  bounded so an abandoned key always expires.
+- **Fail-open on Redis failure**: any Redis error (timeout, connection
+  failure, unexpected reply) allows the request and marks the decision
+  `degraded`, never returning a misleading 429 and never touching any
+  existing database guard (idempotency, approval binding, plan-fingerprint
+  binding, active-operation uniqueness all stay fully authoritative
+  regardless of limiter state).
+- **One reusable dependency** (`rate_limit_deps.py`): `RateLimited(code)` is
+  the only way a route declares a policy, evaluated once at route-declaration
+  time against the closed registry. The one exception is the shared
+  `POST /privacy/deletion-operations/{id}/confirm` route, which serves both
+  ordinary and account-deletion confirmations through one path: it resolves
+  `account_deletion_confirm` vs. `deletion_confirm_cancel` from a
+  side-effect-free, owner-scoped read of the operation's type *before*
+  charging exactly one policy, then proceeds to the unchanged, independently
+  authoritative `confirm_operation` (its own `FOR UPDATE` lock and
+  fingerprint/version validation are untouched).
+- **Idempotent replays**: every policy documents (via
+  `applies_to_idempotent_replays`) that a replay still consumes a token —
+  broad request-volume control is a separate concern from database
+  idempotency, which remains authoritative regardless of what the limiter
+  allowed through. A blocked replay therefore never duplicates a record; an
+  allowed replay returns the pre-existing result unchanged.
+- **Safe 429 contract**: `errors.py` gained `RateLimitExceededError`, handled
+  through the existing `{"error": {code, message, correlation_id}}` envelope
+  (429 already mapped to `"rate_limited"`) plus one additional field,
+  `retry_after_seconds` (bounded, non-negative), and a matching `Retry-After`
+  header — never a policy code, bucket key, digest, or subject.
+- **Frontend**: `RateLimitError` (a typed `ApiError` subclass carrying
+  `retryAfterSeconds`) and a shared `RateLimitNotice`/`rateLimitMessage`
+  helper render a rounded, accessible retry guidance message
+  (`role="alert"`) on Today (brief generation), the approval panel (approve/
+  execute), and the Connections deletion controls (sync, preview, confirm,
+  cancel) — never shown as a provider failure or an uncertain execution
+  outcome, never auto-resubmitted, and never clearing already-typed
+  confirmation phrases or reviewed preview state.
+- **Route coverage**: a test walks the live FastAPI route table and asserts
+  every state-changing route carries a `rate_limit_deps` dependency or is on
+  a short, justified exemption list (`/health`, `/ready`, `/config`, and
+  FastAPI's own docs routes) — a new unclassified route fails the test.
+- **Off by default**: `RATE_LIMITING_ENABLED` defaults to `false`, matching
+  every other Stage 8/9 feature flag; the entire pre-existing test suite and
+  every existing Playwright journey are unaffected. Playwright's own new
+  throttling journeys (`rate-limiting.spec.ts`) enable it for the e2e API
+  process only, with small, explicitly justified policy overrides scoped to
+  exactly the policies those journeys exercise.
+
+No migration was needed — rate-limit state lives entirely in Redis and
+validated configuration, matching D64's original architecture note.
+
 ## Consequences
 
 Delivery Phase 1 gives the user a truthful, consolidated view and keeps every
@@ -351,8 +466,11 @@ pre-agreed contract. Delivery Phase 2 ships that engine end-to-end with previews
 typed confirmation, durable bounded/resumable execution, retention enforcement,
 and account anonymisation. Delivery Phase 3 adds the privacy-safe audit-history
 read projection and canonical UI without changing capture or deletion
-semantics. Rate limiting remains Delivery Phase 4 and resilience/telemetry
-remains Delivery Phase 5. See
+semantics. Delivery Phase 4 enforces the rate-limiting architecture D64
+described, as defence-in-depth layered strictly on top of — never in place
+of — every existing database guard. Resilience/telemetry remains Delivery
+Phase 5. See
 `docs/delivery/reports/stage-09-phase-1.md` and
 `docs/delivery/reports/stage-09-phase-2.md` and
-`docs/delivery/reports/stage-09-phase-3.md`.
+`docs/delivery/reports/stage-09-phase-3.md` and
+`docs/delivery/reports/stage-09-phase-4.md`.

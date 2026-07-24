@@ -4,14 +4,14 @@
 
 | Metric | Value |
 |---|---|
-| Python files | 158 |
-| TypeScript files | 29 |
+| Python files | 168 |
+| TypeScript files | 30 |
 | Prompt files | 2 |
 | Eval cases | 20 |
-| Backend tests | 653 passing |
-| Backend coverage | 91% |
-| Frontend tests | 76 passing |
-| E2E journeys (Playwright) | 7 |
+| Backend tests | 716 passing |
+| Backend coverage | 92% |
+| Frontend tests | 86 passing |
+| E2E journeys (Playwright) | 10 |
 | Frontend coverage | not yet measured — coverage reporter deferred until the UI stabilises |
 | CI | not yet connected — activates on first GitHub push |
 | Current stage | ? |

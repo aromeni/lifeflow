@@ -46,7 +46,7 @@ Every mitigation maps to a planned component and delivery stage (Stage 0 check: 
 | T18 | Audit log tampering or secret leakage into audit | integrity | Append-only writes (no update/delete paths); `safe_metadata_json` schema excludes secrets; redaction tests | AuditEvent | 2 |
 | T19 | Session hijack / weak app auth | B1 | Google Sign-In (OIDC) with server-side sessions; secure, httpOnly, same-site cookies; session expiry; auth security tests | Session layer | 2 |
 | T20 | Scope creep / silent broadening of Google scopes | B2 | Connector scopes declared in one constant; UI shows exactly the scopes Google actually granted (never the requested set); no automatic re-request of dropped scopes; test asserts the authorization-URL scope string matches the documented set | Google adapter, Connections UI | 7 |
-| T21 | Rate-limit abuse / cost exhaustion (LLM or Google quota) | B2 | Bounded pagination, bounded retries, request timeouts; per-user rate limiting (Stage 9); cost capture per LLM call | LLM layer, API middleware | 4, 9 |
+| T21 | Rate-limit abuse / cost exhaustion (LLM or Google quota) | B2 | Bounded pagination, bounded retries, request timeouts; per-user/per-IP Redis-backed rate limiting (Stage 9 Delivery Phase 4, ADR 0005 D64/D81 — see below); cost capture per LLM call | LLM layer, `rate_limit_*` modules | 4, 9 |
 | T22 | `gmail.compose` scope permits sending, not just drafting — a compromised or buggy code path could send mail even though the product never intends to | B2 | Defense in depth, not scope reliance (ADR 0003 D11/D33): closed `ActionType` enum has no send member; `GmailDraftClient` exposes only `create_draft()` against one fixed, allow-listed path; no generic request method exists; transport-level tests assert the only HTTP call ever made is `POST /gmail/v1/users/me/drafts`. The literal allow-list assertion inside the client is a cheap self-check, not itself the boundary — see D33 | `google/gmail_client.py`, `action_executors.py` | 7 |
 | T23 | Undisclosed guest notification on calendar-event creation (Google's default `sendUpdates` behaviour would email attendees without the user ever approving a "send") | B4 | `CalendarEventClient.insert_event()` hard-codes `sendUpdates=none` (not caller-overridable); the approval preview carries an immutable `guest_notifications: off` field bound into the same payload hash | `google/calendar_client.py`, approval preview | 7 |
 | T24 | Execution context substitution — a proposal approved under one execution path (simulation, or a specific Google account/scope) silently executing under a different one because the decision was recomputed from live "is anything connected" state instead of what the user actually approved | B4 | `execution_context.py` binds execution mode/provider/account/scope to the proposal's own evidence provenance, never to "any capable account"; the approved snapshot (`ActionProposal.approved_execution_*`, migration `0008`) is persisted at approval and re-verified twice: once pre-commit (`validate_execution`) and, atomically with token acquisition — under the same account row lock, after the durability commit (D16) that necessarily releases the pre-commit check's locks — via `GoogleTokenService.get_valid_access_token_for_execution` (ADR 0003 D34); any difference (disconnect, reconnect, scope change, a different source account) raises `approval_context_changed` before any provider call and is classified `failed`, not `uncertain` | `execution_context.py`, `action_policy.py`, `action_proposal_service.py`, `accounts.py`, `action_executors.py` | 7 |
@@ -230,8 +230,84 @@ tests, the frontend component suite, and `audit-history.spec.ts`.
   validation returns 422. `(timestamp DESC, id DESC)` keysets plus a frozen
   `as_of` window prevent duplicate/shifted pages under concurrent inserts.
 - **Deferred controls remain deferred.** Phase 3 introduces no rate limiter,
-  trusted-proxy behaviour, telemetry, log expansion, or provider scope. Those
-  remain Delivery Phases 4 and 5.
+  trusted-proxy behaviour, telemetry, log expansion, or provider scope. The
+  rate limiter and trusted-proxy behaviour ship in Delivery Phase 4 below;
+  telemetry/log expansion remain Delivery Phase 5.
+
+## Rate limiting (Stage 9 Delivery Phase 4, recorded 2026-07-24)
+
+Closes T21 (see the updated table row above). Covered by
+`test_rate_limit_policy.py`, `test_rate_limit_ip.py`, `test_rate_limiter.py`
+(real Redis), `test_rate_limiting_api.py` (real Postgres + Redis, full route
+table), `test_rate_limit_uvicorn_regression.py` (a real Uvicorn subprocess,
+not `ASGITransport`), the frontend component/page suites, and
+`e2e/rate-limiting.spec.ts` (real API, worker, PostgreSQL, and Redis).
+
+- **T21 (abuse/cost exhaustion).** Every state-changing route carries a
+  closed rate-limit policy or an explicit, tested exemption
+  (`/health`, `/ready`, `/config`, FastAPI's own docs routes). Authenticated
+  policies key on the stable internal user id; anonymous policies key on a
+  securely resolved client IP that never trusts a forwarded header unless the
+  immediate peer is itself an explicitly configured trusted proxy. A single
+  atomic Lua script performs the whole token-bucket read-refill-consume-write
+  cycle, so concurrent requests against one bucket can never overshoot
+  capacity.
+- **T1/T6 (secret and subject disclosure).** Redis holds only a versioned
+  namespace, a registered policy code, and an HMAC digest of the subject —
+  never a raw user id, IP address, or path parameter. The 429 response and
+  server logs carry only the policy code, allow/block result, and a bounded
+  retry-after value — never the digest, the raw subject, the forwarded
+  header, or request body content.
+- **T2 (cross-user/hidden-parameter bypass).** A subject is derived solely
+  from the authenticated user id or resolved IP, never from a path parameter
+  — proven by a test that two different proposal/account/operation ids for
+  the same user share one bucket, so a hidden identifier can never grant a
+  fresh budget.
+- **Fail-open, and why that is safe.** Redis unavailability, a timeout, or an
+  unexpected reply allows the request rather than returning a misleading 429
+  — a rate limiter is defence-in-depth, not the source of truth for
+  correctness. Every database-level guard that existed before this phase
+  (execution idempotency, approval-payload binding, deletion active-operation
+  uniqueness, preview-plan fingerprint binding) is completely unmodified and
+  stays authoritative regardless of the limiter's state; tests prove Redis
+  failure creates no duplicate execution or deletion operation.
+- **Layered without double-charging.** Each route declares exactly one
+  policy via one reusable dependency, evaluated once at route-declaration
+  time against a closed registry (an unregistered code fails at import time).
+  The sole exception, the shared deletion-confirmation route, resolves which
+  of two policies applies from a side-effect-free read of the operation's
+  type before charging exactly one of them — never both, and never zero.
+- **Idempotency is unaffected.** Rate limiting only gates whether a request
+  proceeds to the unchanged database logic; a blocked replay attempt cannot
+  duplicate a record because nothing runs, and an allowed replay still hits
+  the pre-existing idempotency guard, which returns the original result
+  unchanged.
+- **No migration.** Rate-limit state lives entirely in Redis plus validated
+  environment configuration (`RATE_LIMITING_ENABLED`, `RATE_LIMIT_KEY_SECRET`,
+  `RATE_LIMIT_POLICY_OVERRIDES_JSON`, `TRUSTED_PROXY_CIDRS`, reused from
+  Delivery Phase 1) — no new table, and no per-user configurable limits.
+- **Deferred controls remain deferred.** Phase 4 introduces no CAPTCHA,
+  account suspension, IP deny lists, or telemetry/log expansion beyond the
+  limiter's own safe policy-code/allow-block instrumentation. Those, and any
+  broader outage-resilience hardening, remain Delivery Phase 5.
+- **Uvicorn's own header trust is not the security boundary (found via
+  manual smoke test, fixed, regression-tested).** Uvicorn's
+  `--proxy-headers`/`--forwarded-allow-ips` machinery runs ahead of this
+  application and, by default, trusts `X-Forwarded-For` from any loopback
+  peer — rewriting `request.client` before `rate_limit_ip.py`'s own
+  `TRUSTED_PROXY_CIDRS` check ever runs, which let a spoofed header bypass an
+  empty (default-deny) allowlist during the required manual smoke test. No
+  automated test caught this before the smoke test, because
+  `httpx.ASGITransport` (used everywhere else in this suite) never runs
+  Uvicorn's header middleware at all. Fixed at every launch site with
+  `--forwarded-allow-ips=""` (ADR 0005 D81); enforced going forward by
+  `scripts/check_uvicorn_launch_safety.py` (pre-commit and `secret-scan.yml`)
+  and proven end-to-end by `test_rate_limit_uvicorn_regression.py`, which
+  drives a real Uvicorn subprocess over a real socket. A production
+  deployment behind a real reverse proxy must keep `--forwarded-allow-ips=""`
+  and configure `TRUSTED_PROXY_CIDRS` to the proxy's real address instead —
+  Uvicorn's independent forwarded-header trust must never be relied on as
+  the application's security boundary.
 
 ## Out-of-scope threats (recorded, revisit at Stage 11)
 

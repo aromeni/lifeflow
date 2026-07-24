@@ -212,13 +212,14 @@ Delivery Phase 1 shipped one consolidated, **read-only, non-destructive** surfac
 
 Delivery Phase 2 ships imported-data deletion, retention enforcement, and account deletion behind **one** durable model (`DataDeletionOperation`, migration `0011`), **one** planner (`deletion_planner.apply_derived_decisions`), and **one** worker (`deletion.run_operation`), per ADR 0005 D66–D72. A previewed operation is a durable, content-free record with a snapshot cutoff (`SourceItem.created_at`, D68), captured counts, disposition (preserved/minimised/recomputed), a typed-confirmation phrase (`DELETE IMPORTED DATA` / `DELETE MY LIFEFLOW ACCOUNT`, never stored), and an expiry. Confirm requires the exact phrase (422), expected version (409 stale), and non-expired preview (409); it is idempotent, and a partial unique index guarantees at most one active operation per (user, type, scope). The worker claims atomically (conditional `UPDATE … RETURNING`), processes bounded batches committing each with a resume cursor + heartbeat, and finalises with a content-free audit tombstone; the per-minute cron drains never-enqueued pending operations (Redis-outage-safe, D70) and recovers stale ones. Derived-data rules: fully-unsupported signals/proposals deleted, mixed pruned, approved/executed minimised to tombstones, pending/uncertain executions always preserved, confirmed preferences never deleted. Account deletion keeps a terminal anonymised `users` row (`account_state='deleted'`, random `deletion_subject_id`, cleared identity — D67), preserving the content-free audit/execution tombstones `AuditEvent.user_id` CASCADE-references; `get_current_user` rejects a deleted account (session invalidation) and `require_active_account` blocks sync/brief/proposal mutations while `deletion_pending`. Retention (D72) is opt-in (`RETENTION_ENFORCEMENT_ENABLED`), bounded, uses a controllable clock, and reuses the planner. 35 backend + 6 frontend tests. At the Phase 2 boundary, audit history (Phase 3), rate limiting (Phase 4), and resilience/telemetry (Phase 5) had not begun.
 
-**Remote completion (2026-07-23).** Delivery Phase 1 is remotely preserved at
-`49f121a`. Delivery Phase 2 is remotely finalised at `fdb4636` on
-`origin/stage-9-deletion-retention`. The `stage-9-audit-history` branch starts
-at that immutable boundary. Delivery Phase 3 is committed locally (five
-commits from `eedd69d`) and awaits remote finalisation; Delivery Phases 4–5
-have not begun. Stage 9 is not complete, has no `stage-9-complete` tag, and has
-not been merged to `main`.
+**Remote completion (2026-07-23/24).** Delivery Phase 1 is remotely preserved
+at `49f121a`. Delivery Phase 2 is remotely finalised at `fdb4636` on
+`origin/stage-9-deletion-retention`. Delivery Phase 3 is remotely finalised at
+`a50cf06` on `origin/stage-9-audit-history`. Delivery Phase 4 is implemented,
+verified, and committed locally as six commits on `stage-9-rate-limiting`
+from that `a50cf06` parent, awaiting remote finalisation (not pushed, not
+tagged); Delivery Phase 5 has not begun. Stage 9 is not complete, has no
+`stage-9-complete` tag, and has not been merged to `main`.
 
 ## Stage 9 Delivery Phase 3 — privacy-safe audit history (recorded 2026-07-24)
 
@@ -237,8 +238,69 @@ frontend and is linked from Privacy & Connections; it renders the user's
 configured timezone and supports an honest empty/error state and “Load more”.
 No migration, new capture model, deletion-semantic change, audit mutation
 route, provider scope, rate limiter, or telemetry hardening was added.
-Decisions are ratified as ADR 0005 D75–D78. Delivery Phases 4–5 have not
-begun; nothing on `stage-9-audit-history` is tagged, pushed, or merged.
+Decisions are ratified as ADR 0005 D75–D80. Remotely finalised at `a50cf06`
+on `origin/stage-9-audit-history`.
+
+## Stage 9 Delivery Phase 4 — rate limiting (recorded 2026-07-24)
+
+Implemented on `stage-9-rate-limiting` (base: the Phase 3 tip `a50cf06`),
+enforcing the D64 architecture decided at the planning gate. A closed
+registry of sixteen named token-bucket policies
+(`apps/api/src/lifeflow_api/rate_limit_policy.py`) covers every
+state-changing route plus the two stronger read buckets; every route not on
+a short, tested exemption list (`/health`, `/ready`, `/config`, FastAPI's own
+docs routes) carries exactly one policy via one reusable dependency
+(`rate_limit_deps.RateLimited`). Authenticated policies key on the stable
+user id; anonymous policies key on a client IP resolved via a
+trusted-proxy-CIDR-gated `X-Forwarded-For` walk
+(`rate_limit_ip.py`) that falls back safely on anything malformed. One atomic
+Lua script (`rate_limiter.py`) performs the whole token-bucket
+read-refill-consume-write cycle using Redis's own clock, so concurrent
+requests can never overshoot capacity; Redis holds only an HMAC digest of the
+subject, never a raw id or IP. Any Redis failure fails open (allows the
+request) without touching any pre-existing database guard — execution
+idempotency, approval-payload binding, deletion active-operation uniqueness,
+and preview-plan fingerprint binding are all completely unmodified and stay
+authoritative regardless of limiter state. The one route serving two
+operation types through a single path (deletion confirmation) resolves its
+policy from a side-effect-free read before charging exactly one bucket, never
+two. The safe 429 contract reuses the existing `{"error": {...}}` envelope
+(429 was already mapped to `"rate_limited"`) plus a bounded
+`retry_after_seconds` field and a `Retry-After` header. The frontend renders
+a rounded, accessible retry message on brief generation, proposal approval/
+execution, and every deletion control — never as a provider failure or an
+uncertain outcome, never auto-resubmitted, and never discarding typed
+confirmation phrases or reviewed preview state. `RATE_LIMITING_ENABLED`
+defaults to `false` (every existing test and Playwright journey is
+unaffected); the new `rate-limiting.spec.ts` journeys enable it for the e2e
+process with small overrides scoped to exactly the policies they exercise. No
+migration was needed. Decisions are ratified as ADR 0005 D81.
+
+**Phase 4 closure (recorded 2026-07-24).** Phase 4 is committed locally as six
+commits on `stage-9-rate-limiting` from the approved parent `a50cf06` and
+awaits remote finalisation — not pushed, not tagged, not merged. All 47 routes
+are classified: each carries exactly one closed policy or sits on the short,
+tested exemption list. Redis state is ephemeral and TTL-bounded (an abandoned
+bucket always expires), holds only HMAC-pseudonymised subjects, and is
+consumed through one atomic Lua token bucket; any Redis failure is an
+availability-oriented fail-open, never a misleading 429, and never displaces
+the database and approval guards, which remain authoritative in every case.
+The immediate TCP socket peer is the sole trust anchor. Uvicorn's own
+forwarded-header rewriting is explicitly disabled at every live launch site
+with `--forwarded-allow-ips=""` (enforced by
+`scripts/check_uvicorn_launch_safety.py` in pre-commit and CI, and regression-
+tested against a real Uvicorn subprocess in
+`tests/test_rate_limit_uvicorn_regression.py`), so LifeFlow's own
+`TRUSTED_PROXY_CIDRS` resolver is the only place a forwarded address is ever
+trusted — including in production behind a real reverse proxy. A 429 returns
+only safe, bounded retry guidance. Rate-limit outcomes are operational metrics
+and two safe log lines, deliberately **not** an `AuditEvent` stream, so
+throttling never becomes audit noise. No migration was created and the Alembic
+head remains `0011`. Final verified numbers: 716 backend tests at 92%
+coverage (63 of them focused rate-limit tests), 86 frontend tests, 10
+Playwright journeys passing twice consecutively, and both the deterministic
+and action evaluations passing. Delivery Phase 5 has not begun, and Stage 9 is
+not complete, tagged, or merged.
 
 **Presentation completeness correction (recorded 2026-07-24, ADR 0005
 D79–D80).** A follow-up review found two pure presentation-layer gaps (a
@@ -253,7 +315,7 @@ anonymisation, or state transitions (D80). `retention.py` has never populated
 `preserved_counts_json`, so `preserved_count` is correctly always absent on
 retention events specifically; no writer produces a per-record `failed_count`
 anywhere in the engine, so that field is always omitted. Implemented as two
-further commits pending review.
+further commits (`69117f7`, `b707788`), both remotely finalised in `a50cf06`.
 
 ## Open questions deliberately deferred (with owner stage)
 
