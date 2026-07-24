@@ -26,6 +26,6 @@ def test_secret_shaped_metadata_keys_are_rejected(bad_key: str) -> None:
 
 def test_audit_repository_is_append_only() -> None:
     exposed = {name for name in dir(AuditEventRepository) if not name.startswith("_")}
-    assert exposed == {"append", "list", "list_for_entity"}, (
+    assert exposed == {"append", "list", "list_for_entity", "list_history_page"}, (
         f"append-only contract violated: {exposed}"
     )

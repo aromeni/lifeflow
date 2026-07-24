@@ -334,6 +334,116 @@
         "title": "ApprovalPreview",
         "type": "object"
       },
+      "AuditHistoryActor": {
+        "enum": [
+          "you",
+          "lifeflow"
+        ],
+        "title": "AuditHistoryActor",
+        "type": "string"
+      },
+      "AuditHistoryCategory": {
+        "enum": [
+          "all",
+          "actions",
+          "briefs",
+          "connections",
+          "privacy",
+          "preferences",
+          "account"
+        ],
+        "title": "AuditHistoryCategory",
+        "type": "string"
+      },
+      "AuditHistoryItem": {
+        "properties": {
+          "actor": {
+            "$ref": "#/components/schemas/AuditHistoryActor"
+          },
+          "category": {
+            "$ref": "#/components/schemas/AuditHistoryCategory"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "occurred_at": {
+            "format": "date-time",
+            "title": "Occurred At",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "tone": {
+            "$ref": "#/components/schemas/AuditHistoryTone"
+          }
+        },
+        "required": [
+          "id",
+          "occurred_at",
+          "category",
+          "actor",
+          "title",
+          "summary",
+          "tone"
+        ],
+        "title": "AuditHistoryItem",
+        "type": "object"
+      },
+      "AuditHistoryPeriod": {
+        "enum": [
+          "7d",
+          "30d",
+          "90d",
+          "all"
+        ],
+        "title": "AuditHistoryPeriod",
+        "type": "string"
+      },
+      "AuditHistoryResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AuditHistoryItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "AuditHistoryResponse",
+        "type": "object"
+      },
+      "AuditHistoryTone": {
+        "enum": [
+          "neutral",
+          "success",
+          "warning",
+          "failure"
+        ],
+        "title": "AuditHistoryTone",
+        "type": "string"
+      },
       "BriefEvidence": {
         "additionalProperties": false,
         "properties": {
@@ -2939,6 +3049,85 @@
           }
         },
         "summary": "Reject Action Proposal"
+      }
+    },
+    "/audit-history": {
+      "get": {
+        "description": "Return a read-only, privacy-reviewed projection of the owner's log.",
+        "operationId": "list_audit_history_audit_history_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "category",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/AuditHistoryCategory",
+              "default": "all"
+            }
+          },
+          {
+            "in": "query",
+            "name": "period",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/AuditHistoryPeriod",
+              "default": "7d"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 50,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 1024,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditHistoryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Audit History"
       }
     },
     "/auth/dev-login": {

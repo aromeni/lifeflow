@@ -90,6 +90,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/audit-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Audit History
+         * @description Return a read-only, privacy-reviewed projection of the owner's log.
+         */
+        get: operations["list_audit_history_audit_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/dev-login": {
         parameters: {
             query?: never;
@@ -836,6 +856,50 @@ export interface components {
             /** Proposal Version */
             proposal_version: number;
         };
+        /**
+         * AuditHistoryActor
+         * @enum {string}
+         */
+        AuditHistoryActor: "you" | "lifeflow";
+        /**
+         * AuditHistoryCategory
+         * @enum {string}
+         */
+        AuditHistoryCategory: "all" | "actions" | "briefs" | "connections" | "privacy" | "preferences" | "account";
+        /** AuditHistoryItem */
+        AuditHistoryItem: {
+            actor: components["schemas"]["AuditHistoryActor"];
+            category: components["schemas"]["AuditHistoryCategory"];
+            /** Id */
+            id: string;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+            /** Summary */
+            summary: string;
+            /** Title */
+            title: string;
+            tone: components["schemas"]["AuditHistoryTone"];
+        };
+        /**
+         * AuditHistoryPeriod
+         * @enum {string}
+         */
+        AuditHistoryPeriod: "7d" | "30d" | "90d" | "all";
+        /** AuditHistoryResponse */
+        AuditHistoryResponse: {
+            /** Items */
+            items: components["schemas"]["AuditHistoryItem"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+        };
+        /**
+         * AuditHistoryTone
+         * @enum {string}
+         */
+        AuditHistoryTone: "neutral" | "success" | "warning" | "failure";
         /** BriefEvidence */
         BriefEvidence: {
             /** Excerpt */
@@ -1860,6 +1924,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ActionProposalResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_audit_history_audit_history_get: {
+        parameters: {
+            query?: {
+                category?: components["schemas"]["AuditHistoryCategory"];
+                period?: components["schemas"]["AuditHistoryPeriod"];
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditHistoryResponse"];
                 };
             };
             /** @description Validation Error */
