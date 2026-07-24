@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, test, vi } from "vitest";
 
@@ -159,4 +159,110 @@ test("handles unauthenticated and recoverable load failures accessibly", async (
   render(<AuditHistoryPage />);
   expect(await screen.findByText(/Could not load your audit history/i)).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
+});
+
+test("renders a safe action-type badge and reason when the API provides them", async () => {
+  mockApi(
+    history([
+      item({
+        title: "Action proposed",
+        summary: "LifeFlow prepared an action for your review.",
+        action_type: "Gmail draft",
+      }),
+    ]),
+  );
+  render(<AuditHistoryPage />);
+
+  expect(await screen.findByTestId("audit-action-type")).toHaveTextContent("Gmail draft");
+});
+
+test("renders a safe reason line when the API provides one", async () => {
+  mockApi(
+    history([
+      item({
+        title: "Imported-data deletion partly completed",
+        summary: "Some confirmed data was deleted, but the operation needs review.",
+        reason: "Provider access could not be revoked",
+      }),
+    ]),
+  );
+  render(<AuditHistoryPage />);
+
+  expect(await screen.findByTestId("audit-reason")).toHaveTextContent(
+    "Reason: Provider access could not be revoked",
+  );
+});
+
+test("omits the action-type badge and reason line when the API returns none", async () => {
+  mockApi(history([item()]));
+  render(<AuditHistoryPage />);
+
+  await screen.findByRole("heading", { name: "Action rejected" });
+  expect(screen.queryByTestId("audit-action-type")).toBeNull();
+  expect(screen.queryByTestId("audit-reason")).toBeNull();
+});
+
+test("renders validated counts with correct singular/plural wording", async () => {
+  mockApi(
+    history([
+      item({
+        title: "Imported-data deletion completed",
+        summary: "LifeFlow completed the confirmed deletion.",
+        deleted_count: 36,
+        preserved_count: 1,
+      }),
+    ]),
+  );
+  render(<AuditHistoryPage />);
+
+  const counts = await screen.findByTestId("audit-counts");
+  expect(counts).toHaveTextContent("36 records deleted");
+  expect(counts).toHaveTextContent("1 record preserved for reconciliation");
+});
+
+test("does not claim preserved records were deleted, and shows failed counts distinctly", async () => {
+  mockApi(
+    history([
+      item({
+        title: "Account deletion partly completed",
+        summary: "Some account data was deleted, but the operation needs review.",
+        reason: "Provider access could not be revoked",
+        deleted_count: 40,
+        preserved_count: 2,
+        failed_count: 3,
+      }),
+    ]),
+  );
+  render(<AuditHistoryPage />);
+
+  const counts = await screen.findByTestId("audit-counts");
+  expect(counts).toHaveTextContent("40 records deleted");
+  expect(counts).toHaveTextContent("2 records preserved for reconciliation");
+  expect(counts).toHaveTextContent("3 records could not be processed");
+  // Never a claim that preserved records were also deleted.
+  expect(counts.textContent).not.toMatch(/2 records? deleted/);
+});
+
+test("omits zero-value counts and the whole counts block when nothing is present", async () => {
+  mockApi(
+    history([
+      item({
+        title: "Imported-data deletion completed",
+        summary: "LifeFlow completed the confirmed deletion.",
+        deleted_count: 5,
+        preserved_count: 0,
+      }),
+    ]),
+  );
+  render(<AuditHistoryPage />);
+
+  const counts = await screen.findByTestId("audit-counts");
+  expect(counts).toHaveTextContent("5 records deleted");
+  expect(counts.textContent).not.toContain("0 record");
+
+  cleanup();
+  mockApi(history([item()]));
+  render(<AuditHistoryPage />);
+  await screen.findByRole("heading", { name: "Action rejected" });
+  expect(screen.queryByTestId("audit-counts")).toBeNull();
 });

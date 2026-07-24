@@ -158,6 +158,11 @@ async def test_history_never_exposes_raw_audit_fields_or_unknown_events(
                 "title": "Memory suggestion confirmed",
                 "summary": "You confirmed a preference suggestion.",
                 "tone": "success",
+                "action_type": None,
+                "reason": None,
+                "deleted_count": None,
+                "preserved_count": None,
+                "failed_count": None,
             }
         ],
         "next_cursor": None,
@@ -417,3 +422,481 @@ async def test_history_query_is_supported_by_the_user_time_index(
     assert indexdef is not None, "expected index ix_audit_events_user_time to exist"
     assert "user_id" in indexdef
     assert "timestamp" in indexdef
+
+
+@pytest.mark.asyncio
+async def test_gmail_draft_proposal_renders_the_safe_action_label(
+    dev_client: AsyncClient,
+) -> None:
+    user_id = await _login(dev_client, "gmail-draft")
+    now = datetime.now(UTC) - timedelta(minutes=1)
+    await _replace_events(
+        user_id,
+        [
+            _event(
+                user_id,
+                "proposal.created",
+                timestamp=now,
+                metadata={"action_type": "create_gmail_draft", "risk_level": "medium"},
+            )
+        ],
+    )
+
+    response = await dev_client.get("/audit-history", params={"period": "all"})
+
+    assert response.status_code == 200
+    item = response.json()["items"][0]
+    assert item["action_type"] == "Gmail draft"
+    assert "create_gmail_draft" not in response.text
+
+
+@pytest.mark.asyncio
+async def test_calendar_event_proposal_renders_the_safe_action_label(
+    dev_client: AsyncClient,
+) -> None:
+    user_id = await _login(dev_client, "calendar-event")
+    now = datetime.now(UTC) - timedelta(minutes=1)
+    await _replace_events(
+        user_id,
+        [
+            _event(
+                user_id,
+                "proposal.approved",
+                timestamp=now,
+                metadata={"action_type": "create_calendar_event", "version": 1},
+            )
+        ],
+    )
+
+    response = await dev_client.get("/audit-history", params={"period": "all"})
+
+    assert response.status_code == 200
+    item = response.json()["items"][0]
+    assert item["action_type"] == "Calendar event"
+    assert "create_calendar_event" not in response.text
+
+
+@pytest.mark.asyncio
+async def test_unknown_action_type_is_omitted(dev_client: AsyncClient) -> None:
+    user_id = await _login(dev_client, "unknown-action-type")
+    now = datetime.now(UTC) - timedelta(minutes=1)
+    await _replace_events(
+        user_id,
+        [
+            _event(
+                user_id,
+                "proposal.created",
+                timestamp=now,
+                metadata={"action_type": "SENTINEL-FUTURE-ACTION-TYPE"},
+            )
+        ],
+    )
+
+    response = await dev_client.get("/audit-history", params={"period": "all"})
+
+    assert response.status_code == 200
+    item = response.json()["items"][0]
+    assert item["action_type"] is None
+    assert "SENTINEL-FUTURE-ACTION-TYPE" not in response.text
+
+
+@pytest.mark.asyncio
+async def test_partially_failed_deletion_renders_only_a_registered_safe_reason(
+    dev_client: AsyncClient,
+) -> None:
+    user_id = await _login(dev_client, "deletion-reason")
+    now = datetime.now(UTC) - timedelta(minutes=1)
+    await _replace_events(
+        user_id,
+        [
+            _event(
+                user_id,
+                "data.import_deletion_partially_failed",
+                timestamp=now,
+                metadata={
+                    "operation_type": "imported_data",
+                    "state": "partially_failed",
+                    "error_code": "provider_revoke_failed",
+                },
+            )
+        ],
+    )
+
+    response = await dev_client.get(
+        "/audit-history", params={"category": "privacy", "period": "all"}
+    )
+
+    assert response.status_code == 200
+    item = response.json()["items"][0]
+    assert item["reason"] == "Provider access could not be revoked"
+    assert "provider_revoke_failed" not in response.text
+    assert "operation_type" not in response.text
+    assert "imported_data" not in response.text
+
+
+@pytest.mark.asyncio
+async def test_unregistered_reason_code_is_omitted(dev_client: AsyncClient) -> None:
+    user_id = await _login(dev_client, "unregistered-reason")
+    now = datetime.now(UTC) - timedelta(minutes=1)
+    await _replace_events(
+        user_id,
+        [
+            _event(
+                user_id,
+                "account.deletion_failed",
+                timestamp=now,
+                metadata={"error_code": "SENTINEL-RAW-EXCEPTION-TEXT"},
+            )
+        ],
+    )
+
+    response = await dev_client.get(
+        "/audit-history", params={"category": "privacy", "period": "all"}
+    )
+
+    assert response.status_code == 200
+    item = response.json()["items"][0]
+    assert item["reason"] is None
+    assert "SENTINEL-RAW-EXCEPTION-TEXT" not in response.text
+
+
+@pytest.mark.asyncio
+async def test_historical_event_without_optional_detail_still_renders_safely(
+    dev_client: AsyncClient,
+) -> None:
+    """Mirrors the real execution.uncertain call site that carries only
+    action_type and execution_id, with no reason_code — a genuinely historical
+    shape, not a hypothetical one."""
+    user_id = await _login(dev_client, "historical-no-detail")
+    now = datetime.now(UTC) - timedelta(minutes=1)
+    await _replace_events(
+        user_id,
+        [
+            _event(
+                user_id,
+                "execution.uncertain",
+                timestamp=now,
+                metadata={"action_type": "create_task", "execution_id": "SENTINEL-EXEC-ID"},
+            )
+        ],
+    )
+
+    response = await dev_client.get("/audit-history", params={"period": "all"})
+
+    assert response.status_code == 200
+    item = response.json()["items"][0]
+    assert item["action_type"] == "Task"
+    assert item["reason"] is None
+    assert "SENTINEL-EXEC-ID" not in response.text
+
+
+@pytest.mark.asyncio
+async def test_typed_details_never_expose_raw_metadata_or_google_status_message(
+    dev_client: AsyncClient,
+) -> None:
+    """The one parametrized reason code embeds only an HTTP status integer
+    (never a message body); confirm the rendered label is the fixed safe
+    string, not an interpolation of the raw code."""
+    user_id = await _login(dev_client, "google-client-error")
+    now = datetime.now(UTC) - timedelta(minutes=1)
+    await _replace_events(
+        user_id,
+        [
+            _event(
+                user_id,
+                "execution.failed",
+                timestamp=now,
+                metadata={
+                    "action_type": "create_gmail_draft",
+                    "error_code": "google_client_error_503",
+                },
+            )
+        ],
+    )
+
+    response = await dev_client.get("/audit-history", params={"period": "all"})
+
+    assert response.status_code == 200
+    item = response.json()["items"][0]
+    # Exact-equality already proves no interpolation occurred; a bare "503"
+    # substring check would be flaky, since a timestamp can coincidentally
+    # contain those digits.
+    assert item["reason"] == "The connected service returned an error"
+    assert "google_client_error_503" not in response.text
+
+
+@pytest.mark.asyncio
+async def test_imported_data_completion_emits_safe_aggregate_counts(
+    dev_client: AsyncClient,
+) -> None:
+    user_id = await _login(dev_client, "counts-imported")
+    now = datetime.now(UTC) - timedelta(minutes=1)
+    await _replace_events(
+        user_id,
+        [
+            _event(
+                user_id,
+                "data.import_deletion_completed",
+                timestamp=now,
+                metadata={
+                    "operation_type": "imported_data",
+                    "state": "succeeded",
+                    "deleted_count": 36,
+                    "preserved_count": 1,
+                },
+            )
+        ],
+    )
+
+    response = await dev_client.get(
+        "/audit-history", params={"category": "privacy", "period": "all"}
+    )
+
+    assert response.status_code == 200
+    item = response.json()["items"][0]
+    assert item["deleted_count"] == 36
+    assert item["preserved_count"] == 1
+    assert item["failed_count"] is None
+
+
+@pytest.mark.asyncio
+async def test_retention_completion_emits_safe_aggregate_counts(
+    dev_client: AsyncClient,
+) -> None:
+    """retention.py never populates preserved_counts_json (ADR 0005 D79) —
+    preserved_count is correctly absent, not fabricated as zero."""
+    user_id = await _login(dev_client, "counts-retention")
+    now = datetime.now(UTC) - timedelta(minutes=1)
+    await _replace_events(
+        user_id,
+        [
+            _event(
+                user_id,
+                "retention.operation_completed",
+                timestamp=now,
+                metadata={"operation_type": "retention", "state": "succeeded", "deleted_count": 12},
+            )
+        ],
+    )
+
+    response = await dev_client.get(
+        "/audit-history", params={"category": "privacy", "period": "all"}
+    )
+
+    assert response.status_code == 200
+    item = response.json()["items"][0]
+    assert item["deleted_count"] == 12
+    assert item["preserved_count"] is None
+
+
+@pytest.mark.asyncio
+async def test_account_deletion_completion_emits_only_content_free_totals(
+    dev_client: AsyncClient,
+) -> None:
+    user_id = await _login(dev_client, "counts-account")
+    now = datetime.now(UTC) - timedelta(minutes=1)
+    await _replace_events(
+        user_id,
+        [
+            _event(
+                user_id,
+                "account.deletion_completed",
+                timestamp=now,
+                metadata={
+                    "operation_type": "account_deletion",
+                    "state": "succeeded",
+                    "deleted_count": 58,
+                    "preserved_count": 0,
+                },
+            )
+        ],
+    )
+
+    response = await dev_client.get(
+        "/audit-history", params={"category": "privacy", "period": "all"}
+    )
+
+    assert response.status_code == 200
+    item = response.json()["items"][0]
+    assert item["deleted_count"] == 58
+    assert item["preserved_count"] == 0
+    assert "account_deletion" not in response.text
+
+
+@pytest.mark.asyncio
+async def test_partially_failed_operation_distinguishes_deleted_and_preserved_totals(
+    dev_client: AsyncClient,
+) -> None:
+    user_id = await _login(dev_client, "counts-partial")
+    now = datetime.now(UTC) - timedelta(minutes=1)
+    await _replace_events(
+        user_id,
+        [
+            _event(
+                user_id,
+                "account.deletion_partially_failed",
+                timestamp=now,
+                metadata={
+                    "error_code": "provider_revoke_failed",
+                    "deleted_count": 40,
+                    "preserved_count": 2,
+                },
+            )
+        ],
+    )
+
+    response = await dev_client.get(
+        "/audit-history", params={"category": "privacy", "period": "all"}
+    )
+
+    assert response.status_code == 200
+    item = response.json()["items"][0]
+    assert item["reason"] == "Provider access could not be revoked"
+    assert item["deleted_count"] == 40
+    assert item["preserved_count"] == 2
+
+
+@pytest.mark.asyncio
+async def test_previewed_event_ignores_count_shaped_metadata_defensively(
+    dev_client: AsyncClient,
+) -> None:
+    """Defense in depth: even if a future/buggy writer ever attached
+    count-shaped keys to a non-terminal event, the registry's show_counts
+    flag — not the presence of the keys — decides whether they render."""
+    user_id = await _login(dev_client, "counts-previewed")
+    now = datetime.now(UTC) - timedelta(minutes=1)
+    await _replace_events(
+        user_id,
+        [
+            _event(
+                user_id,
+                "data.import_deletion_previewed",
+                timestamp=now,
+                metadata={"deleted_count": 99, "preserved_count": 5},
+            )
+        ],
+    )
+
+    response = await dev_client.get("/audit-history", params={"period": "all"})
+
+    assert response.status_code == 200
+    item = response.json()["items"][0]
+    assert item["deleted_count"] is None
+    assert item["preserved_count"] is None
+
+
+@pytest.mark.asyncio
+async def test_historical_completion_without_counts_renders_safely(
+    dev_client: AsyncClient,
+) -> None:
+    """A pre-correction historical row has no count keys at all — it must
+    still render without error."""
+    user_id = await _login(dev_client, "counts-historical")
+    now = datetime.now(UTC) - timedelta(minutes=1)
+    await _replace_events(
+        user_id,
+        [
+            _event(
+                user_id,
+                "data.import_deletion_completed",
+                timestamp=now,
+                metadata={"operation_type": "imported_data", "state": "succeeded"},
+            )
+        ],
+    )
+
+    response = await dev_client.get("/audit-history", params={"period": "all"})
+
+    assert response.status_code == 200
+    item = response.json()["items"][0]
+    assert item["deleted_count"] is None
+    assert item["preserved_count"] is None
+    assert item["failed_count"] is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "bad_value",
+    [-1, True, "36", 3.5, 2_000_000],
+    ids=["negative", "boolean", "string", "float", "excessive"],
+)
+async def test_malformed_counts_are_omitted(dev_client: AsyncClient, bad_value: object) -> None:
+    user_id = await _login(dev_client, "counts-malformed")
+    now = datetime.now(UTC) - timedelta(minutes=1)
+    await _replace_events(
+        user_id,
+        [
+            _event(
+                user_id,
+                "data.import_deletion_completed",
+                timestamp=now,
+                metadata={"deleted_count": bad_value},
+            )
+        ],
+    )
+
+    response = await dev_client.get("/audit-history", params={"period": "all"})
+
+    assert response.status_code == 200
+    item = response.json()["items"][0]
+    # The field-level check is exact and sufficient; a raw substring check on
+    # the response body would be flaky here — a small integer like -1 or a
+    # short digit string can coincidentally appear inside a UUID or timestamp.
+    assert item["deleted_count"] is None
+
+
+@pytest.mark.asyncio
+async def test_unknown_count_keys_are_ignored(dev_client: AsyncClient) -> None:
+    user_id = await _login(dev_client, "counts-unknown-key")
+    now = datetime.now(UTC) - timedelta(minutes=1)
+    await _replace_events(
+        user_id,
+        [
+            _event(
+                user_id,
+                "data.import_deletion_completed",
+                timestamp=now,
+                metadata={
+                    "deleted_count": 5,
+                    "record_id": "SENTINEL-RECORD-ID",
+                    "arbitrary_extra_key": 999,
+                },
+            )
+        ],
+    )
+
+    response = await dev_client.get("/audit-history", params={"period": "all"})
+
+    assert response.status_code == 200
+    item = response.json()["items"][0]
+    assert item["deleted_count"] == 5
+    assert "arbitrary_extra_key" not in response.text
+    assert "SENTINEL-RECORD-ID" not in response.text
+
+
+@pytest.mark.asyncio
+async def test_raw_per_category_count_json_is_never_returned(dev_client: AsyncClient) -> None:
+    """The per-category breakdown (the actual shape of deleted_counts_json)
+    uses a different key name and category-name sub-keys — neither the wrong
+    key nor the category names it would contain can leak through."""
+    user_id = await _login(dev_client, "counts-raw-json")
+    now = datetime.now(UTC) - timedelta(minutes=1)
+    await _replace_events(
+        user_id,
+        [
+            _event(
+                user_id,
+                "data.import_deletion_completed",
+                timestamp=now,
+                metadata={"deleted_counts": {"source_items": 10, "signals": 2}},
+            )
+        ],
+    )
+
+    response = await dev_client.get("/audit-history", params={"period": "all"})
+
+    assert response.status_code == 200
+    item = response.json()["items"][0]
+    assert item["deleted_count"] is None
+    assert "source_items" not in response.text
+    assert "deleted_counts" not in response.text

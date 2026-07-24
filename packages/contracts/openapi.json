@@ -357,11 +357,44 @@
       },
       "AuditHistoryItem": {
         "properties": {
+          "action_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action Type"
+          },
           "actor": {
             "$ref": "#/components/schemas/AuditHistoryActor"
           },
           "category": {
             "$ref": "#/components/schemas/AuditHistoryCategory"
+          },
+          "deleted_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deleted Count"
+          },
+          "failed_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failed Count"
           },
           "id": {
             "title": "Id",
@@ -371,6 +404,28 @@
             "format": "date-time",
             "title": "Occurred At",
             "type": "string"
+          },
+          "preserved_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preserved Count"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
           },
           "summary": {
             "title": "Summary",

@@ -22,6 +22,9 @@ from lifeflow_api.audit_history_registry import (
     AUDIT_EVENT_PRESENTATIONS,
     AuditHistoryCategory,
     AuditHistoryTone,
+    safe_action_type_label,
+    safe_counts,
+    safe_reason_label,
 )
 from lifeflow_api.deps import CurrentUser, DbSession
 from lifeflow_api.models import AuditEvent
@@ -50,6 +53,14 @@ class AuditHistoryItem(BaseModel):
     title: str
     summary: str
     tone: AuditHistoryTone
+    # All closed, pre-validated safe values — never the raw metadata — and
+    # None/absent whenever the event type doesn't declare the detail, the
+    # source key is missing, or the value fails validation (fail closed).
+    action_type: str | None = None
+    reason: str | None = None
+    deleted_count: int | None = None
+    preserved_count: int | None = None
+    failed_count: int | None = None
 
 
 class AuditHistoryResponse(BaseModel):
@@ -140,6 +151,21 @@ def _actor_label(actor: str) -> AuditHistoryActor:
 
 def _render(event: AuditEvent) -> AuditHistoryItem:
     presentation = AUDIT_EVENT_PRESENTATIONS[event.event_type]
+    metadata = event.safe_metadata_json or {}
+    action_type = (
+        safe_action_type_label(metadata.get("action_type"))
+        if presentation.show_action_type
+        else None
+    )
+    # Writers use either key depending on the failure's origin (policy
+    # rejection vs. execution/deletion error); the two never co-occur on the
+    # same event, and both are validated against the same closed label set.
+    reason = (
+        safe_reason_label(metadata.get("reason_code") or metadata.get("error_code"))
+        if presentation.show_reason
+        else None
+    )
+    counts = safe_counts(metadata) if presentation.show_counts else {}
     return AuditHistoryItem(
         id=str(event.id),
         occurred_at=event.timestamp,
@@ -148,6 +174,11 @@ def _render(event: AuditEvent) -> AuditHistoryItem:
         title=presentation.title,
         summary=presentation.summary,
         tone=presentation.tone,
+        action_type=action_type,
+        reason=reason,
+        deleted_count=counts.get("deleted_count"),
+        preserved_count=counts.get("preserved_count"),
+        failed_count=counts.get("failed_count"),
     )
 
 

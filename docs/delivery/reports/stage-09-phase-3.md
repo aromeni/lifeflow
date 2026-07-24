@@ -5,7 +5,7 @@
 **Immutable Delivery Phase 2 ancestor:** `fdb46368732a0a26f72e74062704623a55a85c6d`
 **Date:** 2026-07-24
 
-Delivery Phase 3 is committed locally as five commits on `stage-9-audit-history`.
+Delivery Phase 3 is committed locally as seven commits on `stage-9-audit-history`.
 Nothing has been tagged, pushed, or merged. Delivery Phases 4 and 5 have not
 begun, Stage 9 is not complete, and Stage 9 has not been merged to `main`.
 
@@ -127,26 +127,120 @@ response schemas), so the registry and the API can be reviewed, tested, and
 committed as independent concerns. This is a pure code-organisation change:
 behaviour, routes, and schemas are unchanged.
 
+## Presentation completeness correction (2026-07-24)
+
+A follow-up review asked whether the committed Phase 3 timeline under-renders
+detail the underlying audit writers already capture safely. Inspecting every
+`record_audit_event`/`_audit` call site (not inferring from `safe_metadata_json`
+shape alone) found three gaps, all now fixed:
+
+- **`action_type`** — a closed 3-value field (`create_task`/`create_gmail_draft`/
+  `create_calendar_event`) is written on every single proposal/execution/
+  approval audit call (verified systematically across all ~17 event types in
+  that category) and was never rendered.
+- **`reason_code`/`error_code`** on `approval.denied`, `execution.denied`,
+  `execution.uncertain`, `execution.failed`, and the deletion/retention/
+  account-deletion failure events — drawn from closed, hand-written code
+  vocabularies (`action_policy.PolicyViolationError`'s 7 codes,
+  `FinalExecutionError`'s ~9 codes plus one bounded parametrized HTTP-status
+  case, and `deletion_ops.py`'s 5 codes) — was never rendered.
+- **Record counts** (deleted/preserved) for deletion/retention/account-deletion
+  events were not even in `AuditEvent.safe_metadata_json` — confirmed by
+  reading `deletion.py`'s `_audit()` helper directly: it wrote only
+  `operation_type`, `state`, and the error code when set. Fixing this required
+  modifying that Phase 2 writer, already committed and pushed on
+  `origin/stage-9-deletion-retention` — **explicit authorisation was given** to
+  make this one narrow, audit-only addition (ADR 0005 D80). No deletion
+  planning, batching, preservation rule, retention eligibility, account
+  anonymisation, or state-transition logic was touched.
+
+**action_type/reason (ADR 0005 D79):** `Presentation` gained
+`show_action_type`/`show_reason` declaration flags, and
+`audit_history_registry.py` gained `safe_action_type_label`/`safe_reason_label`
+— two closed lookup functions that return `None` for anything absent,
+wrong-typed, or unregistered, never a raw fallback.
+
+**Safe aggregate counts (ADR 0005 D80):** `deletion.py` gained
+`safe_aggregate_counts(operation)`, called from `_audit()` only for the three
+terminal suffixes (`completed`/`partially_failed`/`failed`) where deletion
+actually ran; it sums each per-category counts dict into one flat, bounded,
+non-negative total, invalidating the whole total (never under-counting) if any
+entry is malformed. Only the two flat totals are ever written to the audit
+event — never the raw per-category JSON. There is no per-record failure count
+anywhere in this engine, so `failed_count` is never produced by any writer; and
+`retention.py` has never populated `preserved_counts_json` at all (pre-existing,
+unrelated to this correction), so `preserved_count` is correctly always absent
+specifically on retention events. `Presentation` gained a third flag,
+`show_counts`, on the nine terminal deletion/retention/account-deletion event
+types; `audit_history_registry.py` gained `safe_counts(metadata)`, which
+independently re-validates each of the three approved keys rather than
+trusting the writer.
+
+`AuditHistoryItem` gained five new optional fields total: `action_type`,
+`reason`, `deleted_count`, `preserved_count`, `failed_count` — all closed,
+independently validated values, never raw metadata. The frontend renders
+`action_type` as a small badge next to the entry title, `reason` as a one-line
+explanation beneath the summary, and each present count as a plain sentence
+("36 records deleted", "1 record preserved for reconciliation") with correct
+singular/plural wording and zero-value counts omitted as noise. See ADR 0005
+D79/D80 for the full design record. This correction is implemented, tested,
+and verified below, split across two commits:
+`feat(stage-9): record safe aggregate counts in audit events` (the writer) and
+`feat(stage-9): add typed details to audit summaries` (the presentation
+layer).
+
 ## Tests added
 
-- **Backend registry (`test_audit_history_registry.py`, 3 tests):** closed
+- **Backend deletion-engine writer (`test_deletion_engine.py`, +12 tests):**
+  `_sum_safe_counts`/`safe_aggregate_counts` unit behaviour (malformed/
+  negative/boolean/string/float/excessive values invalidate the whole total;
+  the per-category breakdown is never in the output); real end-to-end runs
+  proving `completed`/`partially_failed`/`failed` audit events for
+  imported-data, retention, and account-deletion all carry only the two flat,
+  content-free totals (no account id, operation id, or scope descriptor); a
+  provider-revoke partial failure still recording the real, non-zero deleted
+  count; and a direct proof that `previewed`/`requested`/`cancelled`/`started`
+  never attach counts even when the operation already has valid ones to show.
+- **Backend registry (`test_audit_history_registry.py`, 8 tests):** closed
   registry shape (no duplicate/malformed entries, no residual "metadata"
-  wording), `retention.operation_cancelled` presence, and the exact
-  "did not retry automatically" wording on `execution.uncertain`.
-- **Backend API (`test_audit_history.py`, 9 tests):** authentication/read-only
-  behaviour with no side effect on read, owner isolation, unknown-event
-  exclusion, raw-field sentinels, closed filters/time windows,
+  wording), `retention.operation_cancelled` presence, the exact
+  "did not retry automatically" wording on `execution.uncertain`,
+  `safe_action_type_label`'s/`safe_reason_label`'s closed lookup behaviour
+  (known values map correctly; unknown/malformed/non-string values return
+  `None`; the parametrized `google_client_error_*` code is bounded to a valid
+  HTTP-status shape), a guard that no label ever equals or echoes its raw
+  source code, and `safe_counts`'s closed extraction (only the three approved
+  keys; malformed/negative/boolean/string/float/excessive values rejected).
+- **Backend API (`test_audit_history.py`, 29 tests):** authentication/
+  read-only behaviour with no side effect on read, owner isolation,
+  unknown-event exclusion, raw-field sentinels, closed filters/time windows,
   equal-timestamp ordering, frozen-window pagination, no duplicates,
   filter-bound/malformed cursors, deletion-summary privacy, the
   cancelled-retention-operation fix end-to-end, connection-sync and
-  execution-uncertain rendering (parametrized, 2 cases), and index-catalog
-  verification that the query keeps real `(user_id, timestamp)` index support.
-  The existing append-only repository surface test (`test_audit.py`) now pins
-  the one additional read method.
-- **Frontend:** 5 canonical-page tests plus 1 Privacy & Connections link test,
-  covering safe rendering, timezone/actor/category/outcome text, filter reset,
-  cursor-based append, empty/auth/error/retry states, and the canonical link.
-- **Browser:** 1 real API/PostgreSQL Playwright journey.
+  execution-uncertain rendering (parametrized, 2 cases), index-catalog
+  verification that the query keeps real `(user_id, timestamp)` index support,
+  Gmail-draft/Calendar-event safe action labels, unknown action types omitted,
+  registered/unregistered reasons, a historical shape with no optional detail
+  still rendering safely, the parametrized Google error code, and — from the
+  safe-counts correction — imported-data/retention/account-deletion completion
+  emitting correct totals, a partially-failed operation distinguishing
+  deleted/preserved totals, a non-terminal event ignoring count-shaped
+  metadata defensively, a historical completion with no count keys at all
+  rendering safely, negative/boolean/string/float/excessive counts all
+  omitted, unknown metadata keys ignored, and the raw per-category JSON shape
+  never returned. The existing append-only repository surface test
+  (`test_audit.py`) now pins the one additional read method.
+- **Frontend:** 11 canonical-page tests (5 typed-detail tests: safe
+  action-type badge, safe reason line, both omitted when absent, validated
+  counts with correct singular/plural wording, and no claim that preserved
+  records were deleted plus zero-value omission) plus 1 Privacy & Connections
+  link test.
+- **Browser:** 1 real API/ARQ-worker/PostgreSQL Playwright journey, extended to
+  drive a genuine imported-data deletion to completion and assert the rejected
+  proposal's action-type badge is one of the three closed safe labels, the
+  completed deletion shows the exact seeded count ("3 records deleted"), and
+  no raw `create_*` action type, category breakdown, operation id, or scope
+  descriptor ever appears in the DOM.
 
 A live `EXPLAIN`-based query-plan assertion was deliberately not used: each
 test creates its own near-empty audit log, and PostgreSQL's planner prefers a
@@ -157,29 +251,44 @@ still exists and still covers the right columns.
 
 ## Verification
 
-| Gate | Result |
-|---|---|
-| Git starting boundary | pass — branch `stage-9-audit-history`, HEAD `eedd69d`, `fdb4636` immutable ancestor, clean starting tree/index; re-confirmed by Claude on handoff |
-| Backend pytest | **616 passed** in ~4m (real PostgreSQL/Redis; includes the registry-split tests) |
-| Backend coverage | **91%** |
-| Ruff format / check | pass |
-| mypy | pass — 80 source files (one new module after the registry split) |
-| Alembic | pass — single head `0011`; no Phase 3 migration |
-| Frontend Vitest | **70 passed** |
-| ESLint / TypeScript | pass / pass |
-| Repository frontend format check | pass — repository-pinned Prettier (`format:check`) |
-| Production build | pass — Next.js 16.2.10 (Turbopack); `/audit-history` prerendered as static content |
-| Playwright complete suite, run 1 | **7 passed** in 2.0m |
-| Playwright complete suite, run 2 | **7 passed** in 1.6m (both runs from a clean state, no reused/orphan processes) |
-| Deterministic eval (`det`) | pass — precision 1.00, recall 0.94, matches established baseline |
-| Action-proposal eval (`actions`) | PASS — 0 grounding/injection/usefulness violations, matches baseline |
-| Contract freshness | pass — regenerating `openapi.json`/`index.d.ts` reproduced byte-identical diffs (no drift), including after the registry-module split |
-| Metrics | regenerated — see the committed `metrics.md` for the exact final numbers |
-| pre-commit `--all-files` | **pass** — all 10 hooks passed (trailing-whitespace, end-of-file, yaml, large-files, merge-conflict, private-key, ruff, ruff-format, Detect secrets, `.env.example`) |
-| detect-secrets | pass — no unstaged-baseline warning; `.secrets.baseline` byte-identical to HEAD (0-line diff) |
-| gitleaks full history | pass — no leaks |
-| `.env.example` validation | pass |
-| `git diff --check` | pass |
+| Gate | Post-registry-split | Post-typed-detail (action_type/reason) | Post-safe-counts (final) |
+|---|---|---|---|
+| Git starting boundary | pass — HEAD `eedd69d`, `fdb4636` ancestor | pass — five commits now on top | pass — committed as commits 6 (writer) and 7 (presentation) |
+| Backend pytest | **616 passed** in ~4m | **626 passed** in ~3.4m | **653 passed** in ~3.5m |
+| Backend coverage | **91%** | **91%** | **91%** |
+| Ruff format / check | pass | pass | pass |
+| mypy | pass — 80 files | pass — 80 files | pass — 80 files |
+| Alembic | pass — single head `0011` | pass — single head `0011` | pass — single head `0011`; no migration for the writer change either |
+| Frontend Vitest | **70 passed** | **73 passed** | **76 passed** |
+| ESLint / TypeScript | pass / pass | pass / pass | pass / pass |
+| Repository frontend format check | pass | pass | pass |
+| Production build | pass | pass | pass |
+| Playwright complete suite | **7 passed** in 2.0m / 1.6m (×2) | **7 passed** in 2.2m | **7 passed** in 1.4m (includes a real completed deletion showing "3 records deleted") |
+| Deterministic + action evals | pass, baseline | pass, baseline | pass, baseline |
+| Contract freshness | pass, byte-identical | pass, deterministic | pass, deterministic (repeated-hash check); new count fields present |
+| Metrics | 158/29/616/70/7/91% | 158/29/626/73/7/91% | **158/29/653/76/7/91%** |
+| pre-commit `--all-files` | pass | pass | pass — all 10 hooks |
+| detect-secrets | pass, baseline unchanged | pass, baseline unchanged | pass, baseline unchanged |
+| gitleaks full history | pass | pass | pass — 35 commits, no leaks |
+| `.env.example` validation | pass | pass | pass |
+| `git diff --check` | pass | pass | pass |
+
+Two flaky tests were found and fixed during this work, both the same class of
+issue as an earlier documented flake (a coincidental digit match inside a
+UUID/timestamp, not a real leak):
+
+- `test_typed_details_never_expose_raw_metadata_or_google_status_message`
+  asserted the bare substring `"503"` was absent from the whole response.
+  Fixed to rely on exact-value equality for `reason` (already fully proving no
+  interpolation) plus a precise check that the full raw code string is absent.
+- `test_malformed_counts_are_omitted[negative]` asserted the bare substring
+  `"-1"` was absent from the whole response; a generated UUID's hyphen
+  followed by a digit ("...3-104b...") produced a false failure. Fixed to rely
+  on the exact `deleted_count is None` field check alone, which is sufficient
+  and deterministic.
+
+Both were verified stable across repeated runs after the fix, and clean across
+every subsequent full-suite and Playwright run in this report.
 
 ## Focused verification corrections
 
@@ -219,14 +328,19 @@ mutation/deletion route; raw audit metadata; new provider scope; Delivery Phase
 
 ## Git and remote status
 
-Committed as five commits on `stage-9-audit-history`, all reachable from the
+Committed as seven commits on `stage-9-audit-history`, all reachable from the
 approved preparatory HEAD `eedd69d`: presentation registry, audit history API,
-Audit History frontend, tests and Playwright, and this documentation. `fdb4636`
-remains an ancestor. Nothing has been tagged, pushed, or merged.
-`origin/stage-9-deletion-retention` remains the Phase 2 remote boundary; no
-`origin/stage-9-audit-history` tracking ref and no Stage 9 tag exist.
+Audit History frontend, tests and Playwright, documentation, safe aggregate
+counts in the deletion/retention/account-deletion audit writer, and the typed
+action-type/reason/counts presentation layer. `fdb4636` remains an ancestor;
+`origin/stage-9-deletion-retention` remains the Phase 2 remote boundary at
+`fdb4636`, unchanged and not amended. Nothing has been tagged, pushed, or
+merged; no `origin/stage-9-audit-history` tracking ref and no Stage 9 tag
+exist.
 
 ## Stop point
 
-Delivery Phase 3 is committed locally and fully verified. Do not push, tag,
-merge, or begin Delivery Phase 4 without explicit approval.
+Delivery Phase 3, including the presentation completeness correction (D79
+action-type/reason, D80 safe aggregate counts), is committed locally as seven
+commits and fully verified. Do not push, tag, merge, or begin Delivery Phase 4
+without explicit approval.

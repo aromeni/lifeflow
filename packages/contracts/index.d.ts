@@ -868,8 +868,14 @@ export interface components {
         AuditHistoryCategory: "all" | "actions" | "briefs" | "connections" | "privacy" | "preferences" | "account";
         /** AuditHistoryItem */
         AuditHistoryItem: {
+            /** Action Type */
+            action_type?: string | null;
             actor: components["schemas"]["AuditHistoryActor"];
             category: components["schemas"]["AuditHistoryCategory"];
+            /** Deleted Count */
+            deleted_count?: number | null;
+            /** Failed Count */
+            failed_count?: number | null;
             /** Id */
             id: string;
             /**
@@ -877,6 +883,10 @@ export interface components {
              * Format: date-time
              */
             occurred_at: string;
+            /** Preserved Count */
+            preserved_count?: number | null;
+            /** Reason */
+            reason?: string | null;
             /** Summary */
             summary: string;
             /** Title */

@@ -8,9 +8,9 @@
 | TypeScript files | 29 |
 | Prompt files | 2 |
 | Eval cases | 20 |
-| Backend tests | 616 passing |
+| Backend tests | 653 passing |
 | Backend coverage | 91% |
-| Frontend tests | 70 passing |
+| Frontend tests | 76 passing |
 | E2E journeys (Playwright) | 7 |
 | Frontend coverage | not yet measured — coverage reporter deferred until the UI stabilises |
 | CI | not yet connected — activates on first GitHub push |

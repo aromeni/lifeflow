@@ -240,6 +240,21 @@ route, provider scope, rate limiter, or telemetry hardening was added.
 Decisions are ratified as ADR 0005 D75–D78. Delivery Phases 4–5 have not
 begun; nothing on `stage-9-audit-history` is tagged, pushed, or merged.
 
+**Presentation completeness correction (recorded 2026-07-24, ADR 0005
+D79–D80).** A follow-up review found two pure presentation-layer gaps (a
+closed `action_type` and closed `reason`/`error_code` already written on every
+relevant audit call but never rendered — D79) and one genuine data gap (record
+counts were never written to `AuditEvent.safe_metadata_json` at all — only to
+`DataDeletionOperation`'s own columns). Rendering counts required one small,
+explicitly authorised, narrowly scoped addition to the already-committed
+Phase 2 `deletion.py` writer — audit metadata only, no change to deletion
+planning, batching, preservation, retention eligibility, account
+anonymisation, or state transitions (D80). `retention.py` has never populated
+`preserved_counts_json`, so `preserved_count` is correctly always absent on
+retention events specifically; no writer produces a per-record `failed_count`
+anywhere in the engine, so that field is always omitted. Implemented as two
+further commits pending review.
+
 ## Open questions deliberately deferred (with owner stage)
 
 - ~~Evaluation acceptance targets~~ — **ratified 2026-07-16 in [ADR 0002](../architecture/adr/0002-evaluation-targets.md)** after the deterministic baseline; real-model metrics still pending an Anthropic key (before the Stage 10 gate).

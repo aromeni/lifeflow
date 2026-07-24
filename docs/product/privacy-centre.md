@@ -68,10 +68,16 @@ impact preview, and type the exact confirmation phrase — never on page load.
 ## Audit history (Phase 3)
 
 The **View audit history** link opens the canonical `/audit-history` page.
-Entries contain only a fixed plain-language title and summary, the time, and
-closed actor/category/outcome labels. Raw event metadata, private content,
-provider identifiers, entity/correlation ids, rejection reasons, memory or
-preference values, counts, and technical error details are not returned.
+Entries contain a fixed plain-language title and summary, the time, closed
+actor/category/outcome labels, and — where relevant — a small safe action-type
+badge (**Task**, **Gmail draft**, or **Calendar event**), a plain-language
+**Reason:** line for a blocked or failed action, and, for a completed or
+partly completed deletion/retention operation, plain-language record counts
+("36 records deleted", "1 record preserved for reconciliation"). Raw event
+metadata, private content, provider identifiers, entity/correlation ids,
+rejection reasons, memory or preference values, per-category count
+breakdowns, and technical error details are never returned — only these few
+closed, pre-validated summaries.
 
 Use the closed activity filters (All activity, Actions, Briefs, Connections,
 Privacy, Preferences, Account) and time filters (7/30/90 days or All time).

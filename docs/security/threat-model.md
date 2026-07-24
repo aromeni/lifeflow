@@ -199,21 +199,29 @@ The destructive engine (ADR 0005 D66–D72) introduces a new class of privileged
 - **Authorisation & session invalidation.** A typed confirmation phrase gates each user-requested operation; a `deletion_pending`/`deleted` account is blocked from sync/brief/proposal mutations (`require_active_account`), and a `deleted` account can never authenticate again (`get_current_user`), invalidating existing sessions. The same Google identity may create a genuinely new account without reviving the anonymised one.
 - **T29 (queue outage).** Preview/confirm never touch Redis; a confirmed operation persists as `pending` and is drained by the per-minute cron when Redis returns — ordinary API routes stay available throughout.
 
-## Public audit history (Stage 9 Delivery Phase 3, recorded 2026-07-23)
+## Public audit history (Stage 9 Delivery Phase 3, recorded 2026-07-23, extended 2026-07-24)
 
 The audit-history surface is a new disclosure boundary over internal safety
-records (ADR 0005 D75–D78), covered by `test_audit_history_registry.py`,
-`test_audit_history.py`, the frontend
-component suite, and `audit-history.spec.ts`.
+records (ADR 0005 D75–D80), covered by `test_audit_history_registry.py`,
+`test_audit_history.py`, `test_deletion_engine.py`'s safe-aggregate-counts
+tests, the frontend component suite, and `audit-history.spec.ts`.
 
 - **T2 (cross-user history leakage).** `GET /audit-history` authenticates with
   `CurrentUser`; every repository query filters by that exact `user_id`.
   Cursors are never authority and cannot override the owner predicate.
 - **T1/T6 (private content and internals disclosure).** A closed presentation
-  registry produces fixed text. The API schema has no metadata, raw event type,
-  raw actor, entity id, correlation id, provider id, payload, reason, value,
-  count, or error-detail field. Unknown event types are excluded at query time.
-  Sentinel tests cover raw metadata and another owner's records.
+  registry produces fixed text. The API schema has no raw event type, raw
+  actor, entity id, correlation id, provider id, payload, or value field.
+  Three narrow, independently re-validated typed details were added on top of
+  the fixed text (D79–D80): a closed 3-value `action_type`, a closed
+  `reason` drawn only from hand-written safe code vocabularies, and two flat
+  bounded non-negative `deleted_count`/`preserved_count` integers aggregated
+  from durable per-category totals — never the raw metadata value, the raw
+  per-category JSON, an id, or a scope descriptor. Each closed lookup function
+  omits (never guesses or echoes) anything absent, wrong-typed, or
+  unregistered. Unknown event types are excluded at query time. Sentinel tests
+  cover raw metadata, malformed/excessive/negative/boolean/string/float
+  counts, unknown metadata keys, and another owner's records.
 - **T18 (audit integrity).** Phase 3 adds one read method and no mutation or
   deletion method/route. The append-only capture path and deletion tombstone
   rules are unchanged; a repository surface test pins that contract.

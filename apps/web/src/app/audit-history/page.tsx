@@ -60,6 +60,29 @@ function formatTimestamp(iso: string, timezone: string): string {
   }).format(new Date(iso));
 }
 
+function recordWord(n: number): string {
+  return n === 1 ? "record" : "records";
+}
+
+// Zero-value counts are omitted — "0 records deleted" is noise, not clarity —
+// and preserved is always phrased distinctly from deleted so the two are
+// never conflated.
+function countLines(item: AuditHistoryItem): string[] {
+  const lines: string[] = [];
+  if (item.deleted_count) {
+    lines.push(`${item.deleted_count} ${recordWord(item.deleted_count)} deleted`);
+  }
+  if (item.preserved_count) {
+    lines.push(
+      `${item.preserved_count} ${recordWord(item.preserved_count)} preserved for reconciliation`,
+    );
+  }
+  if (item.failed_count) {
+    lines.push(`${item.failed_count} ${recordWord(item.failed_count)} could not be processed`);
+  }
+  return lines;
+}
+
 export default function AuditHistoryPage() {
   const [state, setState] = useState<LoadState>("loading");
   const [items, setItems] = useState<AuditHistoryItem[]>([]);
@@ -211,8 +234,30 @@ export default function AuditHistoryPage() {
                   className="grid gap-2 rounded-lg border border-current/20 p-5 sm:grid-cols-[1fr_auto]"
                 >
                   <div>
-                    <h3 className="font-semibold">{item.title}</h3>
+                    <h3 className="font-semibold">
+                      {item.title}
+                      {item.action_type ? (
+                        <span
+                          data-testid="audit-action-type"
+                          className="ml-2 rounded-full border border-current/30 px-2 py-0.5 text-xs font-normal opacity-80"
+                        >
+                          {item.action_type}
+                        </span>
+                      ) : null}
+                    </h3>
                     <p className="mt-1 text-sm opacity-80">{item.summary}</p>
+                    {item.reason ? (
+                      <p data-testid="audit-reason" className="mt-1 text-xs opacity-70">
+                        Reason: {item.reason}
+                      </p>
+                    ) : null}
+                    {countLines(item).length > 0 ? (
+                      <ul data-testid="audit-counts" className="mt-1 text-xs opacity-70">
+                        {countLines(item).map((line) => (
+                          <li key={line}>{line}</li>
+                        ))}
+                      </ul>
+                    ) : null}
                     <p className="mt-2 text-xs opacity-65">
                       {item.actor === "you" ? "You" : "LifeFlow"} · {CATEGORY_LABELS[item.category]}{" "}
                       · {TONE_LABELS[item.tone]}

@@ -1,6 +1,6 @@
 # ADR 0005 — Stage 9: privacy, deletion, retention, audit UX, resilience
 
-**Status:** accepted (planning gate approved 2026-07-22); Delivery Phase 1 implemented 2026-07-22; Delivery Phase 2 implemented 2026-07-23; Delivery Phase 3 committed locally 2026-07-24 and awaiting remote finalisation.
+**Status:** accepted (planning gate approved 2026-07-22); Delivery Phase 1 implemented 2026-07-22; Delivery Phase 2 implemented 2026-07-23; Delivery Phase 3 committed locally 2026-07-24 (D75–D78) and awaiting remote finalisation; a typed-detail presentation completeness correction (D79 action-type/reason, D80 safe aggregate counts) is implemented and verified in the working tree, pending review and commit as two further commits.
 **Context:** Stage 8 is complete and merged to `main` (`c5b60b1`). Stage 9's
 exit theme is *"trust features operational — users control their data; the
 product fails safely in outages."* This ADR records the ratified Stage 9
@@ -269,6 +269,78 @@ Connections centre and back to it. Activity is the closed set `all`, `actions`,
 appends a keyset page, and timestamps render in the user's configured timezone.
 The page is a semantic ordered list with explicit actor/category/outcome text,
 honest empty/error/authentication states, and no write control.
+
+### D79 — Typed detail projection: safe action type and reason (2026-07-24)
+
+A post-commit completeness review found that every proposal/execution/approval
+audit write already carries a closed 3-value `action_type`
+(`create_task`/`create_gmail_draft`/`create_calendar_event`), and several
+failure-path writes carry a closed reason/error code
+(`action_policy.PolicyViolationError`'s 7 codes, a small number of codes
+raised directly in `action_proposal_service.py`/`action_executors.py`'s
+`FinalExecutionError`, and `deletion_ops.py`'s 5 deletion/retention/
+account-deletion codes) — none of it rendered. This was a presentation-layer
+gap, not a missing-data problem, so `audit_history_registry.py` gained two
+closed lookup functions, `safe_action_type_label`/`safe_reason_label`, and
+`Presentation` gained two declaration flags, `show_action_type`/`show_reason`,
+naming exactly which metadata key an event type may project and through which
+closed label table. Both functions return `None` — never the raw value — for
+anything absent, wrong-typed, or not in the closed table, so unregistered
+future codes and historical rows written before this change (which may lack
+`reason_code`/`error_code` entirely) both degrade to the same safe, silent
+omission. One code (`google_client_error_{status}`) is validated structurally
+rather than as a literal, since the interpolated part is a bounded HTTP status
+integer, never a message body.
+
+At this point, record counts (deleted/preserved/failed) were deliberately
+**not** added: they were never written to `AuditEvent.safe_metadata_json` in
+the first place — the shared `deletion.py`/`account_deletion.py`/`retention.py`
+`_audit()` helper recorded only `operation_type`, `state`, and the error code
+when present, while the actual counts lived solely on
+`DataDeletionOperation.deleted_counts_json`/`preserved_counts_json`/
+`preview_counts_json`. Projecting them would require changing that Phase 2
+writer (already committed and pushed on `origin/stage-9-deletion-retention`),
+which was out of this review's authority without explicit approval.
+
+### D80 — Safe aggregate audit counts (2026-07-24, explicitly authorised)
+
+Explicit authorisation was given to add counts to the audit writer, narrowly
+scoped to the audit trail only — no change to deletion planning, batching,
+preservation rules, retention eligibility, account anonymisation, or operation
+state transitions. `deletion.py` gained one small helper,
+`safe_aggregate_counts(operation)`, called only from the shared `_audit()`
+helper and only for the three terminal suffixes where deletion actually ran
+(`completed`, `partially_failed`, `failed` — never `previewed`/`requested`/
+`cancelled`/`started`, which cannot yet have produced any result). It sums each
+of `deleted_counts_json`/`preserved_counts_json`'s per-category values into one
+flat, bounded, non-negative integer per field; a single malformed category
+entry invalidates the whole total rather than under-counting. Only the two
+flat totals — `deleted_count`/`preserved_count` — are ever written to the audit
+event; the raw per-category JSON, with its category-name keys, is never
+copied.
+
+There is no per-record failure count anywhere in this engine — a batch either
+deletes an item or defers it to a later batch, so `failed_count` is never
+produced by any writer today; "failure" is an operation-level state, already
+surfaced through the existing `reason` field. Separately, `retention.py` has
+never populated `preserved_counts_json` at all (a pre-existing Phase 2
+characteristic, not something this correction changes), so `preserved_count`
+is correctly and permanently absent on retention events specifically, while
+present on imported-data and account-deletion events.
+
+On the presentation side, `Presentation` gained a third flag, `show_counts`,
+set on the nine terminal deletion/retention/account-deletion event types.
+`audit_history_registry.py` gained `safe_counts(metadata)`, which reads only
+the three approved keys (`deleted_count`/`preserved_count`/`failed_count`),
+independently re-validates each as a plain non-negative bounded integer
+(rejecting booleans explicitly, since `bool` subclasses `int` in Python),
+ignores every other key however it is spelled, and omits — never guesses —
+anything malformed or absent. This mirrors the writer's own validation rather
+than trusting it, so a future writer bug cannot leak an unbounded or malformed
+value through the API. The frontend renders each present count as a plain
+sentence ("36 records deleted", "1 record preserved for reconciliation") with
+correct singular/plural wording, omits zero-value counts as noise, and never
+implies a preserved record was also deleted.
 
 ## Consequences
 
