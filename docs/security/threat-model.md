@@ -199,6 +199,32 @@ The destructive engine (ADR 0005 D66–D72) introduces a new class of privileged
 - **Authorisation & session invalidation.** A typed confirmation phrase gates each user-requested operation; a `deletion_pending`/`deleted` account is blocked from sync/brief/proposal mutations (`require_active_account`), and a `deleted` account can never authenticate again (`get_current_user`), invalidating existing sessions. The same Google identity may create a genuinely new account without reviving the anonymised one.
 - **T29 (queue outage).** Preview/confirm never touch Redis; a confirmed operation persists as `pending` and is drained by the per-minute cron when Redis returns — ordinary API routes stay available throughout.
 
+## Public audit history (Stage 9 Delivery Phase 3, recorded 2026-07-23)
+
+The audit-history surface is a new disclosure boundary over internal safety
+records (ADR 0005 D75–D78), covered by `test_audit_history_registry.py`,
+`test_audit_history.py`, the frontend
+component suite, and `audit-history.spec.ts`.
+
+- **T2 (cross-user history leakage).** `GET /audit-history` authenticates with
+  `CurrentUser`; every repository query filters by that exact `user_id`.
+  Cursors are never authority and cannot override the owner predicate.
+- **T1/T6 (private content and internals disclosure).** A closed presentation
+  registry produces fixed text. The API schema has no metadata, raw event type,
+  raw actor, entity id, correlation id, provider id, payload, reason, value,
+  count, or error-detail field. Unknown event types are excluded at query time.
+  Sentinel tests cover raw metadata and another owner's records.
+- **T18 (audit integrity).** Phase 3 adds one read method and no mutation or
+  deletion method/route. The append-only capture path and deletion tombstone
+  rules are unchanged; a repository surface test pins that contract.
+- **Pagination abuse and consistency.** `limit` is closed to 1–50; cursor input
+  is non-empty and at most 1024 characters; strict version/filter/type
+  validation returns 422. `(timestamp DESC, id DESC)` keysets plus a frozen
+  `as_of` window prevent duplicate/shifted pages under concurrent inserts.
+- **Deferred controls remain deferred.** Phase 3 introduces no rate limiter,
+  trusted-proxy behaviour, telemetry, log expansion, or provider scope. Those
+  remain Delivery Phases 4 and 5.
+
 ## Out-of-scope threats (recorded, revisit at Stage 11)
 
 Multi-region availability, DDoS at scale, malicious insiders with database access, and formal GDPR DPIA sign-off (draft privacy notice arrives in Stage 10 for professional review).

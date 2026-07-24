@@ -210,13 +210,35 @@ Delivery Phase 1 shipped one consolidated, **read-only, non-destructive** surfac
 
 ## Stage 9 Delivery Phase 2 — durable deletion engine (recorded 2026-07-23)
 
-Delivery Phase 2 ships imported-data deletion, retention enforcement, and account deletion behind **one** durable model (`DataDeletionOperation`, migration `0011`), **one** planner (`deletion_planner.apply_derived_decisions`), and **one** worker (`deletion.run_operation`), per ADR 0005 D66–D72. A previewed operation is a durable, content-free record with a snapshot cutoff (`SourceItem.created_at`, D68), captured counts, disposition (preserved/minimised/recomputed), a typed-confirmation phrase (`DELETE IMPORTED DATA` / `DELETE MY LIFEFLOW ACCOUNT`, never stored), and an expiry. Confirm requires the exact phrase (422), expected version (409 stale), and non-expired preview (409); it is idempotent, and a partial unique index guarantees at most one active operation per (user, type, scope). The worker claims atomically (conditional `UPDATE … RETURNING`), processes bounded batches committing each with a resume cursor + heartbeat, and finalises with a content-free audit tombstone; the per-minute cron drains never-enqueued pending operations (Redis-outage-safe, D70) and recovers stale ones. Derived-data rules: fully-unsupported signals/proposals deleted, mixed pruned, approved/executed minimised to tombstones, pending/uncertain executions always preserved, confirmed preferences never deleted. Account deletion keeps a terminal anonymised `users` row (`account_state='deleted'`, random `deletion_subject_id`, cleared identity — D67), preserving the content-free audit/execution tombstones `AuditEvent.user_id` CASCADE-references; `get_current_user` rejects a deleted account (session invalidation) and `require_active_account` blocks sync/brief/proposal mutations while `deletion_pending`. Retention (D72) is opt-in (`RETENTION_ENFORCEMENT_ENABLED`), bounded, uses a controllable clock, and reuses the planner. 35 backend + 6 frontend tests. Audit history (Phase 3), rate limiting (Phase 4), resilience/telemetry (Phase 5) not begun.
+Delivery Phase 2 ships imported-data deletion, retention enforcement, and account deletion behind **one** durable model (`DataDeletionOperation`, migration `0011`), **one** planner (`deletion_planner.apply_derived_decisions`), and **one** worker (`deletion.run_operation`), per ADR 0005 D66–D72. A previewed operation is a durable, content-free record with a snapshot cutoff (`SourceItem.created_at`, D68), captured counts, disposition (preserved/minimised/recomputed), a typed-confirmation phrase (`DELETE IMPORTED DATA` / `DELETE MY LIFEFLOW ACCOUNT`, never stored), and an expiry. Confirm requires the exact phrase (422), expected version (409 stale), and non-expired preview (409); it is idempotent, and a partial unique index guarantees at most one active operation per (user, type, scope). The worker claims atomically (conditional `UPDATE … RETURNING`), processes bounded batches committing each with a resume cursor + heartbeat, and finalises with a content-free audit tombstone; the per-minute cron drains never-enqueued pending operations (Redis-outage-safe, D70) and recovers stale ones. Derived-data rules: fully-unsupported signals/proposals deleted, mixed pruned, approved/executed minimised to tombstones, pending/uncertain executions always preserved, confirmed preferences never deleted. Account deletion keeps a terminal anonymised `users` row (`account_state='deleted'`, random `deletion_subject_id`, cleared identity — D67), preserving the content-free audit/execution tombstones `AuditEvent.user_id` CASCADE-references; `get_current_user` rejects a deleted account (session invalidation) and `require_active_account` blocks sync/brief/proposal mutations while `deletion_pending`. Retention (D72) is opt-in (`RETENTION_ENFORCEMENT_ENABLED`), bounded, uses a controllable clock, and reuses the planner. 35 backend + 6 frontend tests. At the Phase 2 boundary, audit history (Phase 3), rate limiting (Phase 4), and resilience/telemetry (Phase 5) had not begun.
 
 **Remote completion (2026-07-23).** Delivery Phase 1 is remotely preserved at
 `49f121a`. Delivery Phase 2 is remotely finalised at `fdb4636` on
 `origin/stage-9-deletion-retention`. The `stage-9-audit-history` branch starts
-at that immutable boundary. Delivery Phases 3–5 have not begun; Stage 9 is not
-complete, has no `stage-9-complete` tag, and has not been merged to `main`.
+at that immutable boundary. Delivery Phase 3 is committed locally (five
+commits from `eedd69d`) and awaits remote finalisation; Delivery Phases 4–5
+have not begun. Stage 9 is not complete, has no `stage-9-complete` tag, and has
+not been merged to `main`.
+
+## Stage 9 Delivery Phase 3 — privacy-safe audit history (recorded 2026-07-24)
+
+Delivery Phase 3 is committed locally as five commits on
+`stage-9-audit-history` and awaits remote finalisation. It deliberately reuses
+the existing append-only `AuditEvent` model: a closed presentation registry
+(`audit_history_registry.py`, kept separate from the API module so it can be
+reviewed and committed independently) maps privacy-reviewed event types to
+fixed title/summary/category/tone values; unknown events remain internal and
+raw actor/metadata/entity/correlation fields are never serialised. `GET
+/audit-history` is owner-scoped and read-only, with closed activity/time
+filters and stable `(timestamp DESC, id DESC)` keyset pagination frozen to a
+first-page `as_of` boundary. Its strict, filter-bound cursor is navigation
+state rather than authority. `/audit-history` is the canonical accessible
+frontend and is linked from Privacy & Connections; it renders the user's
+configured timezone and supports an honest empty/error state and “Load more”.
+No migration, new capture model, deletion-semantic change, audit mutation
+route, provider scope, rate limiter, or telemetry hardening was added.
+Decisions are ratified as ADR 0005 D75–D78. Delivery Phases 4–5 have not
+begun; nothing on `stage-9-audit-history` is tagged, pushed, or merged.
 
 ## Open questions deliberately deferred (with owner stage)
 

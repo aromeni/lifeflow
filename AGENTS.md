@@ -30,8 +30,10 @@ Phase 2 is remotely finalised at `fdb4636` on
 `origin/stage-9-deletion-retention`. The current
 `stage-9-audit-history` branch starts at that immutable Phase 2 boundary.
 
-Delivery Phase 3 (audit history), Delivery Phase 4 (rate limiting), and
-Delivery Phase 5 (resilience and telemetry) have not begun. No
+Delivery Phase 3 (audit history) is committed locally as five commits on
+`stage-9-audit-history` from approved preparatory HEAD `eedd69d`; it is not
+pushed and awaits remote finalisation. Delivery Phase 4 (rate
+limiting) and Delivery Phase 5 (resilience and telemetry) have not begun. No
 `stage-9-complete` tag exists, and Stage 9 has not been merged to `main`.
 Do not begin a Delivery Phase without explicit approval.
 

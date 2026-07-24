@@ -1,6 +1,6 @@
 # ADR 0005 — Stage 9: privacy, deletion, retention, audit UX, resilience
 
-**Status:** accepted (planning gate approved 2026-07-22); Delivery Phase 1 implemented 2026-07-22; Delivery Phase 2 implemented 2026-07-23.
+**Status:** accepted (planning gate approved 2026-07-22); Delivery Phase 1 implemented 2026-07-22; Delivery Phase 2 implemented 2026-07-23; Delivery Phase 3 committed locally 2026-07-24 and awaiting remote finalisation.
 **Context:** Stage 8 is complete and merged to `main` (`c5b60b1`). Stage 9's
 exit theme is *"trust features operational — users control their data; the
 product fails safely in outages."* This ADR records the ratified Stage 9
@@ -220,6 +220,56 @@ erasure and yields a truthful `partially_failed` with safe code
 double revoke); and no token, provider response, or raw exception ever enters
 logs, audits, operation state, or API responses.
 
+## Delivery Phase 3 implementation decisions (D75–D78)
+
+Committed locally 2026-07-24 as five commits from approved preparatory HEAD
+`eedd69d`. See
+`docs/delivery/reports/stage-09-phase-3.md`.
+
+### D75 — Public audit history is a closed presentation registry
+
+`AuditEvent` remains the append-only internal safety record; it is not exposed
+as an API schema. `audit_history_registry.AUDIT_EVENT_PRESENTATIONS` explicitly maps each
+privacy-reviewed event type to a fixed title, fixed summary, closed category,
+and closed tone. Unknown/new internal events stay invisible until deliberately
+registered. The renderer may derive only the closed actor label (`you` or
+`lifeflow`) from the internal actor; it never interpolates metadata, entity ids,
+correlation ids, action payloads, provider ids, reasons, values, counts, or raw
+error details. This is a read projection, so no new capture model or migration
+is required.
+
+### D76 — One owner-scoped, read-only endpoint
+
+`GET /audit-history` is the sole public history endpoint. It uses
+`CurrentUser` and `AuditEventRepository(user.id)`; every database branch filters
+by the owner and by the presentation registry's event-type allowlist. The
+response contains only event id, occurrence time, closed category/actor/tone,
+and the fixed rendered title/summary. There are no audit create, update, or
+delete routes, and the repository still exposes no audit mutation or deletion.
+The existing `(user_id, timestamp)` index supports this bounded pilot read; no
+schema change is justified.
+
+### D77 — Stable, filter-bound keyset pagination
+
+Pages order by `(timestamp DESC, id DESC)`, query `limit + 1`, and use the final
+displayed pair as the next keyset. The first page fixes an `as_of` timestamp;
+later pages keep that upper bound, so concurrent inserts cannot shift or
+duplicate the traversed window. The opaque URL-safe cursor carries only the
+version, `as_of`, last timestamp/id, and the selected closed filters. Decoding
+is strict, size-bounded, and rejects filter mismatches with 422. A cursor is
+navigation state, never authority: the authenticated owner filter is reapplied
+on every request.
+
+### D78 — Canonical UI and closed filters
+
+The canonical frontend is `/audit-history`, linked from the existing Privacy &
+Connections centre and back to it. Activity is the closed set `all`, `actions`,
+`briefs`, `connections`, `privacy`, `preferences`, `account`; time is `7d`,
+`30d`, `90d`, or `all`. Filter changes start a new cursor window, “Load more”
+appends a keyset page, and timestamps render in the user's configured timezone.
+The page is a semantic ordered list with explicit actor/category/outcome text,
+honest empty/error/authentication states, and no write control.
+
 ## Consequences
 
 Delivery Phase 1 gives the user a truthful, consolidated view and keeps every
@@ -227,7 +277,10 @@ destructive capability out until its engine and previews exist. The retention
 values and deletion semantics are fixed here so Delivery Phase 2 implements a
 pre-agreed contract. Delivery Phase 2 ships that engine end-to-end with previews,
 typed confirmation, durable bounded/resumable execution, retention enforcement,
-and account anonymisation. Audit history is Delivery Phase 3, rate limiting
-Delivery Phase 4, resilience/telemetry Delivery Phase 5. See
+and account anonymisation. Delivery Phase 3 adds the privacy-safe audit-history
+read projection and canonical UI without changing capture or deletion
+semantics. Rate limiting remains Delivery Phase 4 and resilience/telemetry
+remains Delivery Phase 5. See
 `docs/delivery/reports/stage-09-phase-1.md` and
-`docs/delivery/reports/stage-09-phase-2.md`.
+`docs/delivery/reports/stage-09-phase-2.md` and
+`docs/delivery/reports/stage-09-phase-3.md`.

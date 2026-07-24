@@ -1,13 +1,15 @@
 # Privacy & Connections Control Centre (user guide)
 
-*Stage 9 Delivery Phases 1–2. This page describes the privacy surface at
-`/connections`: the read-only summary (Phase 1) and the actionable deletion
-controls (Phase 2).*
+*Stage 9 Delivery Phases 1–3. This guide describes the privacy surface at
+`/connections`: the read-only summary (Phase 1), actionable deletion controls
+(Phase 2), and its link to the read-only `/audit-history` timeline (Phase 3).*
 
 LifeFlow's **Privacy & Connections** page is the one place to understand what
 LifeFlow is connected to, what it can see, what it has stored, and how long it
-is ordinarily kept. Everything on the page is read-only — LifeFlow never sends
-email, never changes your calendar, and nothing on this page deletes anything.
+is ordinarily kept. LifeFlow never sends email or deletes provider content;
+its existing calendar-create path still requires exact approval. A LifeFlow
+data deletion happens only after you open the distinct control, review its
+impact preview, and type the exact confirmation phrase — never on page load.
 
 ## What you can see
 
@@ -25,6 +27,8 @@ email, never changes your calendar, and nothing on this page deletes anything.
   evidence, and audit records). Counts only — never the contents.
 - **How long data is kept** — the provisional retention defaults for each
   category.
+- **Audit history** — a link to privacy-reviewed plain-language records of
+  important activity.
 
 ## The four data controls (each is different)
 
@@ -60,6 +64,21 @@ email, never changes your calendar, and nothing on this page deletes anything.
   is interrupted it resumes exactly where it left off, and it never runs twice.
 - **Nothing on this page ever runs on load** — a deletion only starts when you
   preview and then type the exact confirmation phrase.
+
+## Audit history (Phase 3)
+
+The **View audit history** link opens the canonical `/audit-history` page.
+Entries contain only a fixed plain-language title and summary, the time, and
+closed actor/category/outcome labels. Raw event metadata, private content,
+provider identifiers, entity/correlation ids, rejection reasons, memory or
+preference values, counts, and technical error details are not returned.
+
+Use the closed activity filters (All activity, Actions, Briefs, Connections,
+Privacy, Preferences, Account) and time filters (7/30/90 days or All time).
+**Load more** appends an older stable page without moving the current window
+when new events arrive. Audit history is owner-only and read-only; it has no
+edit or delete control. A new internal event remains hidden until LifeFlow adds
+an explicit privacy-reviewed presentation for it.
 
 ## Important, honest limitations (for the pilot)
 
