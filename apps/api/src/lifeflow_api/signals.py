@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from lifeflow_api.deps import CurrentUser, DbSession
 from lifeflow_api.extraction import SignalExtractionService
 from lifeflow_api.models import Signal
+from lifeflow_api.rate_limit_deps import RateLimited
 from lifeflow_api.repositories import SignalRepository
 
 router = APIRouter(prefix="/signals")
@@ -59,7 +60,9 @@ def _to_response(signal: Signal) -> SignalResponse:
     )
 
 
-@router.post("/extract", response_model=ExtractionResponse)
+@router.post(
+    "/extract", response_model=ExtractionResponse, dependencies=[RateLimited("signal_extraction")]
+)
 async def extract_signals(
     request: Request, user: CurrentUser, session: DbSession
 ) -> ExtractionResponse:
@@ -79,7 +82,7 @@ async def extract_signals(
     )
 
 
-@router.get("", response_model=SignalListResponse)
+@router.get("", response_model=SignalListResponse, dependencies=[RateLimited("authenticated_read")])
 async def list_signals(
     user: CurrentUser,
     session: DbSession,

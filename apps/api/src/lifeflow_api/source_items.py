@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 from lifeflow_api.deps import CurrentUser, DbSession
 from lifeflow_api.models import SourceItem, SourceType
+from lifeflow_api.rate_limit_deps import RateLimited
 from lifeflow_api.repositories import SourceItemRepository
 
 router = APIRouter(prefix="/source-items")
@@ -40,7 +41,9 @@ def _to_response(item: SourceItem) -> SourceItemResponse:
     )
 
 
-@router.get("", response_model=SourceItemListResponse)
+@router.get(
+    "", response_model=SourceItemListResponse, dependencies=[RateLimited("authenticated_read")]
+)
 async def list_source_items(
     user: CurrentUser,
     session: DbSession,

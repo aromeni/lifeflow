@@ -28,6 +28,7 @@ from lifeflow_api.audit_history_registry import (
 )
 from lifeflow_api.deps import CurrentUser, DbSession
 from lifeflow_api.models import AuditEvent
+from lifeflow_api.rate_limit_deps import RateLimited
 from lifeflow_api.repositories import AuditEventRepository
 
 router = APIRouter(prefix="/audit-history")
@@ -182,7 +183,9 @@ def _render(event: AuditEvent) -> AuditHistoryItem:
     )
 
 
-@router.get("", response_model=AuditHistoryResponse)
+@router.get(
+    "", response_model=AuditHistoryResponse, dependencies=[RateLimited("privacy_audit_read")]
+)
 async def list_audit_history(
     user: CurrentUser,
     session: DbSession,

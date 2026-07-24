@@ -20,6 +20,7 @@ from lifeflow_api.audit import record_audit_event
 from lifeflow_api.deps import CurrentUser, DbSession
 from lifeflow_api.memory_registry import DEFAULT_SIGNOFF, PREFERRED_EMAIL_SIGNOFF_KEY
 from lifeflow_api.models import Preference, Provenance
+from lifeflow_api.rate_limit_deps import RateLimited
 from lifeflow_api.repositories import PreferenceRepository
 
 router = APIRouter(prefix="/preferences")
@@ -280,7 +281,9 @@ def _to_item(key: str, row: Preference | None, resolved_value: dict[str, Any]) -
     )
 
 
-@router.get("", response_model=PreferencesResponse)
+@router.get(
+    "", response_model=PreferencesResponse, dependencies=[RateLimited("authenticated_read")]
+)
 async def list_preferences(user: CurrentUser, session: DbSession) -> PreferencesResponse:
     stored = {p.key: p for p in await PreferenceRepository(session, user.id).list()}
     resolved = await resolved_preferences(session, user.id)
@@ -289,7 +292,9 @@ async def list_preferences(user: CurrentUser, session: DbSession) -> Preferences
     )
 
 
-@router.put("/{key}", response_model=PreferenceItem)
+@router.put(
+    "/{key}", response_model=PreferenceItem, dependencies=[RateLimited("preference_memory_write")]
+)
 async def set_preference(
     key: str, body: PreferenceUpdateRequest, user: CurrentUser, session: DbSession
 ) -> PreferenceItem:

@@ -15,6 +15,7 @@ from lifeflow_api.brief_composition import (
 )
 from lifeflow_api.deps import ActiveUser, CurrentUser, DbSession
 from lifeflow_api.models import Brief, BriefStatus
+from lifeflow_api.rate_limit_deps import RateLimited
 from lifeflow_api.repositories import BriefRepository
 
 router = APIRouter(prefix="/briefs")
@@ -81,7 +82,9 @@ def _to_version_response(brief: Brief) -> BriefVersionResponse:
     )
 
 
-@router.post("/generate", response_model=BriefResponse)
+@router.post(
+    "/generate", response_model=BriefResponse, dependencies=[RateLimited("brief_generate")]
+)
 async def generate_brief(request: Request, user: ActiveUser, session: DbSession) -> BriefResponse:
     brief = await BriefService(
         session,
@@ -91,7 +94,9 @@ async def generate_brief(request: Request, user: ActiveUser, session: DbSession)
     return _to_response(brief)
 
 
-@router.get("/latest", response_model=BriefResponse)
+@router.get(
+    "/latest", response_model=BriefResponse, dependencies=[RateLimited("authenticated_read")]
+)
 async def get_latest_brief(user: CurrentUser, session: DbSession) -> BriefResponse:
     brief = await BriefRepository(session, user.id).latest()
     if brief is None:
@@ -99,7 +104,9 @@ async def get_latest_brief(user: CurrentUser, session: DbSession) -> BriefRespon
     return _to_response(brief)
 
 
-@router.get("", response_model=BriefVersionListResponse)
+@router.get(
+    "", response_model=BriefVersionListResponse, dependencies=[RateLimited("authenticated_read")]
+)
 async def list_brief_versions(
     user: CurrentUser,
     session: DbSession,
@@ -110,7 +117,9 @@ async def list_brief_versions(
     return BriefVersionListResponse(briefs=responses, count=len(responses))
 
 
-@router.get("/{brief_id}", response_model=BriefResponse)
+@router.get(
+    "/{brief_id}", response_model=BriefResponse, dependencies=[RateLimited("authenticated_read")]
+)
 async def get_brief(brief_id: uuid.UUID, user: CurrentUser, session: DbSession) -> BriefResponse:
     brief = await BriefRepository(session, user.id).get(brief_id)
     if brief is None:

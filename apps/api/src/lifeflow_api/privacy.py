@@ -5,8 +5,9 @@ This is a truthful projection over data the user already owns: which provider
 accounts are connected and with exactly which granted scopes, how fresh the
 synced evidence is, owner-scoped counts of every stored category, and the
 provisional retention defaults. It is strictly non-destructive — it adds no
-deletion, no account-deletion, no retention *enforcement* (Delivery Phase 2),
-no audit timeline (Delivery Phase 3), and no rate limiting (Delivery Phase 4).
+deletion, no account-deletion, and no retention *enforcement* (Delivery
+Phase 2 shipped those elsewhere). The read route below is now rate-limited
+under the `privacy_audit_read` policy (Delivery Phase 4, ADR 0005 D64/D81).
 
 Safety by construction: the response carries no OAuth token or ciphertext, no
 sync cursor, no `authorisation_revision`, no provider message/event id, no
@@ -52,6 +53,7 @@ from lifeflow_api.models import (
     Signal,
     SourceItem,
 )
+from lifeflow_api.rate_limit_deps import RateLimited
 
 router = APIRouter(prefix="/privacy")
 
@@ -326,7 +328,11 @@ def build_retention(settings: Settings) -> RetentionView:
     )
 
 
-@router.get("/summary", response_model=PrivacySummaryResponse)
+@router.get(
+    "/summary",
+    response_model=PrivacySummaryResponse,
+    dependencies=[RateLimited("privacy_audit_read")],
+)
 async def get_privacy_summary(
     request: Request, user: CurrentUser, session: DbSession
 ) -> PrivacySummaryResponse:

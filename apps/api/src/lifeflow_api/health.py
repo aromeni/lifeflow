@@ -4,6 +4,13 @@
 /ready  — readiness: dependencies (currently PostgreSQL) are reachable.
 /config — public, unauthenticated capability flags the frontend needs before
           any session exists (e.g. whether to render "Sign in with Google").
+
+Stage 9 Delivery Phase 4 (ADR 0005 D64/D81): all three routes are explicit
+rate-limit exemptions, never silently unclassified. `/health` and `/ready`
+are infrastructure liveness/readiness probes that must never be throttled —
+limiting them could make an orchestrator kill a healthy process. `/config` is
+a static, cost-free, unauthenticated capability flag with no user data,
+needed before any session or CSRF context exists on every page load.
 """
 
 import logging

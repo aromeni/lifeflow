@@ -15,6 +15,7 @@ from lifeflow_api.connectors.synthetic import SyntheticCalendarConnector, Synthe
 from lifeflow_api.deps import CurrentUser, DbSession
 from lifeflow_api.ingestion import IngestionService
 from lifeflow_api.models import ConnectedAccount
+from lifeflow_api.rate_limit_deps import RateLimited
 from lifeflow_api.repositories import ConnectedAccountRepository
 
 router = APIRouter(prefix="/demo")
@@ -30,7 +31,7 @@ class DemoStartResponse(BaseModel):
     skipped: int
 
 
-@router.post("/start", response_model=DemoStartResponse)
+@router.post("/start", response_model=DemoStartResponse, dependencies=[RateLimited("demo_start")])
 async def start_demo(user: CurrentUser, session: DbSession) -> DemoStartResponse:
     accounts = ConnectedAccountRepository(session, user.id)
     account = await accounts.get_by_provider(SYNTHETIC_PROVIDER)

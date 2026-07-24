@@ -47,6 +47,7 @@ from lifeflow_api.models import (
     DeletionOperationState,
     DeletionOperationType,
 )
+from lifeflow_api.rate_limit_deps import RateLimited, enforce_rate_limit
 
 router = APIRouter(prefix="/privacy")
 
@@ -147,7 +148,11 @@ def _not_found() -> JSONResponse:
     return error_response(404, "not_found", "No such deletion operation.")
 
 
-@router.post("/imported-data/{account_id}/preview", response_model=DeletionOperationView)
+@router.post(
+    "/imported-data/{account_id}/preview",
+    response_model=DeletionOperationView,
+    dependencies=[RateLimited("deletion_preview")],
+)
 async def preview_imported_data_deletion(
     account_id: uuid.UUID, request: Request, user: CurrentUser, session: DbSession
 ) -> DeletionOperationView | JSONResponse:
@@ -166,7 +171,11 @@ async def preview_imported_data_deletion(
     return _view(operation)
 
 
-@router.post("/account-deletion/preview", response_model=DeletionOperationView)
+@router.post(
+    "/account-deletion/preview",
+    response_model=DeletionOperationView,
+    dependencies=[RateLimited("account_deletion_preview")],
+)
 async def preview_account_deletion(
     request: Request, user: CurrentUser, session: DbSession
 ) -> DeletionOperationView:
@@ -188,6 +197,24 @@ async def confirm_deletion_operation(
 ) -> DeletionOperationView | JSONResponse:
     settings: Settings = request.app.state.settings
     now = datetime.now(UTC)
+    # This route serves every operation type through one shared confirm path,
+    # so the applicable policy cannot be declared statically at the route
+    # decorator like every other route — it depends on data only knowable
+    # after an owner-scoped read. That read is side-effect-free (no lock, no
+    # state change); `confirm_operation` below still performs its own
+    # authoritative FOR-UPDATE-locked lookup and validation unchanged. Exactly
+    # one rate-limit charge happens per request, never two: account-deletion
+    # confirmation is materially higher-risk than an ordinary imported-data or
+    # retention confirmation, so it alone gets the stricter
+    # `account_deletion_confirm` budget (ADR 0005 D81).
+    existing = await DataDeletionOperationRepository(session, user.id).get(operation_id)
+    policy_code = (
+        "account_deletion_confirm"
+        if existing is not None
+        and existing.operation_type == DeletionOperationType.account_deletion
+        else "deletion_confirm_cancel"
+    )
+    await enforce_rate_limit(request, policy_code, subject=str(user.id))
     try:
         operation = await confirm_operation(
             session,
@@ -225,7 +252,11 @@ async def confirm_deletion_operation(
     return _view(operation)
 
 
-@router.post("/deletion-operations/{operation_id}/cancel", response_model=DeletionOperationView)
+@router.post(
+    "/deletion-operations/{operation_id}/cancel",
+    response_model=DeletionOperationView,
+    dependencies=[RateLimited("deletion_confirm_cancel")],
+)
 async def cancel_deletion_operation(
     operation_id: uuid.UUID, user: CurrentUser, session: DbSession
 ) -> DeletionOperationView | JSONResponse:
@@ -239,7 +270,11 @@ async def cancel_deletion_operation(
     return _view(operation)
 
 
-@router.get("/deletion-operations", response_model=DeletionOperationsResponse)
+@router.get(
+    "/deletion-operations",
+    response_model=DeletionOperationsResponse,
+    dependencies=[RateLimited("authenticated_read")],
+)
 async def list_deletion_operations(
     user: CurrentUser, session: DbSession
 ) -> DeletionOperationsResponse:
@@ -247,7 +282,11 @@ async def list_deletion_operations(
     return DeletionOperationsResponse(operations=[_view(op) for op in operations])
 
 
-@router.get("/deletion-operations/{operation_id}", response_model=DeletionOperationView)
+@router.get(
+    "/deletion-operations/{operation_id}",
+    response_model=DeletionOperationView,
+    dependencies=[RateLimited("authenticated_read")],
+)
 async def get_deletion_operation(
     operation_id: uuid.UUID, user: CurrentUser, session: DbSession
 ) -> DeletionOperationView | JSONResponse:

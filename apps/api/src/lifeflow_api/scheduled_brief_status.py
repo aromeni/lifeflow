@@ -20,6 +20,7 @@ from lifeflow_api.preferences import (
     SCHEDULED_BRIEFS_ENABLED_KEY,
     resolved_preferences,
 )
+from lifeflow_api.rate_limit_deps import RateLimited
 from lifeflow_api.repositories import ScheduledBriefRunRepository
 from lifeflow_api.scheduled_briefs import next_expected_run
 
@@ -63,7 +64,11 @@ async def _scheduler_capability_ready(redis_url: str) -> bool:
         await client.aclose()
 
 
-@router.get("/status", response_model=ScheduledBriefStatusResponse)
+@router.get(
+    "/status",
+    response_model=ScheduledBriefStatusResponse,
+    dependencies=[RateLimited("authenticated_read")],
+)
 async def get_scheduled_brief_status(
     request: Request, user: CurrentUser, session: DbSession
 ) -> ScheduledBriefStatusResponse:
