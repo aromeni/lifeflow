@@ -269,7 +269,7 @@ still exists and still covers the right columns.
 | Metrics | 158/29/616/70/7/91% | 158/29/626/73/7/91% | **158/29/653/76/7/91%** |
 | pre-commit `--all-files` | pass | pass | pass — all 10 hooks |
 | detect-secrets | pass, baseline unchanged | pass, baseline unchanged | pass, baseline unchanged |
-| gitleaks full history | pass | pass | pass — 35 commits, no leaks |
+| gitleaks full history | pass | pass | pass — 37 commits, no leaks |
 | `.env.example` validation | pass | pass | pass |
 | `git diff --check` | pass | pass | pass |
 
