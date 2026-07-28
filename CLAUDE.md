@@ -2,6 +2,8 @@
 
 LifeFlow AI is a permissioned, inspectable, human-in-the-loop personal operations agent. Before making product or architecture decisions, read the North Star: [docs/project/project-foundation.md](docs/project/project-foundation.md). The build follows a stage-gated protocol ([docs/delivery/stage-plan.md](docs/delivery/stage-plan.md)); work only within the active stage.
 
+**Every delivery phase — regardless of which coding model performs the work — is governed by the [Engineering Acceptance Contract](docs/delivery/engineering-acceptance-contract.md).** It defines the requirement-inventory, verification-loop, evidence, negative-control, and completion-report rules that a phase must satisfy before it can be reported as done. Read it before starting implementation on any phase.
+
 **Current stage: 9 (privacy, audit UX, resilience) — in progress, not complete. Delivery Phase 1 is remotely preserved at `49f121a`; Delivery Phase 2 is remotely finalised at `fdb4636` on `origin/stage-9-deletion-retention`; and Delivery Phase 3 (audit history) is remotely finalised at `a50cf06` on `origin/stage-9-audit-history`. Delivery Phase 4 (rate limiting) is committed locally as six commits on `stage-9-rate-limiting` from the approved parent `a50cf06`, and awaits remote finalisation — not pushed, not tagged. Phase 5 (resilience and telemetry) has not begun. No `stage-9-complete` tag exists, and Stage 9 has not been merged to `main`.**
 
 ## Commands

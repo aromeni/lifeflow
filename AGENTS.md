@@ -6,18 +6,27 @@
 Before planning or modifying code, read:
 
 1. `CLAUDE.md`
-2. `.claude/skills/lifeflow-mvp-builder/SKILL.md`
-3. `docs/project/project-foundation.md`
-4. `docs/product/mvp-scope.md`
-5. `docs/architecture/adr/0001-architecture.md`
-6. `docs/architecture/adr/0002-evaluation-targets.md`
-7. `docs/security/threat-model.md`
-8. `docs/delivery/stage-plan.md`
-9. `docs/delivery/reports/stage-05.md`
-10. Relevant source code and tests
+2. `docs/delivery/engineering-acceptance-contract.md`
+3. `.claude/skills/lifeflow-mvp-builder/SKILL.md`
+4. `docs/project/project-foundation.md`
+5. `docs/product/mvp-scope.md`
+6. `docs/architecture/adr/0001-architecture.md`
+7. `docs/architecture/adr/0002-evaluation-targets.md`
+8. `docs/security/threat-model.md`
+9. `docs/delivery/stage-plan.md`
+10. `docs/delivery/reports/stage-05.md`
+11. Relevant source code and tests
 
 Treat the SKILL.md stage definitions and the Project Foundation as binding
 project instructions even though they were originally created for Claude Code.
+
+**The Engineering Acceptance Contract governs every delivery phase, regardless
+of which coding model performs the work.** It defines the requirement
+inventory, implementation loop, evidence rules, negative-control requirement,
+and completion-report format a phase must satisfy before it can be reported
+as done. It supersedes ad hoc judgement about when a phase is "done enough"
+to hand back for review — see its authority order (§2) for how it interacts
+with this file, `CLAUDE.md`, and the phase specification.
 
 ## Current build status
 
@@ -27,15 +36,15 @@ Stages 0–8 are complete and approved. Stage 8 is merged to `main`
 **Stage 9 — privacy, audit UX, and resilience — is in progress but is not
 complete.** Delivery Phase 1 is remotely preserved at `49f121a`. Delivery
 Phase 2 is remotely finalised at `fdb4636` on
-`origin/stage-9-deletion-retention`. The current
-`stage-9-audit-history` branch starts at that immutable Phase 2 boundary.
+`origin/stage-9-deletion-retention`. Delivery Phase 3 (audit history) is
+remotely finalised at `a50cf06` on `origin/stage-9-audit-history`.
 
-Delivery Phase 3 (audit history) is committed locally as five commits on
-`stage-9-audit-history` from approved preparatory HEAD `eedd69d`; it is not
-pushed and awaits remote finalisation. Delivery Phase 4 (rate
-limiting) and Delivery Phase 5 (resilience and telemetry) have not begun. No
-`stage-9-complete` tag exists, and Stage 9 has not been merged to `main`.
-Do not begin a Delivery Phase without explicit approval.
+Delivery Phase 4 (rate limiting) is committed locally as six commits on
+`stage-9-rate-limiting` from the approved parent `a50cf06`, and awaits remote
+finalisation — not pushed, not tagged. Delivery Phase 5 (resilience and
+telemetry) has not begun. No `stage-9-complete` tag exists, and Stage 9 has
+not been merged to `main`. Do not begin a Delivery Phase without explicit
+approval.
 
 ## Permanent rules
 

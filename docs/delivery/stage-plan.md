@@ -33,9 +33,13 @@ Gmail + Calendar → Daily Brief → Proposed Action → Approval → Execution 
 
 Each stage ends with: all required checks run, implementation inspected (not just exit codes), docs and decision log updated, a completion report in the standard format, then **stop**. Every completion report is archived in [reports/](reports/) as `stage-NN.md` — the project's engineering log.
 
+## Engineering Acceptance Contract
+
+Every delivery phase — regardless of which coding model performs the work — must follow the [Engineering Acceptance Contract](engineering-acceptance-contract.md). It governs how a phase specification becomes a numbered acceptance matrix, the implementation/verification loop the agent runs autonomously, which ordinary engineering gaps must be fixed without a review round-trip, the negative-control and exact-boundary security-proof requirements, and the standard completion-report structure. It applies from Stage 9 Delivery Phase 5 onward; phases delivered before it was adopted (Stages 0–8 and Stage 9 Delivery Phases 1–4) are not retroactively re-audited against it. Every future phase prompt should open with the instruction in the contract's §17.
+
 ## Quality gates at every stage
 
-Formatter · linter · type checker · unit tests · relevant integration tests · stage-appropriate security checks · build · documentation check. Tests are never disabled to obtain a green build.
+Formatter · linter · type checker · unit tests · relevant integration tests · stage-appropriate security checks · build · documentation check. Tests are never disabled to obtain a green build. From Delivery Phase 5 onward, gates are also governed by the [Engineering Acceptance Contract](engineering-acceptance-contract.md)'s completion conditions (§12).
 
 ## External setup the user will eventually need (none blocks demo-mode development)
 
@@ -62,4 +66,4 @@ Formatter · linter · type checker · unit tests · relevant integration tests 
 
 ## Decision log and documentation index
 
-North Star (long-term vision, permanent principles, guard rails): [../project/project-foundation.md](../project/project-foundation.md). Architecture decisions: [../architecture/adr/0001-architecture.md](../architecture/adr/0001-architecture.md). Assumptions and open decisions: [assumptions-and-decisions.md](assumptions-and-decisions.md). Product scope: [../product/mvp-scope.md](../product/mvp-scope.md). Threats: [../security/threat-model.md](../security/threat-model.md). When scope or design questions arise, the Project Foundation document is the single source of truth.
+North Star (long-term vision, permanent principles, guard rails): [../project/project-foundation.md](../project/project-foundation.md). Architecture decisions: [../architecture/adr/0001-architecture.md](../architecture/adr/0001-architecture.md). Assumptions and open decisions: [assumptions-and-decisions.md](assumptions-and-decisions.md). Product scope: [../product/mvp-scope.md](../product/mvp-scope.md). Threats: [../security/threat-model.md](../security/threat-model.md). Engineering delivery process: [engineering-acceptance-contract.md](engineering-acceptance-contract.md). When scope or design questions arise, the Project Foundation document is the single source of truth.
