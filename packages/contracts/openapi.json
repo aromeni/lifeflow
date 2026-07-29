@@ -2329,6 +2329,27 @@
         "title": "PublicConfig",
         "type": "object"
       },
+      "ReadyStatus": {
+        "properties": {
+          "degraded_dependencies": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Degraded Dependencies",
+            "type": "array"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "ReadyStatus",
+        "type": "object"
+      },
       "RetentionClassView": {
         "properties": {
           "description": {
@@ -3934,6 +3955,22 @@
         "summary": "Dismiss Memory"
       }
     },
+    "/metrics": {
+      "get": {
+        "operationId": "metrics_metrics_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Metrics"
+      }
+    },
     "/preferences": {
       "get": {
         "operationId": "list_preferences_preferences_get",
@@ -4233,14 +4270,14 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HealthStatus"
+                  "$ref": "#/components/schemas/ReadyStatus"
                 }
               }
             },
             "description": "Successful Response"
           },
           "503": {
-            "description": "A dependency is unavailable"
+            "description": "A required dependency is unavailable"
           }
         },
         "summary": "Ready"
