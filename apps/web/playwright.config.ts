@@ -29,6 +29,13 @@ export default defineConfig({
   fullyParallel: false,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? "github" : "list",
+  // Playwright's 5s default is tight for `next dev`'s on-demand, first-hit
+  // route compilation under CI's constrained (2 vCPU) runners — a Stage 9
+  // Final Integration CI run surfaced this as page-navigation assertions
+  // (toHaveURL) timing out on cold routes, never on a warm local machine.
+  // Left at Playwright's default locally, where this margin was never an
+  // issue in any local run of this suite.
+  expect: { timeout: process.env.CI ? 10_000 : 5_000 },
   use: {
     baseURL: "http://localhost:3000",
     trace: "on-first-retry",
