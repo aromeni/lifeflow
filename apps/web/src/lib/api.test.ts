@@ -70,3 +70,30 @@ test("a 429 with neither source falls back to a safe default", async () => {
   const error = await api("/briefs/generate", { method: "POST" }).catch((e: unknown) => e);
   expect((error as RateLimitError).retryAfterSeconds).toBe(30);
 });
+
+test("an error with retryable/dependency surfaces both on the ApiError", async () => {
+  mockFetch(502, {
+    error: {
+      code: "google_sync_failed",
+      message: "Google was temporarily unavailable.",
+      correlation_id: "c1",
+      retryable: true,
+      dependency: "google",
+    },
+  });
+  const error = await api("/connected-accounts/google/sync", { method: "POST" }).catch(
+    (e: unknown) => e,
+  );
+  expect(error).toBeInstanceOf(ApiError);
+  const apiError = error as ApiError;
+  expect(apiError.retryable).toBe(true);
+  expect(apiError.dependency).toBe("google");
+});
+
+test("an error without retryable/dependency leaves both undefined, never a guessed default", async () => {
+  mockFetch(401, { error: { code: "unauthenticated", message: "Not signed in." } });
+  const error = await api("/me").catch((e: unknown) => e);
+  const apiError = error as ApiError;
+  expect(apiError.retryable).toBeUndefined();
+  expect(apiError.dependency).toBeUndefined();
+});

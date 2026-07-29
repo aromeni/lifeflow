@@ -2,7 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, test, vi } from "vitest";
 
-import { RateLimitError } from "@/lib/api";
+import { ApiError, RateLimitError } from "@/lib/api";
 import type {
   ConnectionSummary,
   DeletionOperation,
@@ -302,6 +302,58 @@ test("a rate-limited sync shows accessible retry guidance and re-enables the but
   expect(alert).toHaveTextContent(/Try again in about 20 seconds/);
   expect(syncButton).toBeEnabled();
   expect(screen.queryByTestId("sync-result")).not.toBeInTheDocument();
+});
+
+test("a temporarily-unavailable Google sync shows non-alarming, safe-to-retry guidance", async () => {
+  apiMock.mockImplementation(async (path: string) => {
+    if (path === "/privacy/summary") return summaryWith([googleConnection()]);
+    if (path === "/connected-accounts/google/sync") {
+      throw new ApiError(
+        502,
+        "google_sync_failed",
+        "Google was temporarily unavailable.",
+        undefined,
+        true,
+        "google",
+      );
+    }
+    throw new Error(`unexpected path ${path}`);
+  });
+  render(<ConnectionsPage />);
+  const user = userEvent.setup();
+  await user.click(await screen.findByTestId("sync-google-now"));
+
+  const notice = await screen.findByTestId("sync-degraded-notice");
+  expect(notice).toHaveAttribute("role", "status");
+  expect(notice).toHaveTextContent(/temporarily unavailable/i);
+  expect(notice).toHaveTextContent(/safe to try syncing again/i);
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+});
+
+test("a permanent Google sync failure explicitly says retrying will not help", async () => {
+  apiMock.mockImplementation(async (path: string) => {
+    if (path === "/privacy/summary") return summaryWith([googleConnection()]);
+    if (path === "/connected-accounts/google/sync") {
+      throw new ApiError(
+        502,
+        "google_sync_failed",
+        "Google rejected the request.",
+        undefined,
+        false,
+        "google",
+      );
+    }
+    throw new Error(`unexpected path ${path}`);
+  });
+  render(<ConnectionsPage />);
+  const user = userEvent.setup();
+  await user.click(await screen.findByTestId("sync-google-now"));
+
+  const notice = await screen.findByTestId("sync-error-notice");
+  expect(notice).toHaveAttribute("role", "alert");
+  expect(notice).toHaveTextContent(/will not help/i);
+  expect(notice).toHaveTextContent(/reconnect/i);
+  expect(screen.queryByTestId("sync-degraded-notice")).not.toBeInTheDocument();
 });
 
 test("a rate-limited imported-data preview creates no operation UI", async () => {

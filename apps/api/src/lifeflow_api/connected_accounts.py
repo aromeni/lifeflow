@@ -20,6 +20,7 @@ from pydantic import BaseModel
 from lifeflow_api.accounts import ConnectedAccountService, ReauthorisationRequiredError
 from lifeflow_api.deps import ActiveUser, CurrentUser, DbSession
 from lifeflow_api.errors import error_response
+from lifeflow_api.failure_taxonomy import classify_exception
 from lifeflow_api.google.errors import GoogleApiError
 from lifeflow_api.google.oauth import build_authorization_url
 from lifeflow_api.google_scopes import CONNECTOR_SCOPE_STRING
@@ -211,10 +212,17 @@ async def sync_google(
         return error_response(
             409, "read_scope_missing", "Grant Gmail or Calendar read access before syncing."
         )
-    except GoogleApiError:
+    except GoogleApiError as exc:
         # Never surface a raw provider exception/URL to the client (T6).
         logger.warning("connected_accounts.google sync failed", exc_info=True)
-        return error_response(502, "google_sync_failed", "Google sync could not complete.")
+        classification = classify_exception(exc)
+        return error_response(
+            502,
+            "google_sync_failed",
+            classification.safe_message,
+            retryable=classification.retryable,
+            dependency="google",
+        )
 
     return GoogleSyncResponse(
         imported=summary.imported,

@@ -10,6 +10,12 @@ export class ApiError extends Error {
     public readonly code: string,
     message: string,
     public readonly retryAfterSeconds?: number,
+    // Stage 9 Delivery Phase 5 (§17): present only where the API has a
+    // genuine, closed-taxonomy answer (e.g. a Google-dependent route) —
+    // `undefined` means "not applicable/unknown", never "safe to retry".
+    // A caller must never infer retryability from its absence.
+    public readonly retryable?: boolean,
+    public readonly dependency?: string,
   ) {
     super(message);
     this.name = "ApiError";
@@ -62,7 +68,14 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
           : (retryAfterFromHeader(response) ?? 30);
       throw new RateLimitError(retryAfterSeconds, message);
     }
-    throw new ApiError(response.status, error.code ?? "error", message);
+    throw new ApiError(
+      response.status,
+      error.code ?? "error",
+      message,
+      undefined,
+      typeof error.retryable === "boolean" ? error.retryable : undefined,
+      typeof error.dependency === "string" ? error.dependency : undefined,
+    );
   }
   return body as T;
 }

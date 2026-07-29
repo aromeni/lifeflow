@@ -43,6 +43,16 @@ class ErrorBody(BaseModel):
     # bounded, non-negative number of seconds, never a raw bucket timestamp,
     # policy code, or subject digest.
     retry_after_seconds: int | None = None
+    # Stage 9 Delivery Phase 5 (§17): present only where a route has a
+    # genuine, closed-taxonomy answer (e.g. a Google-dependent route
+    # classifying a `GoogleApiError` via `failure_taxonomy.classify_exception`)
+    # — never a guess. `None` means "not applicable/unknown", not "no".
+    # Frontend rule: never invite a retry of an uncertain external write,
+    # regardless of what this field says for a route that dispatches one.
+    retryable: bool | None = None
+    # A closed, single-word dependency category (today only ever
+    # `"google"`) — never a hostname, account id, or exception detail.
+    dependency: str | None = None
 
 
 class ErrorResponse(BaseModel):
@@ -50,7 +60,13 @@ class ErrorResponse(BaseModel):
 
 
 def error_response(
-    status_code: int, code: str, message: str, *, retry_after_seconds: int | None = None
+    status_code: int,
+    code: str,
+    message: str,
+    *,
+    retry_after_seconds: int | None = None,
+    retryable: bool | None = None,
+    dependency: str | None = None,
 ) -> JSONResponse:
     body = ErrorResponse(
         error=ErrorBody(
@@ -58,6 +74,8 @@ def error_response(
             message=message,
             correlation_id=get_correlation_id(),
             retry_after_seconds=retry_after_seconds,
+            retryable=retryable,
+            dependency=dependency,
         )
     )
     response = JSONResponse(status_code=status_code, content=body.model_dump())

@@ -15,6 +15,27 @@ import DeletionControls from "./DeletionControls";
 
 type LoadState = "loading" | "ready" | "unauthenticated" | "error";
 
+// Stage 9 Delivery Phase 5 (§16): a Google sync failure is not one thing —
+// distinguish "temporarily unavailable, safe to try again shortly" from
+// "won't succeed by retrying" using the API's closed retryable/dependency
+// fields, rather than a single undifferentiated error string.
+type SyncErrorState = { message: string; retryable: boolean | null };
+
+function syncErrorState(error: unknown): SyncErrorState {
+  if (error instanceof RateLimitError) {
+    // Never shown as a sync failure or provider outcome — the request
+    // never reached Google. Evidence-freshness state is untouched.
+    return { message: rateLimitMessage(error.retryAfterSeconds), retryable: null };
+  }
+  if (error instanceof ApiError && error.dependency === "google") {
+    return { message: error.message, retryable: error.retryable ?? null };
+  }
+  return {
+    message: error instanceof ApiError ? error.message : "Google sync could not complete.",
+    retryable: null,
+  };
+}
+
 const FRESHNESS_COPY: Record<string, string> = {
   fresh: "Fresh — synced within the last 24 hours",
   aging: "Aging — synced within the last week",
@@ -42,7 +63,7 @@ export default function ConnectionsPage() {
   const [pending, setPending] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<GoogleSyncResult | null>(null);
-  const [syncError, setSyncError] = useState("");
+  const [syncError, setSyncError] = useState<SyncErrorState | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -80,7 +101,7 @@ export default function ConnectionsPage() {
   async function syncGoogle() {
     if (syncing) return;
     setSyncing(true);
-    setSyncError("");
+    setSyncError(null);
     setSyncResult(null);
     try {
       const result = await api<GoogleSyncResult>("/connected-accounts/google/sync", {
@@ -89,13 +110,7 @@ export default function ConnectionsPage() {
       setSyncResult(result);
       await load();
     } catch (error) {
-      if (error instanceof RateLimitError) {
-        // Never shown as a sync failure or provider outcome — the request
-        // never reached Google. Evidence-freshness state is untouched.
-        setSyncError(rateLimitMessage(error.retryAfterSeconds));
-      } else {
-        setSyncError(error instanceof ApiError ? error.message : "Google sync could not complete.");
-      }
+      setSyncError(syncErrorState(error));
     } finally {
       setSyncing(false);
     }
@@ -177,9 +192,26 @@ export default function ConnectionsPage() {
                   )}
                 </div>
                 {syncError ? (
-                  <p role="alert" className="text-red-700 dark:text-red-400">
-                    {syncError}
-                  </p>
+                  syncError.retryable === true ? (
+                    <p
+                      role="status"
+                      data-testid="sync-degraded-notice"
+                      className="rounded bg-amber-100 p-2 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200"
+                    >
+                      {syncError.message} It is safe to try syncing again in a moment.
+                    </p>
+                  ) : (
+                    <p
+                      role="alert"
+                      data-testid="sync-error-notice"
+                      className="text-red-700 dark:text-red-400"
+                    >
+                      {syncError.message}
+                      {syncError.retryable === false
+                        ? " Retrying now will not help — reconnect Google if this continues."
+                        : ""}
+                    </p>
+                  )
                 ) : null}
                 {syncResult ? (
                   <div data-testid="sync-result" className="rounded border border-current/20 p-3">
