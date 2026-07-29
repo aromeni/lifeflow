@@ -1,9 +1,14 @@
 import pytest
+import redis.asyncio as aioredis
+import redis.exceptions as redis_exceptions
 from asgi_lifespan import LifespanManager
 from httpx import ASGITransport, AsyncClient
 
 from lifeflow_api.config import Settings
 from lifeflow_api.main import create_app
+
+# Matches config.Settings.redis_url's default (docker compose up -d redis).
+_REDIS_URL = "redis://localhost:6380/0"
 
 
 async def test_ready_returns_503_when_database_is_unreachable() -> None:
@@ -26,7 +31,18 @@ async def test_ready_returns_503_when_database_is_unreachable() -> None:
 async def test_ready_returns_ok_with_running_database(client: AsyncClient) -> None:
     """Requires PostgreSQL from docker compose up -d db. The default test
     settings also point at a real Redis (docker compose up -d redis), so
-    the healthy case reports no degraded dependencies."""
+    the healthy case reports no degraded dependencies. Skipped when Redis
+    is not reachable — the `integration` marker's documented contract is
+    PostgreSQL only (pyproject.toml), and ci.yml's `api` job deliberately
+    provisions Postgres alone; the Redis-down path is already covered
+    deterministically, without needing a real Redis, by
+    test_ready_reports_redis_degraded_without_failing_readiness below."""
+    try:
+        probe = aioredis.from_url(_REDIS_URL)
+        await probe.ping()
+        await probe.aclose()
+    except (OSError, redis_exceptions.RedisError):
+        pytest.skip("Redis is not running (docker compose up -d redis --wait)")
     response = await client.get("/ready")
     assert response.status_code == 200
     assert response.json() == {"status": "ok", "degraded_dependencies": []}

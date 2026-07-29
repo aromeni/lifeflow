@@ -100,22 +100,7 @@ jobs:
   e2e:
     name: E2E — demo journey (Playwright)
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: lifeflow
-          POSTGRES_PASSWORD: lifeflow # pragma: allowlist secret
-          POSTGRES_DB: lifeflow
-        ports:
-          - 5433:5432
-        options: >-
-          --health-cmd "pg_isready -U lifeflow -d lifeflow"
-          --health-interval 5s
-          --health-timeout 3s
-          --health-retries 10
-    env:
-      DATABASE_URL: postgresql+asyncpg://lifeflow:lifeflow@localhost:5433/lifeflow # pragma: allowlist secret
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
@@ -130,9 +115,25 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: cd apps/api && uv sync --locked
-      - run: cd apps/api && uv run alembic upgrade head
       - run: pnpm --filter @lifeflow/web exec playwright install chromium --with-deps
-      - run: pnpm web:e2e
+      # Runs via scripts/e2e.sh, not a raw `pnpm web:e2e` — this suite's
+      # deletion.spec.ts and audit-history.spec.ts journeys drive a real
+      # imported-data deletion through the real ARQ worker (never a mock),
+      # and rate-limiting.spec.ts needs a real Redis to observe throttling
+      # at all (Redis absence makes the limiter fail open by design — see
+      # ADR 0005 D64/D81 — so the journey has nothing to assert against). A
+      # CI-coverage audit during Stage 9 Final Integration found this job
+      # had never actually provisioned either dependency, undetected because
+      # this was the first pull request ever opened against this workflow.
+      - run: ./scripts/e2e.sh
+      - name: Upload Playwright trace/report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: apps/web/playwright-report/
+          retention-days: 7
+          if-no-files-found: ignore
 
   e2e-resilience:
     name: E2E — outage resilience journeys (Playwright)
