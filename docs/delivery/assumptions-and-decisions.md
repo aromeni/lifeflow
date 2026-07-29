@@ -317,6 +317,86 @@ retention events specifically; no writer produces a per-record `failed_count`
 anywhere in the engine, so that field is always omitted. Implemented as two
 further commits (`69117f7`, `b707788`), both remotely finalised in `a50cf06`.
 
+## Stage 9 Delivery Phase 5 — outage resilience and privacy-safe telemetry (recorded 2026-07-28)
+
+Implemented on `stage-9-resilience-telemetry` (base: the Phase 4 tip
+`481a67b`, `origin/stage-9-rate-limiting`), decided as ADR 0005 D82–D91. A
+mandatory baseline repair preceded product work: the pre-existing failing
+test `test_proposal_generation_dedup.py::test_approval_inbox_route_returns_the_new_proposal`
+(a Stage-8-era test seeding a proposal from a frozen historical constant,
+then reading it back through `GET /action-proposals`, which expires
+proposals against the real wall clock) was corrected per the repository's
+own documented clock-control convention (`tests/helpers.py`): route-level
+tests must seed from a live reference, never a frozen one. Fixed with no
+production behaviour change and proved stable via a disposable
+future-dated-clock monkeypatch (~400 days forward) before being removed; a
+new regression test (`test_approval_inbox_route_expires_a_proposal_seeded_from_a_stale_reference`)
+locks in the fix.
+
+A dependency-and-failure-mode inventory across Google, Redis, PostgreSQL,
+and ARQ preceded design and surfaced two genuine pre-existing gaps (closed
+in D87) plus the absence of any timeout policy, retry policy, failure
+taxonomy, metrics, or worker-side correlation propagation (closed in
+D82–D84, D89–D90). Ten decisions were ratified (D82–D91, see ADR 0005):
+closed failure taxonomy; central validated timeout policy distinguishing a
+write's longer budget from a read's; bounded retry-with-backoff for reads
+only, provably never applied to a write, with exhaustion re-raising the
+original exception type unchanged; a circuit breaker evaluated and
+deliberately omitted (existing per-account status, timeouts, retries, and
+the durable uncertain-outcome model already provide its benefits at pilot
+scale); a proactive stale-pending-execution recovery sweep closing the one
+asymmetry between the durable-execution model and the deletion/
+scheduled-brief subsystems; Redis-enqueue-failure hardening in both those
+subsystems; non-blocking Redis-degraded reporting on `/ready`; worker-scoped
+correlation IDs; bounded-cardinality metrics via `prometheus-client`
+(`GET /metrics`); and an additive `retryable`/`dependency` extension to the
+existing safe error envelope, wired into the Google-sync route.
+
+The frontend gained one new degraded state — a Google sync failure now
+visibly distinguishes "temporarily unavailable, safe to retry" (`role="status"`,
+amber) from "will not succeed by retrying, reconnect" (`role="alert"`, red) —
+implemented in `apps/web/src/app/connections/page.tsx` and
+`apps/web/src/lib/api.ts`. Three other outage-adjacent UX requirements
+(worker-delay wording, uncertain-execution warning, deletion-in-progress
+wording) were found already correctly implemented in earlier stages/phases
+and were verified, not re-built.
+
+No migration was needed — every Phase 5 mechanism lives in application code,
+Redis, or in-process state; the Alembic head remains `0011`.
+
+**Known limitations — superseded (recorded 2026-07-28, resolved 2026-07-29).**
+An earlier pass of this phase recorded four scope reductions here: partial
+provider-metrics coverage, an unpopulated timeout counter, the four
+outage-simulation Playwright journeys not built, and the existing ten
+journeys run only once. All four were closed in a follow-up convergence
+pass (2026-07-29), continuing on the same branch: (1) `observe_provider_call`
+now wraps the full Gmail/Calendar ingestion read path
+(`list_messages`/`get_message`/`list_history`/`get_current_history_id`/
+`list_events`) and OAuth token refresh, with three additional closed outcome
+values (`history_expired`, `sync_token_expired`, `grant_invalid`) so routine
+resync/revocation conditions no longer fall into the `unknown_error`
+catch-all. (2) `lifeflow_provider_timeouts_total` is now populated whenever
+a `GoogleTransientError`'s `__cause__` is an `httpx.TimeoutException`,
+alongside (not instead of) the general `provider_requests_total{outcome="timeout"}`
+count — a documented deliberate double count. (3) All four outage-simulation
+Playwright journeys (`apps/web/e2e-resilience/`) are built and passing —
+against a dedicated stack (a test-only fake Google server plus a separate
+API/web instance, `scripts/e2e-resilience.sh`, never run alongside the
+shared stack) — twice consecutively, with clean teardown and no orphan
+processes both times. (4) The existing ten Playwright journeys were also
+re-run twice consecutively on the fully-converged code with zero
+regressions. The full 17-item manual smoke test (§21) was completed live
+against the real stack, including every item previously covered only by
+automated tests: provider-read retry/recovery, provider permanent failure,
+provider authentication expiry, an uncertain provider write, no automatic
+retry of that uncertain write, and worker correlation propagation — the
+last of which surfaced one genuine gap (`worker_app.py::on_startup` never
+called `configure_logging`, so the worker process silently never emitted
+the structured, correlation-id-bearing logs the rest of this phase already
+built) which was fixed and covered by a regression test. See the Phase 5
+completion report's Manual Smoke-Test Results and Playwright Results
+sections for the exact commands and observed output.
+
 ## Open questions deliberately deferred (with owner stage)
 
 - ~~Evaluation acceptance targets~~ — **ratified 2026-07-16 in [ADR 0002](../architecture/adr/0002-evaluation-targets.md)** after the deterministic baseline; real-model metrics still pending an Anthropic key (before the Stage 10 gate).

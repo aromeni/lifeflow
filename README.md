@@ -81,7 +81,11 @@ uv sync                           # installs Python 3.12 + dependencies
 uv run alembic upgrade head       # apply migrations (works from empty state)
 uv run uvicorn --app-dir src lifeflow_api.main:app --reload --port 8010 --forwarded-allow-ips=""
 # → http://localhost:8010/health  (liveness)
-# → http://localhost:8010/ready   (readiness: checks the database)
+# → http://localhost:8010/ready   (readiness: PostgreSQL blocking, Redis
+#                                  reported as degraded_dependencies but
+#                                  never blocking — see docs/delivery/
+#                                  runbooks/health-readiness.md)
+# → http://localhost:8010/metrics (Prometheus operational metrics)
 # → http://localhost:8010/docs    (OpenAPI UI, development only)
 # Port 8010 by default: 8000 is commonly taken by other local apps.
 # --forwarded-allow-ips="" is required: uvicorn otherwise trusts X-Forwarded-For
@@ -148,6 +152,12 @@ pnpm web:test && pnpm web:lint && pnpm web:typecheck && pnpm web:build
 
 # Playwright end-to-end (starts db, api, and web itself)
 ./scripts/e2e.sh
+
+# Playwright outage/resilience journeys (Stage 9 Delivery Phase 5) — a
+# separate dedicated stack (fake Google server + its own API/web instance);
+# never run this alongside ./scripts/e2e.sh, since it stops/starts the real
+# Postgres/Redis containers.
+./scripts/e2e-resilience.sh
 
 # Golden-dataset evals (all six modes)
 ./scripts/run-evals.sh det              # deterministic baseline only

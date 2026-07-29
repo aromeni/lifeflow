@@ -56,6 +56,7 @@ Every mitigation maps to a planned component and delivery stage (Stage 0 check: 
 | T28 | Untrusted deserialization via the job queue — a compromised or misconfigured Redis instance feeding a worker process pickled data (arq's default job serializer) | B2 | Job payloads carry only `run_id` (an internal UUID string, never user content); the worker overrides arq's default pickle (de)serializer with JSON (`scheduled_briefs.job_serializer`/`job_deserializer`) so no job payload is ever pickle-deserialized, verified directly against a real Redis instance (`test_scheduled_briefs_queue.py`) | `scheduled_briefs.py`, `worker_app.py` | 8 |
 | T29 | Scheduler/queue outage cascading into the rest of the product (manual briefs, Google connections, approvals, execution all becoming unavailable because Redis is down) | B2 | The web API never requires Redis for any route except the scheduled-brief status read, which uses a short-timeout best-effort ping and degrades to `scheduler_available: false` rather than failing (`scheduled_brief_status.py`); manual brief generation, sync, and approval/execution have no dependency on Redis or the worker process at all | `scheduled_brief_status.py`, `main.py` | 8 |
 | T30 | A real credential committed to example/template configuration (`.env.example`) going undetected because no scanning gate actually ran against the commit that introduced it | build | `scripts/check_env_example_secrets.py` — a narrow, branch-agnostic, current-tree check specifically for this file, wired into pre-commit and into `secret-scan.yml`, which (unlike `ci.yml`) triggers on every branch push, not only `main`/PRs; see "Credential exposure incident" below for the incident this closes | `scripts/check_env_example_secrets.py`, `.pre-commit-config.yaml`, `.github/workflows/secret-scan.yml` | 8 |
+| T31 | Operational telemetry (structured logs, metrics) added for resilience/observability purposes becoming a second, uncontrolled channel for private data — an email address, calendar content, token, provider payload, or unbounded-cardinality identifier ending up in a log line or a metric label | B2 | Closed, hand-reviewed vocabularies only: `failure_taxonomy.py`'s `FailureCode` enum for every safe error code/message; `metrics.py`'s label sets are fixed at definition time (provider name, operation name, failure code, registered rate-limit policy code, job name) — never a user id, email, proposal id, exception message, or IP address; a full audit of every `logger.*` call site in `apps/api/src/lifeflow_api/` (Stage 9 Delivery Phase 5) found the pre-existing pattern already held everywhere — no raw content, only safe internal identifiers/codes, with `exc_info` (never an interpolated exception message) carrying traceback detail through the existing `redact()` regex backstop | `failure_taxonomy.py`, `metrics.py`, `logging_setup.py`, `correlation.py` | 9 |
 
 ## Prompt-injection boundary (expanded)
 
@@ -308,6 +309,80 @@ not `ASGITransport`), the frontend component/page suites, and
   and configure `TRUSTED_PROXY_CIDRS` to the proxy's real address instead —
   Uvicorn's independent forwarded-header trust must never be relied on as
   the application's security boundary.
+
+## Outage resilience and privacy-safe telemetry (Stage 9 Delivery Phase 5, recorded 2026-07-28, converged 2026-07-29)
+
+Closes T31 (see the updated table row above) and extends T29's Redis-outage
+posture to a documented, closed-taxonomy failure model across Google,
+Redis, and PostgreSQL. Covered by `test_failure_taxonomy.py`, `test_timeouts.py`,
+`test_retry.py`, `test_execution_recovery_sweep.py`,
+`test_scheduled_briefs_enqueue_resilience.py`,
+`test_deletion_engine_enqueue_resilience.py`, `test_ready.py`,
+`test_correlation.py`, `test_metrics.py`, `test_e2e_test_controls.py`,
+updated `test_google_executors.py`/`test_google_route_integration.py`/
+`test_google_gmail_client.py`/`test_google_calendar_client.py`/
+`test_google_oauth.py`/`test_worker_app.py`, the frontend `connections` page
+suite, four real-stack Playwright journeys
+(`apps/web/e2e-resilience/`, run twice consecutively), and a live manual
+smoke test against the real Docker stack (see the Phase 5 completion
+report).
+
+- **T31 (telemetry privacy leak).** Every new operational-observability
+  surface (`failure_taxonomy.py`, `metrics.py`, `correlation.py`'s worker
+  extension) uses a small, fixed, hand-reviewed vocabulary — never
+  user-supplied or provider-supplied content. `test_metrics.py` asserts each
+  metric's label-name set directly, as a regression guard against a future
+  change accidentally widening a label to something unbounded.
+- **Write safety is unchanged by retries.** `retry.py::retry_read` is
+  structurally incapable of retrying a write: it is applied only at Gmail/
+  Calendar read call sites and the OAuth refresh call, never at
+  `create_draft`/`insert_event`. Two dedicated tests count actual transport
+  calls (not just observed outcomes) to prove a write is attempted exactly
+  once regardless of the failure classification.
+- **A local timeout is never mistaken for "no request was sent."** Every
+  Google timeout — connect, read, or the write path's longer budget — is
+  classified identically to a raw connection error (`GoogleTransientError`
+  → `uncertain`), never surfaced as a final failure and never silently
+  treated as success.
+- **T29 extended: Redis outage reporting is now explicit and non-blocking.**
+  `GET /ready` best-effort pings Redis and reports `degraded_dependencies:
+  ["redis"]` without ever returning `503` for it — proven live (Redis
+  stopped/started against the real Docker Compose service, `/ready` observed
+  at each step) and by `test_ready.py`'s equivalent automated case.
+  PostgreSQL unavailability, by contrast, does return `503` (also proven
+  live) — the API genuinely cannot serve its core functions without it,
+  unlike Redis.
+- **No new AuditEvent stream.** Every mechanism in this phase (stale-
+  execution recovery, enqueue-failure handling, metrics, correlation ids)
+  writes only to existing safe channels (structured logs, Prometheus
+  counters, or — for the execution-recovery sweep — the same
+  `execution.uncertain` audit event `execute()`'s own re-entry guard already
+  produces). No new audit event type was introduced.
+- **No new database guard was touched.** The stale-pending-execution sweep,
+  the Redis-enqueue hardening, and the timeout/retry changes are additive
+  observability and recovery around existing durable-state transitions —
+  `ActionExecution`'s pending→uncertain transition, `DataDeletionOperation`'s
+  state machine, and `ScheduledBriefRun`'s status column are exercised
+  through their pre-existing, unmodified write paths.
+- **Circuit breaker: evaluated, not built (see ADR 0005 D85).** Recorded
+  here because a circuit breaker is itself a common source of new privacy/
+  availability risk (shared state that could leak across users, or fail
+  closed for everyone on one user's account-specific problem) — the decision
+  not to add one avoids that risk entirely rather than mitigating it.
+- **Test-only fake-provider infrastructure cannot reach production (ADR 0005
+  D92).** `lifeflow_api/testing/fake_google_server.py` is a separate ASGI
+  app, never imported by `main.py`, that refuses to start without
+  `LIFEFLOW_E2E_FAKE_GOOGLE=1`. The real API only ever talks to it via
+  `google_api_origin_override`, itself inert unless
+  `e2e_test_controls_enabled=true` — and `create_app` refuses to start
+  (`RuntimeError`) if that flag is ever `true` with
+  `environment=production`, proven by
+  `test_e2e_test_controls_enabled_refuses_to_start_in_production`. The fake
+  server never accepts or validates a real bearer token and never makes an
+  outbound call to a real Google host — it is a pure in-memory stub. Its own
+  `/__control__/*` routes accept only a closed `Scenario` enum and a closed
+  operation-name set (422 on anything else), and expose only synthetic
+  object/call counts, never content.
 
 ## Out-of-scope threats (recorded, revisit at Stage 11)
 

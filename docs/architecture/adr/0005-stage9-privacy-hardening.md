@@ -457,6 +457,240 @@ and enforced, closing threat model T21.
 No migration was needed — rate-limit state lives entirely in Redis and
 validated configuration, matching D64's original architecture note.
 
+## Delivery Phase 5 implementation decisions (D82–D91)
+
+### D82 — A closed operational failure taxonomy, not per-module ad hoc codes
+
+`failure_taxonomy.py` defines one `FailureCode` enum and a `classify_exception`
+function used everywhere a Google, Redis, database, or unknown exception needs
+a safe code, message, retryability, and severity. Pre-existing untyped string
+constants in `scheduled_briefs.py` (`ERROR_WORKER_STALE_TIMEOUT`,
+`ERROR_DATABASE_UNAVAILABLE`, `ERROR_REDIS_UNAVAILABLE` → renamed internally to
+the enum's `redis_unavailable`, `ERROR_GENERATION_FAILED`,
+`ERROR_WORKER_TIMEOUT`) now alias the enum's values — byte-identical strings,
+zero behaviour change, but a single source of truth going forward.
+`deletion_ops.py` keeps its own literal constants unchanged: that module is
+deliberately dependency-light (models only, to avoid an import cycle), so its
+matching string values are consistent by construction rather than by import.
+
+### D83 — Central, validated timeout policy; write timeout ≠ "didn't happen"
+
+`timeouts.py` + new `Settings` fields (`GOOGLE_CONNECT_TIMEOUT_SECONDS`,
+`GOOGLE_READ_TIMEOUT_SECONDS`, `GOOGLE_WRITE_TIMEOUT_SECONDS`,
+`DATABASE_STATEMENT_TIMEOUT_SECONDS`, `WORKER_HEALTH_CHECK_TIMEOUT_SECONDS`,
+all `Field(gt=0)`) replace the flat, hand-rolled `httpx.AsyncClient(timeout=10.0)`
+at every construction site (`main.py`, `worker_app.py`) and the previously
+unbounded PostgreSQL statement duration (`db.py::create_engine`, via asyncpg
+`server_settings`). Gmail/Calendar writes (`create_draft`, `insert_event`) get
+a longer, separately-configured read budget than the shared client's default —
+a local timeout on a write must never be treated as proof the request never
+reached Google; it is classified identically to a connection error
+(`GoogleTransientError` → `uncertain`, never `failed`).
+
+### D84 — Bounded retry with backoff/jitter, reads only, by construction
+
+`retry.py::retry_read` wraps every idempotent Gmail/Calendar read
+(`list_messages`, `get_message`, `list_history`, `get_current_history_id`,
+`list_events`) and the two post-write verification reads (`get_draft`,
+`get_event`), plus OAuth token refresh (idempotent under RFC 6749 §6). It is
+never applied to `create_draft`, `insert_event`, or any other write. On
+exhaustion it re-raises the *original* exception unchanged — never a wrapper
+type — so every existing `except GoogleTransientError`/`GoogleHistoryExpiredError`/
+`GoogleClientError` control-flow branch throughout the connectors and
+executors is unaffected whether the underlying call succeeded on the first
+attempt or the last. Proven negative: two dedicated tests
+(`test_gmail_draft_create_is_never_automatically_retried`,
+`test_calendar_event_insert_is_never_automatically_retried`) count actual
+transport calls and assert exactly one POST per write attempt.
+
+### D85 — Circuit breaker evaluated and deliberately omitted
+
+No circuit breaker was added. Reasoning: (1) Google API concurrency here is
+bounded by the number of concurrently active human users (pilot scale), not a
+shared fan-out pool a breaker would protect; (2) the existing per-account
+`ConnectedAccount.status` state machine (`active`/`revoked`) already
+implements the one legitimate circuit-breaking case — a revoked grant stops
+future calls to that account without ever reaching Google again until
+reconnection — at the correct (per-account, not global) granularity a naive
+shared breaker would get wrong (§9's own warning against "one user
+permanently opening a circuit for everyone"); (3) bounded timeouts (D83),
+bounded read retries (D84), and the pre-existing durable `uncertain` outcome
+model together already deliver fast failure, backoff pressure relief, and
+zero duplicate side effects — the three properties a breaker exists to
+provide — without new shared mutable state or a new Redis-outage failure mode
+of its own. Revisit if real pilot telemetry (D91) shows repeated storms a
+timeout+retry combination isn't already absorbing.
+
+### D86 — Proactive stale-pending-execution recovery sweep
+
+`action_proposal_service.recover_stale_pending_executions` (new,
+cross-user) + a new per-minute cron job (`worker_app.recover_stale_action_executions`)
+close a gap the durable-execution model had relative to the deletion engine
+and scheduled-brief subsystems: before this, an `ActionExecution` stuck
+`pending` past `STALE_PENDING_AGE` (a worker crash between the pre-call
+commit and the real executor call) was only ever durably resolved to
+`uncertain` if that specific proposal happened to be acted on again, or
+displayed as `uncertain` without being persisted. The sweep uses the same
+audit event (`execution.uncertain`, `reason_code: stale_pending_attempt`)
+`execute()`'s own re-entry guard already writes — an existing safe outcome,
+now also reached proactively. No new terminal state, no new retry.
+
+### D87 — Redis-enqueue failures fail open, matching the rest of the app
+
+Two genuine gaps found by inventory: `deletion.py::_enqueue` (used by both
+the stale-`running`→`pending` requeue and the pending-drain pass) and three
+enqueue call sites in `scheduled_briefs.py` (`dispatch_tick`,
+`recover_stale_running`, the transient-retry re-enqueue in
+`run_scheduled_generation`) let an uncaught `redis.exceptions.*` propagate
+out of the whole cron function — aborting recovery for every other
+user/operation in the same tick, not just the one Redis-affected row. Both
+now catch, log, and leave the row `pending`/`enqueued_at=None` for the next
+tick's drain pass — the identical self-healing pattern the rate limiter and
+`memory_inference.enqueue_recompute` already used. A new
+`scheduled_briefs._recover_never_enqueued` pass (mirroring the deletion
+engine's existing pending-drain) closes the matching gap for scheduled-brief
+runs, which had no prior drain mechanism at all.
+
+### D88 — `/ready` reports Redis degradation without blocking readiness
+
+`GET /ready` now also best-effort pings Redis (`health.py::check_redis`,
+timeout from D83's `WORKER_HEALTH_CHECK_TIMEOUT_SECONDS`) and reports
+`degraded_dependencies: ["redis"]` in an otherwise-`200` response — never
+`503` — since Redis absence does not compromise the API's core functions
+(rate limiting is fail-open, D64; scheduled-brief/worker status has its own
+dedicated, unaffected endpoint). `check_redis` replaces and is shared with
+`scheduled_brief_status.py`'s previously duplicated local copy. `/health`
+(liveness) is unchanged and remains provider- and Redis-agnostic by design.
+`/metrics` (D90) joins `/health`/`/ready`/`/config` on the rate-limit
+exemption list for the same never-throttle reasoning.
+
+### D89 — Worker-scoped correlation IDs
+
+`correlation.py::with_worker_correlation`, applied to all seven ARQ job/cron
+entry points in `worker_app.py`, is the background-job analogue of
+`CorrelationIdMiddleware`: an ARQ job has no inbound HTTP request to take a
+correlation id from, so before this every job/cron log line carried the
+middleware's `"-"` default. Each invocation now gets a fresh id for its
+duration (never a reused/caller-supplied one — a job has no caller to honour
+in that sense), readable via the same `get_correlation_id()` any nested
+domain-service log call already uses.
+
+### D90 — Bounded-cardinality metrics via `prometheus-client`
+
+New minimal dependency (`prometheus-client`, no transitive dependencies of
+its own) — a small exposition-format client library, not an observability
+platform, chosen over hand-rolling Prometheus's text format. `metrics.py`
+defines one process-local `CollectorRegistry` and a fixed set of
+counters/histograms whose labels are always closed, small registries
+(provider name, operation name, `FailureCode` value, registered rate-limit
+policy code, job name) — never a user id, email, proposal id, exception
+message, or IP address. Wired into: rate-limiter fail-opens, 429 rejections
+by policy, `/ready`'s DB/Redis outcomes, Google write + verification-read
+calls (`create_draft`, `get_draft`, `insert_event`, `get_event` — the
+ingestion read path is intentionally not instrumented in this phase, see the
+Phase 5 report's Known Limitations), worker job success/failure
+(`with_worker_metrics`), and every stale-recovery sweep's recovered count.
+Exposed at `GET /metrics` (Prometheus text exposition format).
+
+### D91 — Safe API error contract gains `retryable`/`dependency`, additively
+
+`ErrorBody` gains two new optional fields, both `None` unless a route has a
+genuine closed-taxonomy answer: `retryable: bool | None` and
+`dependency: str | None` (today, only ever `"google"`). Wired into the one
+route where it adds real signal today — `POST /connected-accounts/google/sync`'s
+generic `GoogleApiError` handler, via `classify_exception` — replacing one
+undifferentiated `"Google sync could not complete."` message with a
+transient/permanent distinction the frontend now surfaces as two visually
+and textually distinct notices (`role="status"`, amber, "safe to try again"
+for transient; `role="alert"`, red, "will not help — reconnect" for
+permanent). Purely additive to the existing envelope shape — every other
+route's error body is unchanged except for gaining these two `null`-valued
+keys.
+
+### D92 — Test-only provider-control boundary: a fake Google server, not a new production route
+
+The four Playwright outage-simulation journeys (§20) need a way to make
+Gmail/Calendar transport fail on demand. Rather than adding any control
+surface to the production API, the fault injection lives entirely in a
+separate standalone ASGI app (`lifeflow_api/testing/fake_google_server.py`)
+that is never imported by `main.py` and refuses to start (`SystemExit` at
+import time) unless `LIFEFLOW_E2E_FAKE_GOOGLE=1` is set. The real API is
+redirected to it only via two settings — `e2e_test_controls_enabled` and
+`google_api_origin_override` — both `false`/empty by default, both ignored
+unless the flag is explicitly on, and `create_app` refuses to start
+(`RuntimeError`) if the flag is ever `true` with `environment=production`.
+`GmailDraftClient`/`CalendarEventClient` gained a `base_url` constructor
+parameter (defaulting to the real Google host) so the override is plain
+configuration, not a weakened abstraction. The fake server's own fault
+vocabulary (`Scenario`: `healthy`, `transient_then_recover`,
+`permanent_failure`, `auth_expired`, `hang_on_write`) and its targetable
+operation vocabulary are both closed enums, validated on every
+`POST /__control__/scenario` call (422 on anything else). It never accepts
+or checks a real bearer token, never proxies to a real Google host, and
+exposes only synthetic object/call counts via `GET /__control__/state`.
+
+### D93 — Provider-read metrics extended to the full ingestion path; a dedicated timeout outcome
+
+The scope initially left the bulk Gmail/Calendar ingestion reads
+uninstrumented (only the write + verification-read call sites were
+wrapped). Closing that: `list_messages`, `get_message`, `list_history`,
+`get_current_history_id` (Gmail), `list_events` (Calendar), and
+`refresh_access_token` (OAuth) are now all wrapped in
+`observe_provider_call`. The outcome vocabulary grew from five values to
+eight to keep it meaningful rather than dumping everything into
+`unknown_error`: `history_expired` and `sync_token_expired` (routine resync
+triggers, not failures) and `grant_invalid` (a revoked refresh token) each
+get their own bucket. A `GoogleTransientError` whose `__cause__` is an
+`httpx.TimeoutException` (set by the `raise ... from exc` every client's
+`_get`/`_post` helper already used) is classified as the dedicated
+`"timeout"` outcome and additionally increments
+`lifeflow_provider_timeouts_total` — a deliberate double count (one counter
+answers "what kind of outcome", the other "did this dependency time out"),
+not an accidental one. An HTTP 429/5xx-derived `GoogleTransientError` (no
+`__cause__`) keeps the ordinary `"transient_error"` outcome — a real
+provider response, not a timeout.
+
+### D94 — Worker structured logging was wired but never installed (fixed)
+
+`with_worker_correlation` binds a fresh correlation id into a contextvar
+for the duration of one job, and `logging_setup.JsonFormatter` reads that
+contextvar into every log line's `correlation_id` field — but
+`worker_app.py::on_startup` never called `configure_logging`, so the
+worker process used Python's default plain-text logging the entire time,
+silently dropping the correlation id this phase's other work had already
+built. Found during Delivery Phase 5's own live manual verification (§21)
+when a worker log inspection came back with no JSON at all. Fixed with a
+single `configure_logging(settings.log_level)` call in `on_startup`,
+identical to `main.py::create_app`'s own call — an ordinary wiring gap, not
+a design change, closed with a regression test
+(`test_on_startup_configures_structured_logging`).
+
+### D95 — Outage journeys run on their own dedicated stack, never alongside the shared one
+
+`apps/web/e2e-resilience/` and `scripts/e2e-resilience.sh` are a separate
+Playwright config and stack (API on :8011, fake Google on :8098, web on
+:3001), not a project bolted onto the existing `playwright.config.ts`.
+Two reasons this had to be a separate stack: the fake-Google origin
+override and `GOOGLE_OAUTH_ENABLED=true` must never be active for the
+other 10 journeys (`connections.spec.ts` explicitly depends on Google OAuth
+being unconfigured); and Journey D stops/starts the real Postgres/Redis
+containers, which would break whichever of the other journeys happened to
+be running concurrently against the same containers. The dedicated API
+process (port 8011) is deliberately *not* a Playwright `webServer` entry —
+Journey B kills and respawns it mid-test (a real OS-level process restart,
+not a simulation) to prove an uncertain provider write is never retried
+across an API restart, and Playwright's `webServer` supervision is not
+designed to survive one of its own entries being killed out from under it.
+A genuine bug surfaced building this: `lsof -ti:PORT` matches a socket by
+port number on *either* end of a connection, not just the listener —
+killing "whatever is on :8011" this way also matched the Playwright test
+process's own outbound keep-alive connection to the API, SIGKILLing the
+test runner itself. Fixed with `lsof -ti tcp:PORT -sTCP:LISTEN`, which
+restricts the match to the actual listening socket.
+
+No migration was needed for any Delivery Phase 5 decision — every mechanism
+above lives in application code, Redis, or in-process state.
+
 ## Consequences
 
 Delivery Phase 1 gives the user a truthful, consolidated view and keeps every
@@ -468,9 +702,17 @@ and account anonymisation. Delivery Phase 3 adds the privacy-safe audit-history
 read projection and canonical UI without changing capture or deletion
 semantics. Delivery Phase 4 enforces the rate-limiting architecture D64
 described, as defence-in-depth layered strictly on top of — never in place
-of — every existing database guard. Resilience/telemetry remains Delivery
-Phase 5. See
+of — every existing database guard. Delivery Phase 5 makes provider, queue,
+and database failures bounded, classified, observable, and — where safe —
+recoverable, without weakening any invariant the earlier four phases
+established: writes are still never retried automatically, an uncertain
+outcome is still never silently treated as success, and no new mechanism
+(the failure taxonomy, timeout policy, retry helper, stale-execution sweep,
+enqueue hardening, readiness reporting, correlation IDs, or metrics) stores
+anything beyond a safe, closed-vocabulary code, count, or bounded internal
+identifier. See
 `docs/delivery/reports/stage-09-phase-1.md` and
 `docs/delivery/reports/stage-09-phase-2.md` and
 `docs/delivery/reports/stage-09-phase-3.md` and
-`docs/delivery/reports/stage-09-phase-4.md`.
+`docs/delivery/reports/stage-09-phase-4.md` and
+`docs/delivery/reports/stage-09-phase-5.md`.

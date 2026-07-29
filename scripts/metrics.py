@@ -81,7 +81,7 @@ def web_tests() -> str:
 
 def stage_progress() -> tuple[str, str]:
     text = (ROOT / "docs" / "delivery" / "stage-plan.md").read_text(encoding="utf-8")
-    active = re.search(r"\*\*Active stage: (\d+)", text)
+    active = re.search(r"\*\*Status:\*\*\s*Stage (\d+)", text)
     current = active.group(1) if active else "?"
     approved = len(re.findall(r"\(approved\)", text))
     pending = " (+1 complete pending approval)" if "complete pending approval" in text else ""
@@ -98,13 +98,11 @@ def main() -> int:
     )
     api_tests, api_coverage = backend_tests_and_coverage()
     web = web_tests()
-    e2e_specs = (
-        sum(
-            len(re.findall(r"^test\(", path.read_text(), re.M))
-            for path in (ROOT / "apps/web/e2e").glob("*.spec.ts")
-        )
-        if (ROOT / "apps/web/e2e").exists()
-        else 0
+    e2e_specs = sum(
+        len(re.findall(r"^test\(", path.read_text(), re.M))
+        for e2e_dir in ("apps/web/e2e", "apps/web/e2e-resilience")
+        if (ROOT / e2e_dir).exists()
+        for path in (ROOT / e2e_dir).glob("*.spec.ts")
     )
     current_stage, completed = stage_progress()
 
