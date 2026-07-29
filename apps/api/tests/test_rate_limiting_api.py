@@ -71,6 +71,9 @@ _EXEMPT_ROUTES: frozenset[tuple[str, str]] = frozenset(
         ("GET", "/health"),
         ("GET", "/ready"),
         ("GET", "/config"),
+        # Stage 9 Delivery Phase 5: scraped frequently by design, same
+        # never-throttle reasoning as /health and /ready.
+        ("GET", "/metrics"),
         # FastAPI's own auto-registered docs routes: GET-only, no user data,
         # already disabled entirely in production (main.py: docs_url=None).
         ("GET", "/openapi.json"),
@@ -138,7 +141,20 @@ async def test_anonymous_auth_route_returns_429_with_safe_body_and_header() -> N
         assert body["error"]["code"] == "rate_limited"
         assert isinstance(body["error"]["retry_after_seconds"], int)
         assert body["error"]["retry_after_seconds"] > 0
-        assert set(body["error"]) == {"code", "message", "correlation_id", "retry_after_seconds"}
+        assert set(body["error"]) == {
+            "code",
+            "message",
+            "correlation_id",
+            "retry_after_seconds",
+            # Stage 9 Delivery Phase 5 (§17): always present in the closed
+            # envelope shape, but `None` here — a rate-limit rejection has
+            # no meaningful retryable/dependency classification of its own
+            # (retrying is exactly what Retry-After already governs).
+            "retryable",
+            "dependency",
+        }
+        assert body["error"]["retryable"] is None
+        assert body["error"]["dependency"] is None
         assert "Retry-After" in blocked.headers
         assert blocked.headers["Retry-After"] == str(body["error"]["retry_after_seconds"])
 
@@ -464,6 +480,7 @@ async def test_health_ready_config_are_never_rate_limited() -> None:
             assert (await client.get("/health")).status_code == 200
             assert (await client.get("/config")).status_code == 200
             assert (await client.get("/ready")).status_code == 200
+            assert (await client.get("/metrics")).status_code == 200
 
 
 # --- Redis failure fails open on a real route --------------------------------

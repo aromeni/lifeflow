@@ -19,6 +19,7 @@ from lifeflow_api.google.errors import (
     GoogleTransientError,
 )
 from lifeflow_api.google.gmail_client import GmailDraftClient
+from lifeflow_api.metrics import REGISTRY, provider_timeouts_total
 
 
 def _build_raw_message(
@@ -242,3 +243,122 @@ async def test_get_current_history_id_is_a_single_fixed_read() -> None:
     client = _client(httpx.MockTransport(handle))
     history_id = await client.get_current_history_id(access_token="token")
     assert history_id == "999"
+
+
+def _requests_value(*, operation: str, outcome: str) -> float:
+    return (
+        REGISTRY.get_sample_value(
+            "lifeflow_provider_requests_total",
+            {"provider": "gmail", "operation": operation, "outcome": outcome},
+        )
+        or 0.0
+    )
+
+
+@pytest.mark.parametrize(
+    ("operation", "call"),
+    [
+        (
+            "list_messages",
+            lambda client: client.list_messages(
+                access_token="token", query="q", page_token=None, max_results=10
+            ),
+        ),
+        ("get_message", lambda client: client.get_message(access_token="token", message_id="m1")),
+        (
+            "list_history",
+            lambda client: client.list_history(
+                access_token="token", start_history_id="1", page_token=None
+            ),
+        ),
+        (
+            "get_current_history_id",
+            lambda client: client.get_current_history_id(access_token="token"),
+        ),
+    ],
+)
+async def test_every_registered_ingestion_read_emits_a_success_request_metric(
+    operation: str, call: object
+) -> None:
+    """Stage 9 Delivery Phase 5 (§14/§18 item 36): the bulk ingestion read
+    surface — previously uninstrumented — now emits the same
+    `lifeflow_provider_requests_total{outcome="success"}` signal the
+    write/verification paths already did."""
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "messages": [{"id": "m1", "threadId": "t1"}],
+                "id": "m1",
+                "threadId": "t1",
+                "snippet": "",
+                "internalDate": "1700000000000",
+                "labelIds": [],
+                "payload": {"headers": []},
+                "history": [],
+                "historyId": "1",
+                "historyId_": None,
+            },
+        )
+
+    client = _client(httpx.MockTransport(handle))
+    before = _requests_value(operation=operation, outcome="success")
+
+    await call(client)  # type: ignore[operator]
+
+    after = _requests_value(operation=operation, outcome="success")
+    assert after == before + 1
+
+
+async def test_a_raw_transport_timeout_is_classified_as_the_timeout_outcome() -> None:
+    """A timeout (no response ever received) must be distinguishable from an
+    ordinary HTTP-level transient error (429/5xx) in the metrics, and must
+    populate the dedicated timeout counter — never treated as evidence the
+    request didn't happen (see `retry.py`/`timeouts.py` module docstrings)."""
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectTimeout("simulated timeout", request=request)
+
+    client = _client(httpx.MockTransport(handle))
+    before_outcome = _requests_value(operation="get_message", outcome="timeout")
+    before_timeout_counter = (
+        REGISTRY.get_sample_value(
+            "lifeflow_provider_timeouts_total", {"provider": "gmail", "operation": "get_message"}
+        )
+        or 0.0
+    )
+
+    with pytest.raises(GoogleTransientError):
+        await client.get_message(access_token="token", message_id="m1")
+
+    assert _requests_value(operation="get_message", outcome="timeout") == before_outcome + 1
+    after_timeout_counter = REGISTRY.get_sample_value(
+        "lifeflow_provider_timeouts_total", {"provider": "gmail", "operation": "get_message"}
+    )
+    assert after_timeout_counter == before_timeout_counter + 1
+    assert provider_timeouts_total is not None  # module import sanity
+
+
+async def test_an_http_5xx_transient_error_does_not_increment_the_timeout_counter() -> None:
+    """A real 5xx response is a transient error but was never a timeout —
+    the two counters must not be conflated."""
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(503, json={})
+
+    client = _client(httpx.MockTransport(handle))
+    before = (
+        REGISTRY.get_sample_value(
+            "lifeflow_provider_timeouts_total", {"provider": "gmail", "operation": "get_message"}
+        )
+        or 0.0
+    )
+
+    with pytest.raises(GoogleTransientError):
+        await client.get_message(access_token="token", message_id="m1")
+
+    after = REGISTRY.get_sample_value(
+        "lifeflow_provider_timeouts_total", {"provider": "gmail", "operation": "get_message"}
+    )
+    assert after == before

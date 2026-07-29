@@ -20,6 +20,7 @@ from fastapi.params import Depends as DependsMarker
 
 from lifeflow_api.deps import CurrentUser
 from lifeflow_api.errors import RateLimitExceededError
+from lifeflow_api.metrics import rate_limited_requests_total
 from lifeflow_api.rate_limit_ip import resolve_client_ip
 from lifeflow_api.rate_limit_policy import RateLimitSubjectType, effective_policy, get_policy
 from lifeflow_api.rate_limiter import RateLimiter, bucket_key, hash_subject
@@ -43,6 +44,7 @@ async def enforce_rate_limit(request: Request, policy_code: str, *, subject: str
     key = bucket_key(settings.rate_limit_redis_prefix, policy.code, digest)
     decision = await limiter.check(key, policy)
     if not decision.allowed:
+        rate_limited_requests_total.labels(policy_code=decision.policy_code).inc()
         raise RateLimitExceededError(decision.policy_code, decision.retry_after_seconds)
 
 

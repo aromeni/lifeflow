@@ -25,6 +25,7 @@ from lifeflow_api.google.errors import (
     GoogleHistoryExpiredError,
     GoogleTransientError,
 )
+from lifeflow_api.metrics import observe_provider_call
 
 _BASE_URL = "https://gmail.googleapis.com/gmail/v1/users/me"
 # The complete set of paths this client may ever request. Enforced before
@@ -152,10 +153,11 @@ class GmailDraftClient:
         params: dict[str, Any] = {"q": query, "maxResults": max_results}
         if page_token:
             params["pageToken"] = page_token
-        response = await _get(
-            self._http, f"{_BASE_URL}/messages", params=params, headers=_headers(access_token)
-        )
-        _raise_for_error(response)
+        async with observe_provider_call("gmail", "list_messages"):
+            response = await _get(
+                self._http, f"{_BASE_URL}/messages", params=params, headers=_headers(access_token)
+            )
+            _raise_for_error(response)
         body = response.json()
         summaries = tuple(
             GmailMessageSummary(id=item["id"], thread_id=item["threadId"])
@@ -165,19 +167,21 @@ class GmailDraftClient:
 
     async def get_message(self, *, access_token: str, message_id: str) -> GmailMessage:
         assert "messages/{id}" in _ALLOWED_READ_PATHS  # noqa: S101
-        response = await _get(
-            self._http,
-            f"{_BASE_URL}/messages/{message_id}",
-            params={
-                "format": "metadata",
-                # List-Unsubscribe (RFC 2369/8058) is fetched solely as a
-                # bulk-mail marker (ADR 0003 D42) — its value is a fact about
-                # the message, and metadata-only minimisation is unchanged.
-                "metadataHeaders": ["From", "To", "Subject", "Date", "List-Unsubscribe"],
-            },
-            headers=_headers(access_token),
-        )
-        _raise_for_error(response)
+        async with observe_provider_call("gmail", "get_message"):
+            response = await _get(
+                self._http,
+                f"{_BASE_URL}/messages/{message_id}",
+                params={
+                    "format": "metadata",
+                    # List-Unsubscribe (RFC 2369/8058) is fetched solely as a
+                    # bulk-mail marker (ADR 0003 D42) — its value is a fact
+                    # about the message, and metadata-only minimisation is
+                    # unchanged.
+                    "metadataHeaders": ["From", "To", "Subject", "Date", "List-Unsubscribe"],
+                },
+                headers=_headers(access_token),
+            )
+            _raise_for_error(response)
         body = response.json()
         headers = {
             item["name"]: item["value"] for item in body.get("payload", {}).get("headers", [])
@@ -203,12 +207,13 @@ class GmailDraftClient:
         }
         if page_token:
             params["pageToken"] = page_token
-        response = await _get(
-            self._http, f"{_BASE_URL}/history", params=params, headers=_headers(access_token)
-        )
-        if response.status_code == 404:
-            raise GoogleHistoryExpiredError("Gmail historyId has expired.")
-        _raise_for_error(response)
+        async with observe_provider_call("gmail", "list_history"):
+            response = await _get(
+                self._http, f"{_BASE_URL}/history", params=params, headers=_headers(access_token)
+            )
+            if response.status_code == 404:
+                raise GoogleHistoryExpiredError("Gmail historyId has expired.")
+            _raise_for_error(response)
         body = response.json()
         message_ids = tuple(
             added["message"]["id"]
@@ -225,8 +230,11 @@ class GmailDraftClient:
         """The mailbox's current historyId — the baseline cursor a full
         resync establishes for the next incremental sync."""
         assert "profile" in _ALLOWED_READ_PATHS  # noqa: S101
-        response = await _get(self._http, f"{_BASE_URL}/profile", headers=_headers(access_token))
-        _raise_for_error(response)
+        async with observe_provider_call("gmail", "get_current_history_id"):
+            response = await _get(
+                self._http, f"{_BASE_URL}/profile", headers=_headers(access_token)
+            )
+            _raise_for_error(response)
         return str(response.json()["historyId"])
 
     async def create_draft(
@@ -251,14 +259,15 @@ class GmailDraftClient:
         extra: dict[str, Any] = (
             {"timeout": self._write_timeout} if self._write_timeout is not None else {}
         )
-        response = await _post(
-            self._http,
-            f"{_BASE_URL}/drafts",
-            json=payload,
-            headers=_headers(access_token),
-            **extra,
-        )
-        _raise_for_error(response)
+        async with observe_provider_call("gmail", "create_draft"):
+            response = await _post(
+                self._http,
+                f"{_BASE_URL}/drafts",
+                json=payload,
+                headers=_headers(access_token),
+                **extra,
+            )
+            _raise_for_error(response)
         result = response.json()
         message = result.get("message", {})
         return GmailDraftResult(
@@ -273,13 +282,14 @@ class GmailDraftClient:
         actually stored, not `create_draft`'s own (frequently minimal)
         response (Stage 7 focused remediation)."""
         assert "drafts/{id}" in _ALLOWED_READ_PATHS  # noqa: S101
-        response = await _get(
-            self._http,
-            f"{_BASE_URL}/drafts/{draft_id}",
-            params={"format": "raw"},
-            headers=_headers(access_token),
-        )
-        _raise_for_error(response)
+        async with observe_provider_call("gmail", "get_draft"):
+            response = await _get(
+                self._http,
+                f"{_BASE_URL}/drafts/{draft_id}",
+                params={"format": "raw"},
+                headers=_headers(access_token),
+            )
+            _raise_for_error(response)
         body = response.json()
         message = body.get("message", {})
         parsed = _parse_raw_message(message.get("raw", ""))

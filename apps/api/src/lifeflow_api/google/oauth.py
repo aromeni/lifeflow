@@ -30,6 +30,7 @@ from lifeflow_api.google.errors import (
     IdTokenVerificationError,
     InvalidGrantError,
 )
+from lifeflow_api.metrics import observe_provider_call
 
 AUTHORIZATION_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth"
 TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token"  # noqa: S105 -- endpoint URL, not a secret
@@ -181,15 +182,19 @@ class GoogleOAuthClient:
     async def refresh_access_token(
         self, *, client_id: str, client_secret: str, refresh_token: str
     ) -> GoogleTokenResponse:
-        response = await self._post(
-            data={
-                "client_id": client_id,
-                "client_secret": client_secret,
-                "refresh_token": refresh_token,
-                "grant_type": "refresh_token",
-            }
-        )
-        return _parse_token_response(response)
+        # The one OAuth call classified as a provider operation for metrics
+        # purposes (Stage 9 Delivery Phase 5) — `exchange_code` is a single
+        # user-initiated, non-retried step and is left uninstrumented.
+        async with observe_provider_call("google_oauth", "refresh_access_token"):
+            response = await self._post(
+                data={
+                    "client_id": client_id,
+                    "client_secret": client_secret,
+                    "refresh_token": refresh_token,
+                    "grant_type": "refresh_token",
+                }
+            )
+            return _parse_token_response(response)
 
     async def _post(self, *, data: dict[str, str]) -> httpx.Response:
         """A raw transport failure (timeout, dropped connection — no

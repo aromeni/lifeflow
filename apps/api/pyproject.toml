@@ -18,6 +18,12 @@ dependencies = [
     "google-auth>=2.36",
     "arq>=0.28.0",
     "redis>=5.0",
+    # Stage 9 Delivery Phase 5: bounded-cardinality operational metrics
+    # (/metrics). A small, single-purpose client library (no transitive
+    # dependencies of its own), not an observability platform — chosen over
+    # hand-rolling Prometheus's text exposition format, and reused rather
+    # than introducing a second metrics mechanism later.
+    "prometheus-client>=0.21",
 ]
 
 [dependency-groups]

@@ -21,6 +21,7 @@ from dataclasses import dataclass
 
 import redis.asyncio as aioredis
 
+from lifeflow_api.metrics import rate_limit_fail_open_total
 from lifeflow_api.rate_limit_policy import RateLimitPolicy, RateLimitSubjectType
 
 logger = logging.getLogger(__name__)
@@ -133,6 +134,7 @@ class RateLimiter:
             )
         except Exception:
             logger.warning("rate_limit.redis_check_failed policy=%s", policy.code)
+            rate_limit_fail_open_total.labels(policy_code=policy.code).inc()
             return RateLimitDecision(
                 allowed=True, retry_after_seconds=0, policy_code=policy.code, degraded=True
             )

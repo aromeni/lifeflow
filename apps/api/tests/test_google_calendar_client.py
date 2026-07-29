@@ -12,6 +12,7 @@ import pytest
 
 from lifeflow_api.google.calendar_client import CalendarEventClient
 from lifeflow_api.google.errors import GoogleSyncTokenExpiredError, GoogleTransientError
+from lifeflow_api.metrics import REGISTRY
 
 
 def _client(handler: httpx.MockTransport) -> CalendarEventClient:
@@ -107,3 +108,67 @@ async def test_transient_error_on_5xx() -> None:
             sync_token="token-1",
             page_token=None,
         )
+
+
+async def test_list_events_emits_a_success_request_metric() -> None:
+    """Stage 9 Delivery Phase 5 (§14/§18 item 36): Calendar's ingestion read
+    now emits the same metric its write/verification calls already did."""
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"items": [], "nextSyncToken": "t"})
+
+    client = _client(httpx.MockTransport(handle))
+    before = (
+        REGISTRY.get_sample_value(
+            "lifeflow_provider_requests_total",
+            {"provider": "calendar", "operation": "list_events", "outcome": "success"},
+        )
+        or 0.0
+    )
+
+    await client.list_events(
+        access_token="token", time_min=None, time_max=None, sync_token="t", page_token=None
+    )
+
+    after = REGISTRY.get_sample_value(
+        "lifeflow_provider_requests_total",
+        {"provider": "calendar", "operation": "list_events", "outcome": "success"},
+    )
+    assert after == before + 1
+
+
+async def test_list_events_sync_token_expiry_is_a_distinct_outcome_not_unknown_error() -> None:
+    """A 410 syncToken-expired response is an expected, routine resync
+    trigger — it must not pollute the `unknown_error` bucket, which is
+    reserved for genuinely unclassified failures."""
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(410, json={})
+
+    client = _client(httpx.MockTransport(handle))
+    before = (
+        REGISTRY.get_sample_value(
+            "lifeflow_provider_requests_total",
+            {
+                "provider": "calendar",
+                "operation": "list_events",
+                "outcome": "sync_token_expired",
+            },
+        )
+        or 0.0
+    )
+
+    with pytest.raises(GoogleSyncTokenExpiredError):
+        await client.list_events(
+            access_token="token",
+            time_min=None,
+            time_max=None,
+            sync_token="stale",
+            page_token=None,
+        )
+
+    after = REGISTRY.get_sample_value(
+        "lifeflow_provider_requests_total",
+        {"provider": "calendar", "operation": "list_events", "outcome": "sync_token_expired"},
+    )
+    assert after == before + 1

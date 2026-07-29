@@ -147,6 +147,7 @@ class Settings(BaseSettings):
     # correctly rather than avoid by racing a short clock.
     google_write_timeout_seconds: float = Field(default=20.0, gt=0)
     database_statement_timeout_seconds: float = Field(default=10.0, gt=0)
+    worker_health_check_timeout_seconds: float = Field(default=0.5, gt=0)
 
 
 @lru_cache

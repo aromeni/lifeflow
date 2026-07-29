@@ -54,6 +54,24 @@ async def test_on_startup_populates_ctx_and_on_shutdown_disposes_cleanly(
     await on_shutdown(ctx)  # must not raise
 
 
+async def test_on_startup_configures_structured_logging(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Stage 9 Delivery Phase 5: without this, `with_worker_correlation`'s
+    per-job correlation id is set in a contextvar nothing ever renders — the
+    worker process must install the same JSON/correlation-aware formatter
+    `main.py::create_app` installs for the API process."""
+    monkeypatch.setattr("lifeflow_api.worker_app.get_settings", lambda: _test_settings("test"))
+    called_with: list[str] = []
+    monkeypatch.setattr(
+        "lifeflow_api.worker_app.configure_logging", lambda level: called_with.append(level)
+    )
+    ctx: dict[str, object] = {}
+    await on_startup(ctx)
+    assert called_with == ["WARNING"]  # _test_settings sets log_level="WARNING"
+    await on_shutdown(ctx)
+
+
 async def test_dispatch_scheduled_briefs_delegates_to_dispatch_tick() -> None:
     engine = create_async_engine(TEST_DB_URL)
     maker = async_sessionmaker(engine, expire_on_commit=False)
