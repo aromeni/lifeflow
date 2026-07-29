@@ -8,6 +8,7 @@ from pydantic import BaseModel, field_validator
 from lifeflow_api.audit import record_audit_event
 from lifeflow_api.deps import CurrentUser, DbSession
 from lifeflow_api.models import OnboardingState, User
+from lifeflow_api.rate_limit_deps import RateLimited
 
 router = APIRouter(prefix="/me")
 
@@ -48,12 +49,12 @@ def _to_response(user: User) -> MeResponse:
     )
 
 
-@router.get("", response_model=MeResponse)
+@router.get("", response_model=MeResponse, dependencies=[RateLimited("authenticated_read")])
 async def get_me(user: CurrentUser) -> MeResponse:
     return _to_response(user)
 
 
-@router.patch("", response_model=MeResponse)
+@router.patch("", response_model=MeResponse, dependencies=[RateLimited("preference_memory_write")])
 async def update_me(body: MeUpdateRequest, user: CurrentUser, session: DbSession) -> MeResponse:
     changes = body.model_dump(exclude_none=True)
     if not changes:

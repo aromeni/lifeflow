@@ -6,15 +6,25 @@ delegate to `scheduled_briefs`), not the domain logic, which
 `test_scheduled_briefs.py` already covers in full.
 """
 
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from tests.conftest import TEST_DB_URL, _test_settings
+from tests.test_action_proposals import NOW, _approve, _proposal, _seed_proposals, _service
 from tests.test_scheduled_briefs import FakeRedis, _enable_scheduling, _make_user
 
-from lifeflow_api.models import ScheduledBriefRun, ScheduledRunStatus
+from lifeflow_api.action_proposal_service import STALE_PENDING_AGE
+from lifeflow_api.models import (
+    ActionExecution,
+    ActionType,
+    ExecutionOutcome,
+    ProposalStatus,
+    ScheduledBriefRun,
+    ScheduledRunStatus,
+)
+from lifeflow_api.repositories import ActionExecutionRepository
 from lifeflow_api.scheduled_briefs import job_deserializer, job_id_for, job_serializer
 from lifeflow_api.worker_app import (
     WorkerSettings,
@@ -22,6 +32,7 @@ from lifeflow_api.worker_app import (
     generate_scheduled_brief,
     on_shutdown,
     on_startup,
+    recover_stale_action_executions,
 )
 
 pytestmark = pytest.mark.integration
@@ -41,6 +52,24 @@ async def test_on_startup_populates_ctx_and_on_shutdown_disposes_cleanly(
         await session.execute(select(1))
 
     await on_shutdown(ctx)  # must not raise
+
+
+async def test_on_startup_configures_structured_logging(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Stage 9 Delivery Phase 5: without this, `with_worker_correlation`'s
+    per-job correlation id is set in a contextvar nothing ever renders — the
+    worker process must install the same JSON/correlation-aware formatter
+    `main.py::create_app` installs for the API process."""
+    monkeypatch.setattr("lifeflow_api.worker_app.get_settings", lambda: _test_settings("test"))
+    called_with: list[str] = []
+    monkeypatch.setattr(
+        "lifeflow_api.worker_app.configure_logging", lambda level: called_with.append(level)
+    )
+    ctx: dict[str, object] = {}
+    await on_startup(ctx)
+    assert called_with == ["WARNING"]  # _test_settings sets log_level="WARNING"
+    await on_shutdown(ctx)
 
 
 async def test_dispatch_scheduled_briefs_delegates_to_dispatch_tick() -> None:
@@ -108,6 +137,48 @@ async def test_generate_scheduled_brief_delegates_to_run_scheduled_generation() 
         await engine.dispose()
 
 
+async def test_recover_stale_action_executions_delegates_to_the_sweep() -> None:
+    """Stage 9 Delivery Phase 5: the cron entry point actually reaches the
+    database and flips a genuinely stale `pending` row — not just that it
+    calls the pure function without error."""
+    engine = create_async_engine(TEST_DB_URL)
+    maker = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with maker() as session:
+            user, proposals = await _seed_proposals(session)
+            task = _proposal(proposals, ActionType.create_task)
+            service = _service(session, user)
+            await _approve(service, task, session=session, user=user)
+            execution = ActionExecution(
+                proposal_id=task.id,
+                idempotency_key="worker-wiring-stale-key",
+                approved_action_type=task.action_type,
+                approved_proposal_version=task.version,
+                executed_payload_json=task.payload_json,
+                executed_payload_hash=task.payload_hash,
+                approval_binding_hash=task.approved_binding_hash,
+                execution_mode="simulation",
+                outcome=ExecutionOutcome.pending,
+                started_at=NOW - STALE_PENDING_AGE - timedelta(minutes=5),
+            )
+            session.add(execution)
+            task.status = ProposalStatus.executing
+            await session.flush()
+            await session.commit()
+            user_id = user.id
+            task_id = task.id
+
+        ctx = {"sessionmaker": maker}
+        await recover_stale_action_executions(ctx)
+
+        async with maker() as session:
+            stored = await ActionExecutionRepository(session, user_id).get_by_proposal(task_id)
+            assert stored is not None
+            assert stored.outcome == ExecutionOutcome.uncertain
+    finally:
+        await engine.dispose()
+
+
 def test_worker_settings_uses_json_serialization_and_a_single_retry_authority() -> None:
     assert WorkerSettings.job_serializer is job_serializer
     assert WorkerSettings.job_deserializer is job_deserializer
@@ -117,8 +188,18 @@ def test_worker_settings_uses_json_serialization_and_a_single_retry_authority() 
     # daily memory-expiry cron on the same worker; no new queue.
     function_names = {getattr(fn, "__name__", "") for fn in WorkerSettings.functions}
     assert "recompute_user_memory" in function_names
+    # Stage 9 Delivery Phase 2 (ADR 0005) added the deletion-operation job and a
+    # per-minute deletion cron (retention scan + pending-drain + stale recovery)
+    # on the same worker; still no new queue.
+    assert "run_deletion_operation" in function_names
     cron_names = {job.name for job in WorkerSettings.cron_jobs}
-    assert cron_names == {"cron:dispatch_scheduled_briefs", "cron:expire_stale_memory"}
+    assert cron_names == {
+        "cron:dispatch_scheduled_briefs",
+        "cron:expire_stale_memory",
+        "cron:dispatch_deletion_operations",
+        # Stage 9 Delivery Phase 5: the stale-pending-execution recovery sweep.
+        "cron:recover_stale_action_executions",
+    }
 
 
 def test_job_serializer_round_trips_a_plain_identifier_payload() -> None:

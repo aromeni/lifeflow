@@ -21,6 +21,7 @@ from lifeflow_api.google.errors import IdTokenVerificationError
 from lifeflow_api.google.oauth import build_authorization_url, verify_id_token
 from lifeflow_api.models import User
 from lifeflow_api.oauth_state import OAuthStateError, begin_oauth_flow, consume_oauth_flow
+from lifeflow_api.rate_limit_deps import RateLimited
 from lifeflow_api.repositories import UserRepository
 
 logger = logging.getLogger(__name__)
@@ -42,7 +43,9 @@ class SessionResponse(BaseModel):
     email: str
 
 
-@router.post("/dev-login", response_model=SessionResponse)
+@router.post(
+    "/dev-login", response_model=SessionResponse, dependencies=[RateLimited("anonymous_auth")]
+)
 async def dev_login(request: Request, body: DevLoginRequest, session: DbSession) -> SessionResponse:
     if request.app.state.settings.environment != "development":
         # Indistinguishable from a route that does not exist.
@@ -77,7 +80,7 @@ async def dev_login(request: Request, body: DevLoginRequest, session: DbSession)
     return SessionResponse(user_id=str(user.id), email=user.email)
 
 
-@router.post("/logout", status_code=204)
+@router.post("/logout", status_code=204, dependencies=[RateLimited("preference_memory_write")])
 async def logout(request: Request, user: CurrentUser, session: DbSession) -> None:
     request.session.clear()
     record_audit_event(
@@ -95,7 +98,7 @@ def _google_oidc_disabled(request: Request) -> bool:
     return not settings.google_oauth_enabled or request.app.state.google_oauth_client is None
 
 
-@router.get("/google/login")
+@router.get("/google/login", dependencies=[RateLimited("anonymous_auth")])
 async def google_login(request: Request) -> RedirectResponse:
     if _google_oidc_disabled(request):
         # Indistinguishable from a route that does not exist, matching the
@@ -114,7 +117,7 @@ async def google_login(request: Request) -> RedirectResponse:
     return RedirectResponse(url=url, status_code=302)
 
 
-@router.get("/google/callback")
+@router.get("/google/callback", dependencies=[RateLimited("anonymous_auth")])
 async def google_callback(
     request: Request, session: DbSession, code: str | None = None, state: str | None = None
 ) -> RedirectResponse:

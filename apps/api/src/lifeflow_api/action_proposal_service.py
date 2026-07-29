@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -859,9 +860,68 @@ class ActionProposalService:
         return proposal, execution
 
 
+async def recover_stale_pending_executions(session: AsyncSession, *, now: datetime) -> int:
+    """Stage 9 Delivery Phase 5 (§10): proactively sweep every user's stale
+    `pending` `ActionExecution` rows, not just the one a caller happens to
+    re-`execute()` or read next.
+
+    Before this, a `pending` row older than `STALE_PENDING_AGE` was only
+    ever durably flipped to `uncertain` lazily — inside `execute()`'s own
+    re-entry guard (above), which only runs if *that specific* proposal is
+    acted on again — or displayed as `uncertain` without being persisted
+    (`effective_execution_status`, read-time only). A worker that crashed
+    right after committing the pending row (the durability checkpoint in
+    `execute()`, before the real executor call) and whose proposal nobody
+    ever revisits would leave that row `pending` in the database forever:
+    always correctly *reported* as uncertain on read, but never actually
+    resolved, and invisible to any operational sweep — unlike the durable
+    deletion engine's `recover_stale_operations` and the scheduled brief's
+    `recover_stale_running`, which both already have exactly this pattern.
+
+    Cross-user by necessity, like those two. Never touches `succeeded`,
+    `failed`, or already-`uncertain` rows, and never retries the underlying
+    write — flipping the stored outcome to `uncertain` is the same terminal
+    (for now), non-retryable state `execute()`'s own re-entry guard already
+    assigns; this only makes sure it happens even if nothing ever revisits
+    the proposal."""
+    cutoff = now - STALE_PENDING_AGE
+    stale = (
+        (
+            await session.execute(
+                select(ActionExecution, ActionProposal)
+                .join(ActionProposal, ActionExecution.proposal_id == ActionProposal.id)
+                .where(
+                    ActionExecution.outcome == ExecutionOutcome.pending,
+                    ActionExecution.started_at < cutoff,
+                )
+            )
+        )
+        .tuples()
+        .all()
+    )
+    for execution, proposal in stale:
+        execution.outcome = ExecutionOutcome.uncertain
+        record_audit_event(
+            session,
+            user_id=proposal.user_id,
+            actor="system:executor",
+            event_type="execution.uncertain",
+            entity_type="action_proposal",
+            entity_id=str(proposal.id),
+            metadata={
+                "action_type": proposal.action_type,
+                "execution_id": str(execution.id),
+                "reason_code": "stale_pending_attempt",
+            },
+        )
+    await session.commit()
+    return len(stale)
+
+
 __all__ = [
     "ActionProposalService",
     "PostCommitHook",
     "ProposalConflictError",
     "ProposalGenerationSummary",
+    "recover_stale_pending_executions",
 ]

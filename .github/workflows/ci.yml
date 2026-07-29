@@ -100,22 +100,7 @@ jobs:
   e2e:
     name: E2E — demo journey (Playwright)
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: lifeflow
-          POSTGRES_PASSWORD: lifeflow # pragma: allowlist secret
-          POSTGRES_DB: lifeflow
-        ports:
-          - 5433:5432
-        options: >-
-          --health-cmd "pg_isready -U lifeflow -d lifeflow"
-          --health-interval 5s
-          --health-timeout 3s
-          --health-retries 10
-    env:
-      DATABASE_URL: postgresql+asyncpg://lifeflow:lifeflow@localhost:5433/lifeflow # pragma: allowlist secret
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
@@ -130,6 +115,58 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: cd apps/api && uv sync --locked
-      - run: cd apps/api && uv run alembic upgrade head
       - run: pnpm --filter @lifeflow/web exec playwright install chromium --with-deps
-      - run: pnpm web:e2e
+      # Runs via scripts/e2e.sh, not a raw `pnpm web:e2e` — this suite's
+      # deletion.spec.ts and audit-history.spec.ts journeys drive a real
+      # imported-data deletion through the real ARQ worker (never a mock),
+      # and rate-limiting.spec.ts needs a real Redis to observe throttling
+      # at all (Redis absence makes the limiter fail open by design — see
+      # ADR 0005 D64/D81 — so the journey has nothing to assert against). A
+      # CI-coverage audit during Stage 9 Final Integration found this job
+      # had never actually provisioned either dependency, undetected because
+      # this was the first pull request ever opened against this workflow.
+      - run: ./scripts/e2e.sh
+      - name: Upload Playwright trace/report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: apps/web/playwright-report/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  e2e-resilience:
+    name: E2E — outage resilience journeys (Playwright)
+    runs-on: ubuntu-latest
+    needs: e2e
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: cd apps/api && uv sync --locked
+      - run: pnpm --filter @lifeflow/web exec playwright install chromium --with-deps
+      # Runs against its own dedicated stack (a synthetic fake-Google server,
+      # never real Google credentials) and starts/stops its own PostgreSQL
+      # and Redis via docker compose — deliberately a separate job from `e2e`
+      # above (gated with `needs: e2e`) rather than a step in it, since
+      # Journey D stops/restarts the shared dependency containers and must
+      # never run concurrently with the other suite against shared state.
+      - run: ./scripts/e2e-resilience.sh
+      - name: Upload Playwright trace/report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-resilience-report
+          path: apps/web/playwright-report/
+          retention-days: 7
+          if-no-files-found: ignore

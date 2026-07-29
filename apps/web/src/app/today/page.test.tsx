@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, test, vi } from "vitest";
 
-import { ApiError } from "@/lib/api";
+import { ApiError, RateLimitError } from "@/lib/api";
 import type { Brief } from "@/lib/types";
 
 import TodayPage from "./page";
@@ -163,6 +163,27 @@ test("shows the honest degraded note when model assistance was unavailable", asy
   render(<TodayPage />);
   expect(await screen.findByText(/Optional model assistance was unavailable/)).toBeInTheDocument();
   expect(screen.getByText(/composed from deterministic signals and rules/)).toBeInTheDocument();
+});
+
+test("a rate-limited generation shows accessible retry guidance without losing the current brief", async () => {
+  apiMock.mockImplementation(async (path: string) => {
+    if (path === "/me") return me;
+    if (path === "/briefs/latest") return brief;
+    if (path === "/briefs/generate") {
+      throw new RateLimitError(42, "Too many requests. Try again later.");
+    }
+    throw new Error(`unexpected ${path}`);
+  });
+  render(<TodayPage />);
+  expect(await screen.findByText(/version 2/)).toBeInTheDocument();
+  await userEvent.setup().click(screen.getByRole("button", { name: "Generate brief" }));
+
+  const notice = await screen.findByTestId("rate-limit-notice");
+  expect(notice).toHaveAttribute("role", "alert");
+  expect(notice).toHaveTextContent(/Try again in about 42 seconds/);
+  // The previously loaded brief is untouched — a 429 is not a load failure.
+  expect(screen.getByText(/version 2/)).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Generate brief" })).toBeEnabled();
 });
 
 test("redirects the signed-out visitor to the demo entry point", async () => {

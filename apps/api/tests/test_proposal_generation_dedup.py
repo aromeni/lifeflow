@@ -13,7 +13,7 @@ an older message's proposal sat in `executing` (uncertain execution),
 
 import uuid
 from collections.abc import AsyncIterator
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from httpx import AsyncClient
@@ -77,10 +77,12 @@ async def _user_with_synthetic_account(session: AsyncSession) -> User:
     return user
 
 
-async def _brief(session: AsyncSession, user: User, *, version: int) -> Brief:
+async def _brief(
+    session: AsyncSession, user: User, *, version: int, briefing_date: datetime = REFERENCE
+) -> Brief:
     brief = Brief(
         user_id=user.id,
-        briefing_date=REFERENCE,
+        briefing_date=briefing_date,
         version=version,
         status=BriefStatus.complete,
         summary="Dedup test brief",
@@ -148,13 +150,13 @@ class _UncertainExecutor:
 
 
 async def _make_uncertain(
-    session: AsyncSession, user: User, proposal: ActionProposal
+    session: AsyncSession, user: User, proposal: ActionProposal, *, now: datetime = REFERENCE
 ) -> ActionProposal:
     exec_service = ActionProposalService(
         session,
         user.id,
         executors=SimulatedExecutorRegistry({ActionType.create_gmail_draft: _UncertainExecutor()}),
-        now_factory=lambda: REFERENCE,
+        now_factory=lambda: now,
     )
     approved = await _approve(exec_service, proposal, session=session, user=user)
     _, execution = await exec_service.execute(approved.id)
@@ -407,7 +409,17 @@ async def test_approval_inbox_route_returns_the_new_proposal(
     """Requirement 7 + real Google-normalised SourceItem shape: the new
     proposal must actually surface through `GET /action-proposals`, not just
     exist in the database, and the existing uncertain one must still appear
-    unchanged alongside it."""
+    unchanged alongside it.
+
+    This is a route-level test: `GET /action-proposals` expires proposals
+    against the real wall clock (`ActionProposalService(session, user.id)`
+    is constructed with no `now_factory` in `action_proposals.py`), so per
+    the clock-control convention documented in `tests/helpers.py`, seeding
+    must use a live reference computed at test time, never the file's frozen
+    `REFERENCE` — otherwise the seeded proposal's `expires_at` (`reference +
+    PROPOSAL_TTL`) rots into the past as real time advances past it, and the
+    route observes it as `expired` instead of `proposed`."""
+    live_now = datetime.now(UTC)
     login = await dev_client.post(
         "/auth/dev-login",
         json={"email": f"route-dedup-{uuid.uuid4()}@example.com", "display_name": "Route Dedup"},
@@ -440,31 +452,31 @@ async def test_approval_inbox_route_returns_the_new_proposal(
         signal_a = _request_signal(user.id, source_a, dedupe_suffix="route-old", priority=0.9)
         session.add(source_a)
         await session.flush()
-        brief1 = await _brief(session, user, version=1)
+        brief1 = await _brief(session, user, version=1, briefing_date=live_now)
         await service.generate_from_brief(
             brief=brief1,
             signals=[signal_a],
             sources=[source_a],
             timezone=TIMEZONE,
-            reference=REFERENCE,
+            reference=live_now,
         )
         await session.commit()
 
         proposal_a = _draft_proposal(await ActionProposalRepository(session, user.id).list())
-        await _make_uncertain(session, user, proposal_a)
+        await _make_uncertain(session, user, proposal_a, now=live_now)
         await session.commit()
 
         source_b = _gmail_source(user.id, "gmail-route-new", thread_id="thread-new")
         signal_b = _request_signal(user.id, source_b, dedupe_suffix="route-new", priority=0.5)
         session.add(source_b)
         await session.flush()
-        brief2 = await _brief(session, user, version=2)
+        brief2 = await _brief(session, user, version=2, briefing_date=live_now)
         await service.generate_from_brief(
             brief=brief2,
             signals=[signal_a, signal_b],
             sources=[source_a, source_b],
             timezone=TIMEZONE,
-            reference=REFERENCE,
+            reference=live_now,
         )
         await session.commit()
     await engine.dispose()
@@ -478,6 +490,90 @@ async def test_approval_inbox_route_returns_the_new_proposal(
     assert new_proposal["status"] == "proposed"
     old_proposal = next(p for p in drafts if p["source_refs"] == ["gmail-route-old"])
     assert old_proposal["execution"]["effective_status"] == "uncertain"
+
+
+async def test_approval_inbox_route_expires_a_proposal_seeded_from_a_stale_reference(
+    dev_client: AsyncClient,
+) -> None:
+    """Regression for the historical-reference/route-clock mismatch fixed
+    above: `GET /action-proposals` must correctly expire a proposal whose
+    `expires_at` (`reference + PROPOSAL_TTL`) has passed relative to the real
+    wall clock, and must correctly leave a freshly-seeded proposal
+    `proposed` — proving the route's live-clock expiry check works in both
+    directions regardless of which real calendar date the suite runs on."""
+    live_now = datetime.now(UTC)
+    stale_reference = live_now - timedelta(days=30)
+
+    login = await dev_client.post(
+        "/auth/dev-login",
+        json={"email": f"route-staleref-{uuid.uuid4()}@example.com", "display_name": "Stale Ref"},
+        headers=CSRF_HEADERS,
+    )
+    assert login.status_code == 200
+    user_id = uuid.UUID(login.json()["user_id"])
+
+    engine = create_async_engine(TEST_DB_URL)
+    maker = async_sessionmaker(engine, expire_on_commit=False)
+    async with maker() as session:
+        user = await session.get(User, user_id)
+        assert user is not None
+        session.add(
+            ConnectedAccount(
+                user_id=user.id,
+                provider="synthetic",
+                encrypted_access_token=None,
+                encrypted_refresh_token=None,
+                granted_scopes=["demo"],
+                expires_at=None,
+                status=AccountStatus.active,
+                last_sync_at=None,
+            )
+        )
+        await session.flush()
+        service = ActionProposalService(session, user.id)
+
+        source_stale = _gmail_source(user.id, "gmail-staleref-old", thread_id="thread-stale")
+        signal_stale = _request_signal(
+            user.id, source_stale, dedupe_suffix="staleref-old", priority=0.9
+        )
+        session.add(source_stale)
+        await session.flush()
+        brief1 = await _brief(session, user, version=1, briefing_date=stale_reference)
+        await service.generate_from_brief(
+            brief=brief1,
+            signals=[signal_stale],
+            sources=[source_stale],
+            timezone=TIMEZONE,
+            reference=stale_reference,
+        )
+        await session.commit()
+
+        source_fresh = _gmail_source(user.id, "gmail-staleref-new", thread_id="thread-fresh")
+        signal_fresh = _request_signal(
+            user.id, source_fresh, dedupe_suffix="staleref-new", priority=0.5
+        )
+        session.add(source_fresh)
+        await session.flush()
+        brief2 = await _brief(session, user, version=2, briefing_date=live_now)
+        await service.generate_from_brief(
+            brief=brief2,
+            signals=[signal_stale, signal_fresh],
+            sources=[source_stale, source_fresh],
+            timezone=TIMEZONE,
+            reference=live_now,
+        )
+        await session.commit()
+    await engine.dispose()
+
+    listed = await dev_client.get("/action-proposals")
+    assert listed.status_code == 200
+    proposals = listed.json()["proposals"]
+    drafts = [p for p in proposals if p["action_type"] == "create_gmail_draft"]
+    assert len(drafts) == 2
+    stale_proposal = next(p for p in drafts if p["source_refs"] == ["gmail-staleref-old"])
+    assert stale_proposal["status"] == "expired"
+    fresh_proposal = next(p for p in drafts if p["source_refs"] == ["gmail-staleref-new"])
+    assert fresh_proposal["status"] == "proposed"
 
 
 async def test_uncertain_execution_is_never_retried_by_generation(session: AsyncSession) -> None:

@@ -8,3 +8,16 @@ description = "detect-secrets' own baseline file stores SHA-256 hashes of alread
 paths = [
     '''\.secrets\.baseline$''',
 ]
+# Exact-literal only, never a path or pattern exclusion: this is the fixed,
+# synthetic TOKEN_KEY value scripts/resilience-api-env.sh and
+# apps/api/scripts/e2e_google_support.py share (Stage 9 Delivery Phase 5,
+# ADR 0005 D92) so the dedicated resilience-journey API can decrypt what the
+# seed script encrypts. It is base64 of the literal ASCII string
+# "e2e-resilience-fake-token-key-32" — never derived from, or capable of
+# decrypting, anything real — flagged only because base64 encoding of a
+# readable phrase still looks like high entropy to a generic-secret rule.
+# A genuinely different (real) secret introduced anywhere else in the repo
+# does not match this exact string and is still caught.
+regexes = [
+    '''ZTJlLXJlc2lsaWVuY2UtZmFrZS10b2tlbi1rZXktMzI=''',
+]

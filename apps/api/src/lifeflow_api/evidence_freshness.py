@@ -19,6 +19,7 @@ from pydantic import BaseModel
 
 from lifeflow_api.deps import CurrentUser, DbSession
 from lifeflow_api.models import AccountStatus
+from lifeflow_api.rate_limit_deps import RateLimited
 from lifeflow_api.repositories import ConnectedAccountRepository
 
 router = APIRouter(prefix="/evidence-freshness")
@@ -54,7 +55,9 @@ def _freshness_band(last_synced_at: datetime, *, now: datetime) -> FreshnessBand
     return "stale"
 
 
-@router.get("", response_model=EvidenceFreshnessResponse)
+@router.get(
+    "", response_model=EvidenceFreshnessResponse, dependencies=[RateLimited("authenticated_read")]
+)
 async def get_evidence_freshness(
     user: CurrentUser, session: DbSession
 ) -> EvidenceFreshnessResponse:

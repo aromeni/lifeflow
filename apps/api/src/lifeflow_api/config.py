@@ -8,6 +8,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # `.env` lives at the repo root, but this module is imported with the process
@@ -67,6 +68,99 @@ class Settings(BaseSettings):
     # scheduled-brief status surface reports reduced capability, and no
     # scheduling happens without a running worker regardless.
     redis_url: str = "redis://localhost:6380/0"
+
+    # Stage 9 Delivery Phase 1 (ADR 0005): provisional product retention
+    # defaults, in days, surfaced read-only by the Privacy Centre. These are
+    # *product* defaults for the pilot, not claimed legal mandates, and are
+    # NOT yet enforced by any job — enforcement is Delivery Phase 2. Globally
+    # configured and validated here (positive integers); there is deliberately
+    # no per-user DataRetentionPolicy table at this stage. Two categories have
+    # no fixed horizon and are therefore not represented as day counts:
+    # Signals follow their supporting SourceItem's lifecycle, and
+    # pending/uncertain executions are never auto-deleted before reconciliation
+    # (both described in words by the Privacy Centre, never as a duration).
+    retention_source_items_days: int = Field(default=30, gt=0)
+    retention_brief_versions_days: int = Field(default=90, gt=0)
+    retention_unapproved_proposals_days: int = Field(default=90, gt=0)
+    retention_approved_terminal_days: int = Field(default=365, gt=0)
+    retention_scheduled_runs_days: int = Field(default=90, gt=0)
+    retention_memory_evidence_days: int = Field(default=90, gt=0)
+    retention_audit_tombstone_days: int = Field(default=365, gt=0)
+    retention_operational_logs_days: int = Field(default=30, gt=0)
+    retention_aggregated_metrics_days: int = Field(default=90, gt=0)
+
+    # Stage 9 Delivery Phase 2 (ADR 0005): the durable deletion engine. Bounded
+    # batch size so no single destructive transaction is unbounded (validated
+    # positive). Preview TTL after which a typed confirmation is refused.
+    # Heartbeat timeout after which a `running` operation is considered stale
+    # and recovered. Daily retention work is bounded (max operations enqueued
+    # per tick) so an initial rollout never triggers a multi-year backfill
+    # storm. Enforcement is opt-in per deployment exactly like the scheduler:
+    # the API (preview/confirm) is always available, but retention only runs
+    # when both a worker and this flag are active.
+    deletion_batch_size: int = Field(default=200, gt=0)
+    deletion_preview_ttl_minutes: int = Field(default=30, gt=0)
+    deletion_heartbeat_timeout_minutes: int = Field(default=10, gt=0)
+    deletion_max_attempts: int = Field(default=3, gt=0)
+    retention_enforcement_enabled: bool = False
+    retention_max_operations_per_tick: int = Field(default=50, gt=0)
+
+    # Stage 9 rate-limiting trusted-proxy allowlist (architecture approved in
+    # ADR 0005; thresholds and enforcement land in Delivery Phase 4). CIDRs
+    # whose immediate-peer proxy may set X-Forwarded-For. Empty (the default)
+    # means trust no forwarded headers — the direct peer IP is authoritative.
+    trusted_proxy_cidrs: str = ""
+
+    # Stage 9 Delivery Phase 4 (ADR 0005 D64): Redis-backed rate limiting.
+    # Off by default, matching every other Stage 8/9 feature flag (scheduled
+    # briefs, retention enforcement, LLM extraction, Google OAuth) — existing
+    # deployments and the whole test suite are unaffected until a deployment
+    # opts in. When enabled, requests are keyed by an HMAC digest (never a raw
+    # user id or IP) using this secret; production refuses to start with a
+    # missing or short secret, but development/test may leave it blank (an
+    # ephemeral secret is generated at startup, exactly like SESSION_SECRET).
+    rate_limiting_enabled: bool = False
+    rate_limit_key_secret: str = ""
+    rate_limit_redis_prefix: str = "ratelimit:v1"
+    # A JSON object of {policy_code: {"capacity": int, "refill_amount": int,
+    # "refill_window_seconds": int}} overriding individual registered
+    # policies' defaults (rate_limit_policy.py). Empty string means no
+    # overrides. Unknown policy codes or out-of-range numeric fields fail
+    # configuration validation at startup, never silently.
+    rate_limit_policy_overrides_json: str = ""
+    # A malformed/overlong X-Forwarded-For chain must not grant a caller a
+    # fresh identity — bounded so a pathological chain fails safely instead of
+    # being walked indefinitely.
+    rate_limit_max_forwarded_hops: int = Field(default=10, gt=0)
+    rate_limit_redis_timeout_seconds: float = Field(default=0.2, gt=0)
+
+    # Stage 9 Delivery Phase 5: central, validated timeout policy. Every
+    # network call in the app uses one of these — never a scattered magic
+    # number — so a deployment can tune them without hunting through call
+    # sites. Defaults are conservative pilot values, not tuned for scale.
+    google_connect_timeout_seconds: float = Field(default=5.0, gt=0)
+    google_read_timeout_seconds: float = Field(default=10.0, gt=0)
+    # Writes (Gmail draft creation, Calendar event insertion) get a longer
+    # budget than reads: they run once, only after explicit user approval,
+    # and an early local timeout on a write whose request Google may still
+    # process is exactly the "uncertain outcome" case this phase must handle
+    # correctly rather than avoid by racing a short clock.
+    google_write_timeout_seconds: float = Field(default=20.0, gt=0)
+    database_statement_timeout_seconds: float = Field(default=10.0, gt=0)
+    worker_health_check_timeout_seconds: float = Field(default=0.5, gt=0)
+
+    # Stage 9 Delivery Phase 5 (§20): the test-only provider-control boundary.
+    # Off by default like every other feature flag; `create_app` refuses to
+    # start if this is ever `true` in `environment=production` (belt-and-
+    # braces alongside the fact that no real deployment ever sets it). When
+    # `true`, `google_api_origin_override` (if non-empty) replaces the
+    # scheme+host+port every Google client talks to — never the path — so a
+    # local Playwright run can point the app at an in-process fake Google
+    # server instead of a real Google host. Both are ignored entirely
+    # (override never read) unless this flag is set, so setting the origin
+    # alone can never accidentally redirect real Google traffic.
+    e2e_test_controls_enabled: bool = False
+    google_api_origin_override: str = ""
 
 
 @lru_cache

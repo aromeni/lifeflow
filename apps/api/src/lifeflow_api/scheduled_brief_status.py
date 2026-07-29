@@ -14,12 +14,14 @@ from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
 from lifeflow_api.deps import CurrentUser, DbSession
+from lifeflow_api.health import check_redis
 from lifeflow_api.models import Brief
 from lifeflow_api.preferences import (
     BRIEFING_TIME_KEY,
     SCHEDULED_BRIEFS_ENABLED_KEY,
     resolved_preferences,
 )
+from lifeflow_api.rate_limit_deps import RateLimited
 from lifeflow_api.repositories import ScheduledBriefRunRepository
 from lifeflow_api.scheduled_briefs import next_expected_run
 
@@ -43,27 +45,11 @@ class ScheduledBriefStatusResponse(BaseModel):
     scheduler_available: bool
 
 
-async def _scheduler_capability_ready(redis_url: str) -> bool:
-    """A short-timeout, best-effort ping — never allowed to hang the API,
-    and never raised past this function (Redis being down must not break
-    ordinary routes)."""
-    try:
-        import redis.asyncio as aioredis
-
-        client: aioredis.Redis = aioredis.from_url(  # type: ignore[no-untyped-call]
-            redis_url, socket_connect_timeout=0.5, socket_timeout=0.5
-        )
-    except Exception:
-        return False
-    try:
-        return bool(await client.ping())
-    except Exception:
-        return False
-    finally:
-        await client.aclose()
-
-
-@router.get("/status", response_model=ScheduledBriefStatusResponse)
+@router.get(
+    "/status",
+    response_model=ScheduledBriefStatusResponse,
+    dependencies=[RateLimited("authenticated_read")],
+)
 async def get_scheduled_brief_status(
     request: Request, user: CurrentUser, session: DbSession
 ) -> ScheduledBriefStatusResponse:
@@ -94,7 +80,10 @@ async def get_scheduled_brief_status(
     # never the process-wide `get_settings()` cache — the two can differ
     # (e.g. per-test app instances), and this must reflect the app actually
     # serving the request.
-    scheduler_available = await _scheduler_capability_ready(request.app.state.settings.redis_url)
+    settings = request.app.state.settings
+    scheduler_available = await check_redis(
+        settings.redis_url, timeout_seconds=settings.worker_health_check_timeout_seconds
+    )
 
     return ScheduledBriefStatusResponse(
         enabled=enabled,

@@ -15,10 +15,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from lifeflow_api.audit import record_audit_event
 from lifeflow_api.execution_context import ApprovedExecutionContextChangedError
+from lifeflow_api.failure_taxonomy import classify_exception
 from lifeflow_api.google.errors import InvalidGrantError
-from lifeflow_api.google.oauth import GoogleOAuthClient
+from lifeflow_api.google.oauth import GoogleOAuthClient, GoogleTokenResponse
 from lifeflow_api.models import AccountStatus, ConnectedAccount
 from lifeflow_api.repositories import ConnectedAccountRepository
+from lifeflow_api.retry import retry_read
 from lifeflow_api.security.token_cipher import TokenCipher
 
 REFRESH_SAFETY_MARGIN = timedelta(minutes=2)
@@ -249,10 +251,25 @@ class GoogleTokenService:
             raise ReauthorisationRequiredError(f"No refresh token stored for {provider}.")
         refresh_token = self._cipher.decrypt(account.encrypted_refresh_token)
         try:
-            token_response = await self._oauth.refresh_access_token(
-                client_id=self._client_id,
-                client_secret=self._client_secret,
-                refresh_token=refresh_token,
+
+            async def _refresh() -> GoogleTokenResponse:
+                return await self._oauth.refresh_access_token(
+                    client_id=self._client_id,
+                    client_secret=self._client_secret,
+                    refresh_token=refresh_token,
+                )
+
+            # Stage 9 Delivery Phase 5: OAuth token refresh is safe to retry
+            # a bounded number of times — it is idempotent by the OAuth 2.0
+            # refresh-grant contract (RFC 6749 §6): each call either returns
+            # a fresh access token or fails, never a duplicate side effect.
+            # A retryable failure here (`GoogleTransientError`) is
+            # classified by `failure_taxonomy`, exactly like every other
+            # Google call; `InvalidGrantError` below is untouched and never
+            # retried (the refresh token itself is rejected, not transient).
+            token_response = await retry_read(
+                _refresh,
+                is_retryable=lambda exc: classify_exception(exc).retryable,
             )
         except InvalidGrantError as exc:
             account.status = AccountStatus.revoked

@@ -42,6 +42,7 @@ from lifeflow_api.preferences import (
     memory_inference_enabled,
     validate_preference_value,
 )
+from lifeflow_api.rate_limit_deps import RateLimited
 from lifeflow_api.repositories import (
     MemoryEvidenceRepository,
     MemoryItemRepository,
@@ -325,7 +326,7 @@ class MemoryService:
         return count
 
 
-@router.get("", response_model=MemoryListResponse)
+@router.get("", response_model=MemoryListResponse, dependencies=[RateLimited("authenticated_read")])
 async def list_memories(user: CurrentUser, session: DbSession) -> MemoryListResponse:
     now = datetime.now(UTC)
     # Expire decayed candidates on read (like the proposals list expires due
@@ -358,7 +359,9 @@ async def _item_response(
     return _to_view(item, evidence, explicit_value=explicit_value, now=datetime.now(UTC))
 
 
-@router.get("/{memory_id}", response_model=MemoryItemView)
+@router.get(
+    "/{memory_id}", response_model=MemoryItemView, dependencies=[RateLimited("authenticated_read")]
+)
 async def get_memory(
     memory_id: uuid.UUID, user: CurrentUser, session: DbSession
 ) -> MemoryItemView | JSONResponse:
@@ -369,7 +372,11 @@ async def get_memory(
     return await _item_response(session, user.id, item)
 
 
-@router.post("/{memory_id}/confirm", response_model=MemoryItemView)
+@router.post(
+    "/{memory_id}/confirm",
+    response_model=MemoryItemView,
+    dependencies=[RateLimited("preference_memory_write")],
+)
 async def confirm_memory(
     memory_id: uuid.UUID, body: MemoryVersionRequest, user: CurrentUser, session: DbSession
 ) -> MemoryItemView | JSONResponse:
@@ -382,7 +389,11 @@ async def confirm_memory(
     return await _item_response(session, user.id, item)
 
 
-@router.put("/{memory_id}", response_model=MemoryItemView)
+@router.put(
+    "/{memory_id}",
+    response_model=MemoryItemView,
+    dependencies=[RateLimited("preference_memory_write")],
+)
 async def edit_memory(
     memory_id: uuid.UUID, body: MemoryEditRequest, user: CurrentUser, session: DbSession
 ) -> MemoryItemView | JSONResponse:
@@ -397,7 +408,11 @@ async def edit_memory(
     return await _item_response(session, user.id, item)
 
 
-@router.post("/{memory_id}/dismiss", response_model=MemoryItemView)
+@router.post(
+    "/{memory_id}/dismiss",
+    response_model=MemoryItemView,
+    dependencies=[RateLimited("preference_memory_write")],
+)
 async def dismiss_memory(
     memory_id: uuid.UUID, body: MemoryVersionRequest, user: CurrentUser, session: DbSession
 ) -> MemoryItemView | JSONResponse:
@@ -410,7 +425,7 @@ async def dismiss_memory(
     return await _item_response(session, user.id, item)
 
 
-@router.delete("/{memory_id}")
+@router.delete("/{memory_id}", dependencies=[RateLimited("preference_memory_write")])
 async def delete_memory(
     memory_id: uuid.UUID, user: CurrentUser, session: DbSession
 ) -> JSONResponse:
@@ -421,7 +436,7 @@ async def delete_memory(
     return JSONResponse(status_code=200, content={"deleted": 1})
 
 
-@router.delete("")
+@router.delete("", dependencies=[RateLimited("preference_memory_write")])
 async def delete_all_memories(user: CurrentUser, session: DbSession) -> JSONResponse:
     count = await MemoryService(session, user.id).delete_all()
     return JSONResponse(status_code=200, content={"deleted": count})

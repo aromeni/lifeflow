@@ -8,10 +8,11 @@ append-only by construction — it exposes no update or delete.
 
 import builtins
 import uuid
+from collections.abc import Collection
 from datetime import date, datetime
 from typing import Any, cast
 
-from sqlalchemy import CursorResult, delete, func, select
+from sqlalchemy import CursorResult, and_, delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from lifeflow_api.models import (
@@ -527,7 +528,11 @@ class MemoryEvidenceRepository:
 
 
 class AuditEventRepository:
-    """Append-only: intentionally no update or delete methods (T18)."""
+    """Append-only writes plus owner-scoped read projections (T18).
+
+    `list_history_page` is read-only: the repository still intentionally
+    exposes no update or delete methods.
+    """
 
     def __init__(self, session: AsyncSession, user_id: uuid.UUID) -> None:
         self._session = session
@@ -559,5 +564,45 @@ class AuditEventRepository:
             )
             .order_by(AuditEvent.timestamp, AuditEvent.id)
             .limit(limit)
+        )
+        return list(result.scalars())
+
+    async def list_history_page(
+        self,
+        *,
+        event_types: Collection[str],
+        not_before: datetime | None,
+        not_after: datetime,
+        before: tuple[datetime, uuid.UUID] | None,
+        limit: int,
+    ) -> builtins.list[AuditEvent]:
+        """Read one stable reverse-chronological keyset page.
+
+        The event-type allowlist is supplied by the closed presentation
+        registry. Unknown events are excluded before rendering, and every
+        branch remains scoped to this repository's owner.
+        """
+        if not event_types:
+            return []
+        query = select(AuditEvent).where(
+            AuditEvent.user_id == self._user_id,
+            AuditEvent.event_type.in_(event_types),
+            AuditEvent.timestamp <= not_after,
+        )
+        if not_before is not None:
+            query = query.where(AuditEvent.timestamp >= not_before)
+        if before is not None:
+            before_timestamp, before_id = before
+            query = query.where(
+                or_(
+                    AuditEvent.timestamp < before_timestamp,
+                    and_(
+                        AuditEvent.timestamp == before_timestamp,
+                        AuditEvent.id < before_id,
+                    ),
+                )
+            )
+        result = await self._session.execute(
+            query.order_by(AuditEvent.timestamp.desc(), AuditEvent.id.desc()).limit(limit)
         )
         return list(result.scalars())

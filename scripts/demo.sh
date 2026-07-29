@@ -12,7 +12,7 @@ echo "→ Applying migrations..."
 (cd apps/api && uv run alembic upgrade head)
 
 echo "→ Starting API (http://localhost:8010) and web (http://localhost:3000)..."
-(cd apps/api && uv run uvicorn --app-dir src lifeflow_api.main:app --port 8010) &
+(cd apps/api && uv run uvicorn --app-dir src lifeflow_api.main:app --port 8010 --forwarded-allow-ips="") &
 API_PID=$!
 pnpm web:dev &
 WEB_PID=$!

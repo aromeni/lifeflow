@@ -17,12 +17,22 @@ import json
 from datetime import UTC, datetime
 
 from lifeflow_api.connectors.interfaces import CalendarEvent
-from lifeflow_api.google.calendar_client import CalendarEventClient, CalendarEventSummary
+from lifeflow_api.failure_taxonomy import classify_exception
+from lifeflow_api.google.calendar_client import (
+    CalendarEventClient,
+    CalendarEventsPage,
+    CalendarEventSummary,
+)
 from lifeflow_api.google.errors import GoogleClientError, GoogleSyncTokenExpiredError
 from lifeflow_api.google_sync_cursor import GoogleSyncCursor, decode_window, encode_window
+from lifeflow_api.retry import retry_read
 
 _MAX_PAGES = 10
 _PAGE_SIZE = 100
+
+
+def _is_retryable(exc: BaseException) -> bool:
+    return classify_exception(exc).retryable
 
 
 def _to_calendar_event(summary: CalendarEventSummary) -> CalendarEvent | None:
@@ -156,14 +166,18 @@ class GoogleCalendarConnector:
         final_sync_token: str | None = None
         completed = False
         for _ in range(_MAX_PAGES):
-            page = await self._client.list_events(
-                access_token=self._access_token,
-                time_min=None,
-                time_max=None,
-                sync_token=None if current_page_token else base_sync_token,
-                page_token=current_page_token,
-                max_results=_PAGE_SIZE,
-            )
+
+            async def _fetch_page(token: str | None = current_page_token) -> CalendarEventsPage:
+                return await self._client.list_events(
+                    access_token=self._access_token,
+                    time_min=None,
+                    time_max=None,
+                    sync_token=None if token else base_sync_token,
+                    page_token=token,
+                    max_results=_PAGE_SIZE,
+                )
+
+            page = await retry_read(_fetch_page, is_retryable=_is_retryable)
             summaries.extend(page.events)
             current_page_token = page.next_page_token
             if not current_page_token:
@@ -195,14 +209,18 @@ class GoogleCalendarConnector:
         final_sync_token: str | None = None
         completed = False
         for _ in range(_MAX_PAGES):
-            page = await self._client.list_events(
-                access_token=self._access_token,
-                time_min=since,
-                time_max=until,
-                sync_token=None,
-                page_token=current_page_token,
-                max_results=_PAGE_SIZE,
-            )
+
+            async def _fetch_page(token: str | None = current_page_token) -> CalendarEventsPage:
+                return await self._client.list_events(
+                    access_token=self._access_token,
+                    time_min=since,
+                    time_max=until,
+                    sync_token=None,
+                    page_token=token,
+                    max_results=_PAGE_SIZE,
+                )
+
+            page = await retry_read(_fetch_page, is_retryable=_is_retryable)
             summaries.extend(page.events)
             current_page_token = page.next_page_token
             if not current_page_token:

@@ -334,6 +334,171 @@
         "title": "ApprovalPreview",
         "type": "object"
       },
+      "AuditHistoryActor": {
+        "enum": [
+          "you",
+          "lifeflow"
+        ],
+        "title": "AuditHistoryActor",
+        "type": "string"
+      },
+      "AuditHistoryCategory": {
+        "enum": [
+          "all",
+          "actions",
+          "briefs",
+          "connections",
+          "privacy",
+          "preferences",
+          "account"
+        ],
+        "title": "AuditHistoryCategory",
+        "type": "string"
+      },
+      "AuditHistoryItem": {
+        "properties": {
+          "action_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action Type"
+          },
+          "actor": {
+            "$ref": "#/components/schemas/AuditHistoryActor"
+          },
+          "category": {
+            "$ref": "#/components/schemas/AuditHistoryCategory"
+          },
+          "deleted_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deleted Count"
+          },
+          "failed_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failed Count"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "occurred_at": {
+            "format": "date-time",
+            "title": "Occurred At",
+            "type": "string"
+          },
+          "preserved_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preserved Count"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "tone": {
+            "$ref": "#/components/schemas/AuditHistoryTone"
+          }
+        },
+        "required": [
+          "id",
+          "occurred_at",
+          "category",
+          "actor",
+          "title",
+          "summary",
+          "tone"
+        ],
+        "title": "AuditHistoryItem",
+        "type": "object"
+      },
+      "AuditHistoryPeriod": {
+        "enum": [
+          "7d",
+          "30d",
+          "90d",
+          "all"
+        ],
+        "title": "AuditHistoryPeriod",
+        "type": "string"
+      },
+      "AuditHistoryResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AuditHistoryItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "AuditHistoryResponse",
+        "type": "object"
+      },
+      "AuditHistoryTone": {
+        "enum": [
+          "neutral",
+          "success",
+          "warning",
+          "failure"
+        ],
+        "title": "AuditHistoryTone",
+        "type": "string"
+      },
       "BriefEvidence": {
         "additionalProperties": false,
         "properties": {
@@ -758,6 +923,24 @@
         "title": "CalendarEventCreatePayload",
         "type": "object"
       },
+      "ConfirmRequest": {
+        "properties": {
+          "confirmation_phrase": {
+            "title": "Confirmation Phrase",
+            "type": "string"
+          },
+          "expected_version": {
+            "title": "Expected Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "expected_version",
+          "confirmation_phrase"
+        ],
+        "title": "ConfirmRequest",
+        "type": "object"
+      },
       "ConnectedAccountView": {
         "properties": {
           "granted_scopes": {
@@ -810,6 +993,259 @@
           "accounts"
         ],
         "title": "ConnectedAccountsResponse",
+        "type": "object"
+      },
+      "ConnectionSummaryView": {
+        "properties": {
+          "account_id": {
+            "title": "Account Id",
+            "type": "string"
+          },
+          "can_disconnect": {
+            "title": "Can Disconnect",
+            "type": "boolean"
+          },
+          "can_reconnect": {
+            "title": "Can Reconnect",
+            "type": "boolean"
+          },
+          "connected": {
+            "title": "Connected",
+            "type": "boolean"
+          },
+          "ever_synced": {
+            "title": "Ever Synced",
+            "type": "boolean"
+          },
+          "freshness_band": {
+            "anyOf": [
+              {
+                "enum": [
+                  "fresh",
+                  "aging",
+                  "stale"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Freshness Band"
+          },
+          "granted_scopes": {
+            "items": {
+              "$ref": "#/components/schemas/GrantedScopeView"
+            },
+            "title": "Granted Scopes",
+            "type": "array"
+          },
+          "last_synced_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Synced At"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "account_id",
+          "provider",
+          "status",
+          "connected",
+          "granted_scopes",
+          "last_synced_at",
+          "freshness_band",
+          "ever_synced",
+          "can_disconnect",
+          "can_reconnect"
+        ],
+        "title": "ConnectionSummaryView",
+        "type": "object"
+      },
+      "DeletionOperationView": {
+        "properties": {
+          "completed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "confirmation_phrase": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmation Phrase"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "deleted_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Deleted Counts",
+            "type": "object"
+          },
+          "in_progress": {
+            "title": "In Progress",
+            "type": "boolean"
+          },
+          "is_terminal": {
+            "title": "Is Terminal",
+            "type": "boolean"
+          },
+          "operation_id": {
+            "title": "Operation Id",
+            "type": "string"
+          },
+          "operation_type": {
+            "title": "Operation Type",
+            "type": "string"
+          },
+          "preserved_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Preserved Counts",
+            "type": "object"
+          },
+          "preview_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Preview Counts",
+            "type": "object"
+          },
+          "preview_expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preview Expires At"
+          },
+          "requester_type": {
+            "title": "Requester Type",
+            "type": "string"
+          },
+          "safe_error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Safe Error Code"
+          },
+          "scope_label": {
+            "title": "Scope Label",
+            "type": "string"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "operation_id",
+          "operation_type",
+          "scope_label",
+          "state",
+          "version",
+          "requester_type",
+          "confirmation_phrase",
+          "preview_expires_at",
+          "preview_counts",
+          "preserved_counts",
+          "deleted_counts",
+          "warnings",
+          "is_terminal",
+          "in_progress",
+          "safe_error_code",
+          "created_at",
+          "started_at",
+          "completed_at"
+        ],
+        "title": "DeletionOperationView",
+        "type": "object"
+      },
+      "DeletionOperationsResponse": {
+        "properties": {
+          "operations": {
+            "items": {
+              "$ref": "#/components/schemas/DeletionOperationView"
+            },
+            "title": "Operations",
+            "type": "array"
+          }
+        },
+        "required": [
+          "operations"
+        ],
+        "title": "DeletionOperationsResponse",
         "type": "object"
       },
       "DemoStartResponse": {
@@ -1132,6 +1568,24 @@
         "title": "GoogleSyncResponse",
         "type": "object"
       },
+      "GrantedScopeView": {
+        "properties": {
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "scope": {
+            "title": "Scope",
+            "type": "string"
+          }
+        },
+        "required": [
+          "scope",
+          "label"
+        ],
+        "title": "GrantedScopeView",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -1156,6 +1610,75 @@
           "status"
         ],
         "title": "HealthStatus",
+        "type": "object"
+      },
+      "InventoryView": {
+        "description": "Owner-scoped counts only \u2014 never any stored content.",
+        "properties": {
+          "action_executions": {
+            "title": "Action Executions",
+            "type": "integer"
+          },
+          "action_proposals": {
+            "title": "Action Proposals",
+            "type": "integer"
+          },
+          "audit_events": {
+            "title": "Audit Events",
+            "type": "integer"
+          },
+          "brief_versions": {
+            "title": "Brief Versions",
+            "type": "integer"
+          },
+          "briefs": {
+            "title": "Briefs",
+            "type": "integer"
+          },
+          "connected_accounts": {
+            "title": "Connected Accounts",
+            "type": "integer"
+          },
+          "memory_evidence": {
+            "title": "Memory Evidence",
+            "type": "integer"
+          },
+          "memory_items": {
+            "title": "Memory Items",
+            "type": "integer"
+          },
+          "preferences": {
+            "title": "Preferences",
+            "type": "integer"
+          },
+          "scheduled_brief_runs": {
+            "title": "Scheduled Brief Runs",
+            "type": "integer"
+          },
+          "signals": {
+            "title": "Signals",
+            "type": "integer"
+          },
+          "source_items": {
+            "title": "Source Items",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "connected_accounts",
+          "source_items",
+          "signals",
+          "briefs",
+          "brief_versions",
+          "action_proposals",
+          "action_executions",
+          "scheduled_brief_runs",
+          "preferences",
+          "memory_items",
+          "memory_evidence",
+          "audit_events"
+        ],
+        "title": "InventoryView",
         "type": "object"
       },
       "MeResponse": {
@@ -1579,6 +2102,30 @@
         "title": "PreferencesResponse",
         "type": "object"
       },
+      "PrivacySummaryResponse": {
+        "properties": {
+          "connections": {
+            "items": {
+              "$ref": "#/components/schemas/ConnectionSummaryView"
+            },
+            "title": "Connections",
+            "type": "array"
+          },
+          "inventory": {
+            "$ref": "#/components/schemas/InventoryView"
+          },
+          "retention": {
+            "$ref": "#/components/schemas/RetentionView"
+          }
+        },
+        "required": [
+          "connections",
+          "inventory",
+          "retention"
+        ],
+        "title": "PrivacySummaryResponse",
+        "type": "object"
+      },
       "ProposalApprovalRequest": {
         "additionalProperties": false,
         "properties": {
@@ -1780,6 +2327,96 @@
           "google_oauth_enabled"
         ],
         "title": "PublicConfig",
+        "type": "object"
+      },
+      "ReadyStatus": {
+        "properties": {
+          "degraded_dependencies": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Degraded Dependencies",
+            "type": "array"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "ReadyStatus",
+        "type": "object"
+      },
+      "RetentionClassView": {
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "enforced": {
+            "title": "Enforced",
+            "type": "boolean"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "retention_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retention Days"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "description",
+          "retention_days",
+          "enforced"
+        ],
+        "title": "RetentionClassView",
+        "type": "object"
+      },
+      "RetentionView": {
+        "properties": {
+          "classes": {
+            "items": {
+              "$ref": "#/components/schemas/RetentionClassView"
+            },
+            "title": "Classes",
+            "type": "array"
+          },
+          "enforcement_active": {
+            "title": "Enforcement Active",
+            "type": "boolean"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "enforcement_active",
+          "classes",
+          "notes"
+        ],
+        "title": "RetentionView",
         "type": "object"
       },
       "RiskLevel": {
@@ -2488,6 +3125,85 @@
           }
         },
         "summary": "Reject Action Proposal"
+      }
+    },
+    "/audit-history": {
+      "get": {
+        "description": "Return a read-only, privacy-reviewed projection of the owner's log.",
+        "operationId": "list_audit_history_audit_history_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "category",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/AuditHistoryCategory",
+              "default": "all"
+            }
+          },
+          {
+            "in": "query",
+            "name": "period",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/AuditHistoryPeriod",
+              "default": "7d"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 50,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 1024,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditHistoryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Audit History"
       }
     },
     "/auth/dev-login": {
@@ -3239,6 +3955,22 @@
         "summary": "Dismiss Memory"
       }
     },
+    "/metrics": {
+      "get": {
+        "operationId": "metrics_metrics_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Metrics"
+      }
+    },
     "/preferences": {
       "get": {
         "operationId": "list_preferences_preferences_get",
@@ -3306,6 +4038,230 @@
         "summary": "Set Preference"
       }
     },
+    "/privacy/account-deletion/preview": {
+      "post": {
+        "operationId": "preview_account_deletion_privacy_account_deletion_preview_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletionOperationView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Preview Account Deletion"
+      }
+    },
+    "/privacy/deletion-operations": {
+      "get": {
+        "operationId": "list_deletion_operations_privacy_deletion_operations_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletionOperationsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Deletion Operations"
+      }
+    },
+    "/privacy/deletion-operations/{operation_id}": {
+      "get": {
+        "operationId": "get_deletion_operation_privacy_deletion_operations__operation_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "operation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Operation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletionOperationView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Deletion Operation"
+      }
+    },
+    "/privacy/deletion-operations/{operation_id}/cancel": {
+      "post": {
+        "operationId": "cancel_deletion_operation_privacy_deletion_operations__operation_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "operation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Operation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletionOperationView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel Deletion Operation"
+      }
+    },
+    "/privacy/deletion-operations/{operation_id}/confirm": {
+      "post": {
+        "operationId": "confirm_deletion_operation_privacy_deletion_operations__operation_id__confirm_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "operation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Operation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletionOperationView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Confirm Deletion Operation"
+      }
+    },
+    "/privacy/imported-data/{account_id}/preview": {
+      "post": {
+        "operationId": "preview_imported_data_deletion_privacy_imported_data__account_id__preview_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Account Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletionOperationView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Imported Data Deletion"
+      }
+    },
+    "/privacy/summary": {
+      "get": {
+        "operationId": "get_privacy_summary_privacy_summary_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivacySummaryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Privacy Summary"
+      }
+    },
     "/ready": {
       "get": {
         "operationId": "ready_ready_get",
@@ -3314,14 +4270,14 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HealthStatus"
+                  "$ref": "#/components/schemas/ReadyStatus"
                 }
               }
             },
             "description": "Successful Response"
           },
           "503": {
-            "description": "A dependency is unavailable"
+            "description": "A required dependency is unavailable"
           }
         },
         "summary": "Ready"

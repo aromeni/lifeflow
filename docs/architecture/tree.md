@@ -8,8 +8,15 @@ lifeflow-ai/
 │   ├── web/                 # Next.js frontend: all screens, routes, and UI components.
 │   │                        # Client code only — no business logic; talks to the API via generated contracts.
 │   │                        # e2e/ holds Playwright journeys (run via scripts/e2e.sh); unit tests sit beside components.
+│   │                        # e2e-resilience/ holds the Stage 9 Delivery Phase 5 outage
+│   │                        # journeys (run via scripts/e2e-resilience.sh, a separate
+│   │                        # dedicated stack — never run alongside scripts/e2e.sh).
 │   └── api/                 # FastAPI backend: domain models, services, policy engine, executors, audit.
 │                            # ALL business logic lives here, behind connector/LLM interfaces.
+│                            # src/lifeflow_api/testing/ is test-only fault-injection
+│                            # infrastructure (the fake Google server) — never imported
+│                            # by the production app, refuses to start without an
+│                            # explicit env marker, never reachable in production.
 ├── packages/
 │   └── contracts/           # OpenAPI-generated TypeScript types shared between web and api.
 │                            # Generated output only — never hand-edit; regenerate from the API schema.
@@ -28,7 +35,9 @@ lifeflow-ai/
 │   ├── product/             # Vision, personas, journeys, MVP scope, wireframes.
 │   ├── architecture/        # System context, this tree, and adr/ (numbered decision records).
 │   ├── security/            # Threat model and security reviews.
-│   └── delivery/            # Stage plan, assumptions/decisions log.
+│   └── delivery/            # Stage plan, assumptions/decisions log, and
+│                            # runbooks/ (operational: outage response,
+│                            # provider failure, worker recovery, health).
 ├── .github/workflows/       # CI pipelines — mirror the local commands exactly, never diverge.
 ├── docker-compose.yml       # Local development stack (PostgreSQL now; Redis when Stage 8 needs it).
 ├── CLAUDE.md                # Repository operating instructions for AI sessions: commands, boundaries, rules.

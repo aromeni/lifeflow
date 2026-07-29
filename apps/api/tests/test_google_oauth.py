@@ -24,6 +24,7 @@ from lifeflow_api.google.oauth import (
     generate_state,
     verify_id_token,
 )
+from lifeflow_api.metrics import REGISTRY
 from lifeflow_api.oauth_state import OAuthStateError, begin_oauth_flow, consume_oauth_flow
 
 
@@ -196,6 +197,53 @@ async def test_other_definitive_4xx_without_error_code_raises_google_client_erro
             client_id="cid", client_secret="csecret", refresh_token="whatever"
         )
     assert exc.value.status_code == 400
+
+
+def _oauth_requests_value(outcome: str) -> float:
+    return (
+        REGISTRY.get_sample_value(
+            "lifeflow_provider_requests_total",
+            {
+                "provider": "google_oauth",
+                "operation": "refresh_access_token",
+                "outcome": outcome,
+            },
+        )
+        or 0.0
+    )
+
+
+async def test_successful_refresh_emits_a_success_request_metric() -> None:
+    """Stage 9 Delivery Phase 5 (§14/§18 item 36): token refresh is the one
+    OAuth call classified as a provider operation for metrics purposes."""
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"access_token": "a", "expires_in": 3600, "scope": "s"})
+
+    client = GoogleOAuthClient(_mock_client(httpx.MockTransport(handle)))
+    before = _oauth_requests_value("success")
+
+    await client.refresh_access_token(client_id="cid", client_secret="csecret", refresh_token="r")
+
+    assert _oauth_requests_value("success") == before + 1
+
+
+async def test_revoked_grant_is_a_distinct_metric_outcome_not_unknown_error() -> None:
+    """A revoked refresh token is an expected, well-understood condition —
+    it must not be lumped into the catch-all `unknown_error` bucket."""
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(400, json={"error": "invalid_grant"})
+
+    client = GoogleOAuthClient(_mock_client(httpx.MockTransport(handle)))
+    before = _oauth_requests_value("grant_invalid")
+
+    with pytest.raises(InvalidGrantError):
+        await client.refresh_access_token(
+            client_id="cid", client_secret="csecret", refresh_token="revoked"
+        )
+
+    assert _oauth_requests_value("grant_invalid") == before + 1
 
 
 async def test_revoke_is_best_effort_and_never_raises() -> None:

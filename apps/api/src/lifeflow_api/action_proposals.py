@@ -20,7 +20,7 @@ from lifeflow_api.action_proposal_service import (
     ProposalConflictError,
     effective_execution_status,
 )
-from lifeflow_api.deps import CurrentUser, DbSession
+from lifeflow_api.deps import ActiveUser, CurrentUser, DbSession
 from lifeflow_api.errors import error_response
 from lifeflow_api.execution_context import (
     ExecutionContext,
@@ -41,6 +41,7 @@ from lifeflow_api.models import (
     SourceType,
 )
 from lifeflow_api.preferences import memory_inference_enabled
+from lifeflow_api.rate_limit_deps import RateLimited
 from lifeflow_api.repositories import (
     ActionExecutionRepository,
     ActionProposalRepository,
@@ -340,7 +341,9 @@ def _conflict_response(exc: ProposalConflictError) -> JSONResponse:
     return error_response(status_code, exc.code, exc.message)
 
 
-@router.get("", response_model=ActionProposalListResponse)
+@router.get(
+    "", response_model=ActionProposalListResponse, dependencies=[RateLimited("authenticated_read")]
+)
 async def list_action_proposals(
     user: CurrentUser,
     session: DbSession,
@@ -356,7 +359,11 @@ async def list_action_proposals(
     return ActionProposalListResponse(proposals=responses, count=len(responses))
 
 
-@router.get("/{proposal_id}", response_model=ActionProposalResponse)
+@router.get(
+    "/{proposal_id}",
+    response_model=ActionProposalResponse,
+    dependencies=[RateLimited("authenticated_read")],
+)
 async def get_action_proposal(
     proposal_id: uuid.UUID, user: CurrentUser, session: DbSession
 ) -> ActionProposalResponse | JSONResponse:
@@ -373,11 +380,15 @@ async def get_action_proposal(
     )
 
 
-@router.patch("/{proposal_id}", response_model=ActionProposalResponse)
+@router.patch(
+    "/{proposal_id}",
+    response_model=ActionProposalResponse,
+    dependencies=[RateLimited("proposal_mutation")],
+)
 async def edit_action_proposal(
     proposal_id: uuid.UUID,
     body: ProposalEditRequest,
-    user: CurrentUser,
+    user: ActiveUser,
     session: DbSession,
 ) -> ActionProposalResponse | JSONResponse:
     try:
@@ -398,12 +409,16 @@ async def edit_action_proposal(
     )
 
 
-@router.post("/{proposal_id}/approve", response_model=ActionProposalResponse)
+@router.post(
+    "/{proposal_id}/approve",
+    response_model=ActionProposalResponse,
+    dependencies=[RateLimited("proposal_approval")],
+)
 async def approve_action_proposal(
     request: Request,
     proposal_id: uuid.UUID,
     body: ProposalApprovalRequest,
-    user: CurrentUser,
+    user: ActiveUser,
     session: DbSession,
 ) -> ActionProposalResponse | JSONResponse:
     try:
@@ -436,7 +451,11 @@ async def approve_action_proposal(
     )
 
 
-@router.post("/{proposal_id}/reject", response_model=ActionProposalResponse)
+@router.post(
+    "/{proposal_id}/reject",
+    response_model=ActionProposalResponse,
+    dependencies=[RateLimited("proposal_mutation")],
+)
 async def reject_action_proposal(
     proposal_id: uuid.UUID,
     body: ProposalRejectionRequest,
@@ -460,9 +479,13 @@ async def reject_action_proposal(
     )
 
 
-@router.post("/{proposal_id}/execute", response_model=ActionProposalResponse)
+@router.post(
+    "/{proposal_id}/execute",
+    response_model=ActionProposalResponse,
+    dependencies=[RateLimited("external_execution")],
+)
 async def execute_action_proposal(
-    request: Request, proposal_id: uuid.UUID, user: CurrentUser, session: DbSession
+    request: Request, proposal_id: uuid.UUID, user: ActiveUser, session: DbSession
 ) -> ActionProposalResponse | JSONResponse:
     google_executors = build_google_executor_registry(request, session, user.id)
     # Test-only seam (Stage 7 focused remediation): only ever set directly on

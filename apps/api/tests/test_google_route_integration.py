@@ -388,6 +388,56 @@ async def test_sync_route_reports_gmail_incomplete_instead_of_502_on_a_404_messa
         break
 
 
+async def test_sync_route_reports_a_transient_provider_failure_as_retryable() -> None:
+    """Stage 9 Delivery Phase 5 (§17): a genuinely transient Google failure
+    (503) must surface as `retryable=true, dependency="google"` — the safe,
+    closed-taxonomy signal the frontend needs to decide whether offering a
+    manual retry is appropriate, never a raw provider status or message."""
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/token":
+            return _token_response(FULL_CONNECTOR_SCOPE)
+        if request.url.path.endswith("/messages"):
+            return httpx.Response(503, json={})
+        raise AssertionError(f"unexpected request: {request.url.path}")
+
+    email = f"gmail-transient-{uuid.uuid4()}@example.com"
+    async for client in _app_client(httpx.MockTransport(handle)):
+        await _dev_login(client, email)
+        await _connect_google(client, _token_response(FULL_CONNECTOR_SCOPE).json())
+
+        sync = await client.post("/connected-accounts/google/sync", headers=CSRF_HEADERS)
+        assert sync.status_code == 502
+        error = sync.json()["error"]
+        assert error["code"] == "google_sync_failed"
+        assert error["retryable"] is True
+        assert error["dependency"] == "google"
+        assert "503" not in error["message"]
+        break
+
+
+async def test_sync_route_reports_a_permanent_provider_failure_as_not_retryable() -> None:
+    def handle(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/token":
+            return _token_response(FULL_CONNECTOR_SCOPE)
+        if request.url.path.endswith("/messages"):
+            return httpx.Response(400, json={})
+        raise AssertionError(f"unexpected request: {request.url.path}")
+
+    email = f"gmail-permanent-{uuid.uuid4()}@example.com"
+    async for client in _app_client(httpx.MockTransport(handle)):
+        await _dev_login(client, email)
+        await _connect_google(client, _token_response(FULL_CONNECTOR_SCOPE).json())
+
+        sync = await client.post("/connected-accounts/google/sync", headers=CSRF_HEADERS)
+        assert sync.status_code == 502
+        error = sync.json()["error"]
+        assert error["code"] == "google_sync_failed"
+        assert error["retryable"] is False
+        assert error["dependency"] == "google"
+        break
+
+
 async def test_real_gmail_execution_calls_exactly_drafts_create() -> None:
     """Section 6, "Real Gmail execution": approving/executing a
     create_gmail_draft proposal with a real, correctly-scoped Google account

@@ -24,6 +24,7 @@ from lifeflow_api.google.errors import (
     GoogleSyncTokenExpiredError,
     GoogleTransientError,
 )
+from lifeflow_api.metrics import observe_provider_call
 
 _BASE_URL = "https://www.googleapis.com/calendar/v3/calendars/primary/events"
 _ALLOWED_WRITE_PARAMS = {"sendUpdates": "none"}
@@ -112,8 +113,20 @@ def _raise_for_error(response: httpx.Response) -> None:
 
 
 class CalendarEventClient:
-    def __init__(self, http_client: httpx.AsyncClient) -> None:
+    def __init__(
+        self,
+        http_client: httpx.AsyncClient,
+        *,
+        write_timeout: httpx.Timeout | None = None,
+        base_url: str = _BASE_URL,
+    ) -> None:
         self._http = http_client
+        # Stage 9 Delivery Phase 5: see `GmailDraftClient.__init__` — the same
+        # longer, separately-configured write-read budget applies here.
+        self._write_timeout = write_timeout
+        # Stage 9 Delivery Phase 5 (§20): see `GmailDraftClient.__init__` —
+        # the same fake-server override point applies here.
+        self._base_url = base_url
 
     async def list_events(
         self,
@@ -138,10 +151,13 @@ class CalendarEventClient:
                 params["timeMin"] = time_min.isoformat()
             if time_max:
                 params["timeMax"] = time_max.isoformat()
-        response = await _get(self._http, _BASE_URL, params=params, headers=_headers(access_token))
-        if response.status_code == 410:
-            raise GoogleSyncTokenExpiredError("Calendar syncToken is invalid.")
-        _raise_for_error(response)
+        async with observe_provider_call("calendar", "list_events"):
+            response = await _get(
+                self._http, self._base_url, params=params, headers=_headers(access_token)
+            )
+            if response.status_code == 410:
+                raise GoogleSyncTokenExpiredError("Calendar syncToken is invalid.")
+            _raise_for_error(response)
         body = response.json()
         events = tuple(
             CalendarEventSummary(
@@ -186,14 +202,19 @@ class CalendarEventClient:
         }
         if location:
             body["location"] = location
-        response = await _post(
-            self._http,
-            _BASE_URL,
-            params={"sendUpdates": "none"},
-            json=body,
-            headers=_headers(access_token),
+        extra: dict[str, Any] = (
+            {"timeout": self._write_timeout} if self._write_timeout is not None else {}
         )
-        _raise_for_error(response)
+        async with observe_provider_call("calendar", "insert_event"):
+            response = await _post(
+                self._http,
+                self._base_url,
+                params={"sendUpdates": "none"},
+                json=body,
+                headers=_headers(access_token),
+                **extra,
+            )
+            _raise_for_error(response)
         result = response.json()
         return CalendarEventResult(
             event_id=result["id"],
@@ -207,8 +228,11 @@ class CalendarEventClient:
         """Read back one stored event so a create can be verified against
         what Calendar actually holds, not against `insert_event`'s own
         response (D40). Read-only; the write surface is unchanged."""
-        response = await _get(self._http, f"{_BASE_URL}/{event_id}", headers=_headers(access_token))
-        _raise_for_error(response)
+        async with observe_provider_call("calendar", "get_event"):
+            response = await _get(
+                self._http, f"{self._base_url}/{event_id}", headers=_headers(access_token)
+            )
+            _raise_for_error(response)
         body = response.json()
         organiser = body.get("organizer") or {}
         return CalendarEventRecord(

@@ -17,6 +17,13 @@ dependencies = [
     "httpx>=0.28",
     "google-auth>=2.36",
     "arq>=0.28.0",
+    "redis>=5.0",
+    # Stage 9 Delivery Phase 5: bounded-cardinality operational metrics
+    # (/metrics). A small, single-purpose client library (no transitive
+    # dependencies of its own), not an observability platform — chosen over
+    # hand-rolling Prometheus's text exposition format, and reused rather
+    # than introducing a second metrics mechanism later.
+    "prometheus-client>=0.21",
 ]
 
 [dependency-groups]
@@ -59,6 +66,15 @@ select = [
 # cipher tests, including as default parameter values (e.g. a seed helper's
 # `refresh_token="refresh-1"`).
 "tests/**" = ["S101", "E501", "S105", "S106", "S107"]
+# Exact-file, non-secret only: the smoke script shells out to Alembic via a
+# fixed argv (`uv run alembic …`); S603/S607's line attribution varies by ruff
+# version so an inline noqa is not portable. No secret rule is exempted here and
+# no wildcard is used, so future scripts are not covered.
+"scripts/smoke_phase2.py" = ["S603", "S607"]
+# Exact-file, non-secret only: the real-Uvicorn regression shells out to the
+# repository's own `uv run uvicorn …` via a fixed argv, the same pattern as
+# smoke_phase2.py above.
+"tests/test_rate_limit_uvicorn_regression.py" = ["S603", "S607"]
 
 [tool.mypy]
 python_version = "3.12"

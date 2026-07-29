@@ -18,14 +18,16 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel
 
 from lifeflow_api.accounts import ConnectedAccountService, ReauthorisationRequiredError
-from lifeflow_api.deps import CurrentUser, DbSession
+from lifeflow_api.deps import ActiveUser, CurrentUser, DbSession
 from lifeflow_api.errors import error_response
+from lifeflow_api.failure_taxonomy import classify_exception
 from lifeflow_api.google.errors import GoogleApiError
 from lifeflow_api.google.oauth import build_authorization_url
 from lifeflow_api.google_scopes import CONNECTOR_SCOPE_STRING
 from lifeflow_api.google_sync import GoogleReadScopeMissingError
 from lifeflow_api.google_wiring import build_google_sync_service
 from lifeflow_api.oauth_state import OAuthStateError, begin_oauth_flow, consume_oauth_flow
+from lifeflow_api.rate_limit_deps import RateLimited
 from lifeflow_api.repositories import ConnectedAccountRepository
 from lifeflow_api.security.token_cipher import TokenCipher
 
@@ -50,7 +52,9 @@ class ConnectedAccountsResponse(BaseModel):
     accounts: list[ConnectedAccountView]
 
 
-@router.get("", response_model=ConnectedAccountsResponse)
+@router.get(
+    "", response_model=ConnectedAccountsResponse, dependencies=[RateLimited("authenticated_read")]
+)
 async def list_connected_accounts(
     user: CurrentUser, session: DbSession
 ) -> ConnectedAccountsResponse:
@@ -73,7 +77,7 @@ def _google_connector_disabled(request: Request) -> bool:
     return not settings.google_oauth_enabled or request.app.state.google_oauth_client is None
 
 
-@router.get("/google/connect")
+@router.get("/google/connect", dependencies=[RateLimited("oauth_connect_callback")])
 async def connect_google(request: Request, user: CurrentUser) -> RedirectResponse:
     if _google_connector_disabled(request):
         raise HTTPException(status_code=404, detail="Not Found")
@@ -93,7 +97,7 @@ async def connect_google(request: Request, user: CurrentUser) -> RedirectRespons
     return RedirectResponse(url=url, status_code=302)
 
 
-@router.get("/google/callback")
+@router.get("/google/callback", dependencies=[RateLimited("oauth_connect_callback")])
 async def google_connector_callback(
     request: Request,
     user: CurrentUser,
@@ -139,7 +143,9 @@ async def google_connector_callback(
     return RedirectResponse(url=f"{web_origin}/connections?connected=google", status_code=302)
 
 
-@router.post("/google/disconnect", status_code=204)
+@router.post(
+    "/google/disconnect", status_code=204, dependencies=[RateLimited("oauth_connect_callback")]
+)
 async def disconnect_google(request: Request, user: CurrentUser, session: DbSession) -> None:
     cipher: TokenCipher = request.app.state.token_cipher
     oauth_client = (
@@ -175,9 +181,11 @@ class GoogleSyncResponse(BaseModel):
     calendar_sync_complete: bool
 
 
-@router.post("/google/sync", response_model=GoogleSyncResponse)
+@router.post(
+    "/google/sync", response_model=GoogleSyncResponse, dependencies=[RateLimited("provider_sync")]
+)
 async def sync_google(
-    request: Request, user: CurrentUser, session: DbSession
+    request: Request, user: ActiveUser, session: DbSession
 ) -> GoogleSyncResponse | JSONResponse:
     """User-triggered, on-demand sync (never automatic on page load — see
     threat model and ADR 0003): pulls the connected user's own Gmail/Calendar
@@ -204,10 +212,17 @@ async def sync_google(
         return error_response(
             409, "read_scope_missing", "Grant Gmail or Calendar read access before syncing."
         )
-    except GoogleApiError:
+    except GoogleApiError as exc:
         # Never surface a raw provider exception/URL to the client (T6).
         logger.warning("connected_accounts.google sync failed", exc_info=True)
-        return error_response(502, "google_sync_failed", "Google sync could not complete.")
+        classification = classify_exception(exc)
+        return error_response(
+            502,
+            "google_sync_failed",
+            classification.safe_message,
+            retryable=classification.retryable,
+            dependency="google",
+        )
 
     return GoogleSyncResponse(
         imported=summary.imported,

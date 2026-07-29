@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { BriefSectionView } from "@/components/BriefSectionView";
-import { api, ApiError } from "@/lib/api";
+import { RateLimitNotice } from "@/components/RateLimitNotice";
+import { api, ApiError, RateLimitError } from "@/lib/api";
 import type { Brief, Me } from "@/lib/types";
 
 type LoadState = "loading" | "generating" | "ready" | "no-brief" | "unauthenticated" | "error";
@@ -32,6 +33,7 @@ export default function TodayPage() {
   const [state, setState] = useState<LoadState>("loading");
   const [me, setMe] = useState<Me | null>(null);
   const [brief, setBrief] = useState<Brief | null>(null);
+  const [generateRetryAfter, setGenerateRetryAfter] = useState<number | null>(null);
   const generationInFlight = useRef(false);
 
   const load = useCallback(async () => {
@@ -64,17 +66,29 @@ export default function TodayPage() {
     // guard also prevents same-frame double clicks from issuing a second POST.
     if (generationInFlight.current) return;
     generationInFlight.current = true;
+    setGenerateRetryAfter(null);
     setState("generating");
     try {
       const fresh = await api<Brief>("/briefs/generate", { method: "POST" });
       setBrief(fresh);
       setState("ready");
     } catch (error) {
-      setState(error instanceof ApiError && error.status === 401 ? "unauthenticated" : "error");
+      if (error instanceof RateLimitError) {
+        // Not a provider failure and not "uncertain" — the request never
+        // reached generation. Keep whatever was already on screen.
+        setGenerateRetryAfter(error.retryAfterSeconds);
+        setState((previous) =>
+          previous === "generating" ? (brief ? "ready" : "no-brief") : previous,
+        );
+      } else if (error instanceof ApiError && error.status === 401) {
+        setState("unauthenticated");
+      } else {
+        setState("error");
+      }
     } finally {
       generationInFlight.current = false;
     }
-  }, []);
+  }, [brief]);
 
   if (state === "unauthenticated") {
     return (
@@ -128,6 +142,7 @@ export default function TodayPage() {
           {state === "no-brief" && "No brief yet."}
           {state === "error" && "Could not load your brief. Is the API running?"}
         </p>
+        {generateRetryAfter !== null && <RateLimitNotice retryAfterSeconds={generateRetryAfter} />}
       </header>
 
       {state === "no-brief" && (

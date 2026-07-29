@@ -46,7 +46,7 @@ Every mitigation maps to a planned component and delivery stage (Stage 0 check: 
 | T18 | Audit log tampering or secret leakage into audit | integrity | Append-only writes (no update/delete paths); `safe_metadata_json` schema excludes secrets; redaction tests | AuditEvent | 2 |
 | T19 | Session hijack / weak app auth | B1 | Google Sign-In (OIDC) with server-side sessions; secure, httpOnly, same-site cookies; session expiry; auth security tests | Session layer | 2 |
 | T20 | Scope creep / silent broadening of Google scopes | B2 | Connector scopes declared in one constant; UI shows exactly the scopes Google actually granted (never the requested set); no automatic re-request of dropped scopes; test asserts the authorization-URL scope string matches the documented set | Google adapter, Connections UI | 7 |
-| T21 | Rate-limit abuse / cost exhaustion (LLM or Google quota) | B2 | Bounded pagination, bounded retries, request timeouts; per-user rate limiting (Stage 9); cost capture per LLM call | LLM layer, API middleware | 4, 9 |
+| T21 | Rate-limit abuse / cost exhaustion (LLM or Google quota) | B2 | Bounded pagination, bounded retries, request timeouts; per-user/per-IP Redis-backed rate limiting (Stage 9 Delivery Phase 4, ADR 0005 D64/D81 — see below); cost capture per LLM call | LLM layer, `rate_limit_*` modules | 4, 9 |
 | T22 | `gmail.compose` scope permits sending, not just drafting — a compromised or buggy code path could send mail even though the product never intends to | B2 | Defense in depth, not scope reliance (ADR 0003 D11/D33): closed `ActionType` enum has no send member; `GmailDraftClient` exposes only `create_draft()` against one fixed, allow-listed path; no generic request method exists; transport-level tests assert the only HTTP call ever made is `POST /gmail/v1/users/me/drafts`. The literal allow-list assertion inside the client is a cheap self-check, not itself the boundary — see D33 | `google/gmail_client.py`, `action_executors.py` | 7 |
 | T23 | Undisclosed guest notification on calendar-event creation (Google's default `sendUpdates` behaviour would email attendees without the user ever approving a "send") | B4 | `CalendarEventClient.insert_event()` hard-codes `sendUpdates=none` (not caller-overridable); the approval preview carries an immutable `guest_notifications: off` field bound into the same payload hash | `google/calendar_client.py`, approval preview | 7 |
 | T24 | Execution context substitution — a proposal approved under one execution path (simulation, or a specific Google account/scope) silently executing under a different one because the decision was recomputed from live "is anything connected" state instead of what the user actually approved | B4 | `execution_context.py` binds execution mode/provider/account/scope to the proposal's own evidence provenance, never to "any capable account"; the approved snapshot (`ActionProposal.approved_execution_*`, migration `0008`) is persisted at approval and re-verified twice: once pre-commit (`validate_execution`) and, atomically with token acquisition — under the same account row lock, after the durability commit (D16) that necessarily releases the pre-commit check's locks — via `GoogleTokenService.get_valid_access_token_for_execution` (ADR 0003 D34); any difference (disconnect, reconnect, scope change, a different source account) raises `approval_context_changed` before any provider call and is classified `failed`, not `uncertain` | `execution_context.py`, `action_policy.py`, `action_proposal_service.py`, `accounts.py`, `action_executors.py` | 7 |
@@ -56,6 +56,7 @@ Every mitigation maps to a planned component and delivery stage (Stage 0 check: 
 | T28 | Untrusted deserialization via the job queue — a compromised or misconfigured Redis instance feeding a worker process pickled data (arq's default job serializer) | B2 | Job payloads carry only `run_id` (an internal UUID string, never user content); the worker overrides arq's default pickle (de)serializer with JSON (`scheduled_briefs.job_serializer`/`job_deserializer`) so no job payload is ever pickle-deserialized, verified directly against a real Redis instance (`test_scheduled_briefs_queue.py`) | `scheduled_briefs.py`, `worker_app.py` | 8 |
 | T29 | Scheduler/queue outage cascading into the rest of the product (manual briefs, Google connections, approvals, execution all becoming unavailable because Redis is down) | B2 | The web API never requires Redis for any route except the scheduled-brief status read, which uses a short-timeout best-effort ping and degrades to `scheduler_available: false` rather than failing (`scheduled_brief_status.py`); manual brief generation, sync, and approval/execution have no dependency on Redis or the worker process at all | `scheduled_brief_status.py`, `main.py` | 8 |
 | T30 | A real credential committed to example/template configuration (`.env.example`) going undetected because no scanning gate actually ran against the commit that introduced it | build | `scripts/check_env_example_secrets.py` — a narrow, branch-agnostic, current-tree check specifically for this file, wired into pre-commit and into `secret-scan.yml`, which (unlike `ci.yml`) triggers on every branch push, not only `main`/PRs; see "Credential exposure incident" below for the incident this closes | `scripts/check_env_example_secrets.py`, `.pre-commit-config.yaml`, `.github/workflows/secret-scan.yml` | 8 |
+| T31 | Operational telemetry (structured logs, metrics) added for resilience/observability purposes becoming a second, uncontrolled channel for private data — an email address, calendar content, token, provider payload, or unbounded-cardinality identifier ending up in a log line or a metric label | B2 | Closed, hand-reviewed vocabularies only: `failure_taxonomy.py`'s `FailureCode` enum for every safe error code/message; `metrics.py`'s label sets are fixed at definition time (provider name, operation name, failure code, registered rate-limit policy code, job name) — never a user id, email, proposal id, exception message, or IP address; a full audit of every `logger.*` call site in `apps/api/src/lifeflow_api/` (Stage 9 Delivery Phase 5) found the pre-existing pattern already held everywhere — no raw content, only safe internal identifiers/codes, with `exc_info` (never an interpolated exception message) carrying traceback detail through the existing `redact()` regex backstop | `failure_taxonomy.py`, `metrics.py`, `logging_setup.py`, `correlation.py` | 9 |
 
 ## Prompt-injection boundary (expanded)
 
@@ -176,6 +177,212 @@ Inferred memory (ADR 0004 D51–D58) is a new place where the system forms a bel
 - **Sensitive inference is refused, not merely absent.** A closed registry (one key) plus a documented `PROHIBITED_MEMORY_CATEGORIES` deny-list (special-category and protected-characteristic data, plus generic personality/mood/risk-profile) means unknown and sensitive keys fail closed at the registry, repository, and API layers. No free-text key/value path exists.
 - **Memory cannot widen authority.** Inferred memory is suggest-only and never read by the policy engine, approval binding, executors, or execution-context resolution. It reaches an outgoing draft only after the user confirms it into an *explicit* preference, which itself is safety-inert (ADR 0004 D46) and whose effect is limited to draft composition — the adapted body is fully previewed and part of the approval hash. So memory can never bypass approval, alter recipients/attendees/execution mode, or trigger a side effect.
 - **Data minimisation and deletion.** Memory tables store only a short normalised token, a reason code, and safe references (proposal id) — never draft bodies, recipients, tokens, or provider data. Redis carries only a user id; worker logs carry only ids and reason codes. `memory.deleted` audit records the key and fact of deletion, never the deleted value. The user can pause learning, delete one memory, delete all inferred memory, and account deletion cascades every memory row.
+
+## Privacy & Connections Control Centre (Stage 9 Delivery Phase 1, recorded 2026-07-22)
+
+The read-only Privacy Centre (ADR 0005 D65, `GET /privacy/summary`) is a new surface over already-owned data, so it gets explicit disclosure-boundary rules; all are code-enforced and regression-tested (`test_privacy_api.py`).
+
+- **T2 (cross-user aggregate leakage).** Every count and connection read is owner-scoped by `user_id`; execution counts enforce ownership through the join to the owning proposal (mirroring `ActionExecutionRepository`). Proven by an isolation test: one user's populated data yields all-zero counts and no trace for another.
+- **T1/T6 (secret & internals disclosure).** The response is counts, statuses, scope labels, and freshness bands only. It never serialises an OAuth token or ciphertext, a sync cursor, the `authorisation_revision`, a provider message/event id, a proposal payload or hash, or audit `safe_metadata` internals — proven by seeding distinctive sentinels into those columns and asserting none appear in the response body. Logs carry only user id, account id, safe event type, and correlation id.
+- **T20 (scope truthfulness).** Granted scopes render exactly as stored, mapped to human labels; unrecognised scopes become a neutral "Other access"; requested-but-not-granted scopes never appear as active. Partial grants render truthfully.
+- **T29 (scheduler/queue outage isolation).** The endpoint depends only on PostgreSQL and is proven to work against an unreachable Redis. Opening or refreshing the page never triggers a Google sync (ADR 0003 boundary preserved).
+- **T15/T16 (retention & deletion honesty).** Delivery Phase 1 is non-destructive. Retention horizons are surfaced read-only with `enforced=False` and explicit "not switched on yet" copy, so the UI can never imply enforcement that does not exist. Actual deletion, retention enforcement, and account deletion (anonymise-and-minimise, ADR 0005 D61–D63) arrive in Delivery Phase 2; rate limiting (D64) in Delivery Phase 4.
+
+## Durable deletion engine (Stage 9 Delivery Phase 2, recorded 2026-07-23)
+
+The destructive engine (ADR 0005 D66–D72) introduces a new class of privileged, irreversible operations, so it gets explicit safety rules; all are code-enforced and regression-tested (`test_deletion_engine.py`, `test_privacy_deletion_api.py`, `test_deletion_queue.py`).
+
+- **T2 (cross-user destruction).** Every preview/confirm/cancel/status is owner-scoped; a cross-user operation returns 404 without ownership leakage. The worker's cross-user recovery/scan create only owner-scoped operations. Anonymisation preserves ownership isolation for retained tombstones.
+- **T12 (duplicate/concurrent destruction).** A partial unique index guarantees at most one active operation per (user, type, scope); the worker claim is an atomic conditional `UPDATE … RETURNING` (only one worker wins); re-running a completed operation is a no-op. Idempotent across crash-resume (durable cursor + fresh DB query authoritative; re-minimising yields the identical tombstone).
+- **T15 (retention honesty & preservation).** Enforcement is opt-in (`RETENTION_ENFORCEMENT_ENABLED`), bounded (per-day scope key, per-tick cap), and reuses the one planner; it never deletes pending/uncertain executions or confirmed explicit preferences. The Privacy Centre flips to "enforced" only when it genuinely is.
+- **T16 (deletion correctness & scope).** Imported-data deletion removes only LifeFlow's copy for one account within the snapshot boundary (`SourceItem.created_at`); it never calls a provider content API (the engine imports no Gmail/Calendar client — proven). Gmail draft-only / Calendar create-only invariants are untouched; uncertain outcomes are never auto-retried.
+- **T1/T6 (content-free by construction).** Operation responses, audit metadata, worker logs, and the Redis payload (operation id only) carry no token, payload, recipient, subject, provider id, or confirmation phrase — only ids, counts, states, and safe reason codes. Retained proposal/execution/audit tombstones are minimised (payloads cleared).
+- **Authorisation & session invalidation.** A typed confirmation phrase gates each user-requested operation; a `deletion_pending`/`deleted` account is blocked from sync/brief/proposal mutations (`require_active_account`), and a `deleted` account can never authenticate again (`get_current_user`), invalidating existing sessions. The same Google identity may create a genuinely new account without reviving the anonymised one.
+- **T29 (queue outage).** Preview/confirm never touch Redis; a confirmed operation persists as `pending` and is drained by the per-minute cron when Redis returns — ordinary API routes stay available throughout.
+
+## Public audit history (Stage 9 Delivery Phase 3, recorded 2026-07-23, extended 2026-07-24)
+
+The audit-history surface is a new disclosure boundary over internal safety
+records (ADR 0005 D75–D80), covered by `test_audit_history_registry.py`,
+`test_audit_history.py`, `test_deletion_engine.py`'s safe-aggregate-counts
+tests, the frontend component suite, and `audit-history.spec.ts`.
+
+- **T2 (cross-user history leakage).** `GET /audit-history` authenticates with
+  `CurrentUser`; every repository query filters by that exact `user_id`.
+  Cursors are never authority and cannot override the owner predicate.
+- **T1/T6 (private content and internals disclosure).** A closed presentation
+  registry produces fixed text. The API schema has no raw event type, raw
+  actor, entity id, correlation id, provider id, payload, or value field.
+  Three narrow, independently re-validated typed details were added on top of
+  the fixed text (D79–D80): a closed 3-value `action_type`, a closed
+  `reason` drawn only from hand-written safe code vocabularies, and two flat
+  bounded non-negative `deleted_count`/`preserved_count` integers aggregated
+  from durable per-category totals — never the raw metadata value, the raw
+  per-category JSON, an id, or a scope descriptor. Each closed lookup function
+  omits (never guesses or echoes) anything absent, wrong-typed, or
+  unregistered. Unknown event types are excluded at query time. Sentinel tests
+  cover raw metadata, malformed/excessive/negative/boolean/string/float
+  counts, unknown metadata keys, and another owner's records.
+- **T18 (audit integrity).** Phase 3 adds one read method and no mutation or
+  deletion method/route. The append-only capture path and deletion tombstone
+  rules are unchanged; a repository surface test pins that contract.
+- **Pagination abuse and consistency.** `limit` is closed to 1–50; cursor input
+  is non-empty and at most 1024 characters; strict version/filter/type
+  validation returns 422. `(timestamp DESC, id DESC)` keysets plus a frozen
+  `as_of` window prevent duplicate/shifted pages under concurrent inserts.
+- **Deferred controls remain deferred.** Phase 3 introduces no rate limiter,
+  trusted-proxy behaviour, telemetry, log expansion, or provider scope. The
+  rate limiter and trusted-proxy behaviour ship in Delivery Phase 4 below;
+  telemetry/log expansion remain Delivery Phase 5.
+
+## Rate limiting (Stage 9 Delivery Phase 4, recorded 2026-07-24)
+
+Closes T21 (see the updated table row above). Covered by
+`test_rate_limit_policy.py`, `test_rate_limit_ip.py`, `test_rate_limiter.py`
+(real Redis), `test_rate_limiting_api.py` (real Postgres + Redis, full route
+table), `test_rate_limit_uvicorn_regression.py` (a real Uvicorn subprocess,
+not `ASGITransport`), the frontend component/page suites, and
+`e2e/rate-limiting.spec.ts` (real API, worker, PostgreSQL, and Redis).
+
+- **T21 (abuse/cost exhaustion).** Every state-changing route carries a
+  closed rate-limit policy or an explicit, tested exemption
+  (`/health`, `/ready`, `/config`, FastAPI's own docs routes). Authenticated
+  policies key on the stable internal user id; anonymous policies key on a
+  securely resolved client IP that never trusts a forwarded header unless the
+  immediate peer is itself an explicitly configured trusted proxy. A single
+  atomic Lua script performs the whole token-bucket read-refill-consume-write
+  cycle, so concurrent requests against one bucket can never overshoot
+  capacity.
+- **T1/T6 (secret and subject disclosure).** Redis holds only a versioned
+  namespace, a registered policy code, and an HMAC digest of the subject —
+  never a raw user id, IP address, or path parameter. The 429 response and
+  server logs carry only the policy code, allow/block result, and a bounded
+  retry-after value — never the digest, the raw subject, the forwarded
+  header, or request body content.
+- **T2 (cross-user/hidden-parameter bypass).** A subject is derived solely
+  from the authenticated user id or resolved IP, never from a path parameter
+  — proven by a test that two different proposal/account/operation ids for
+  the same user share one bucket, so a hidden identifier can never grant a
+  fresh budget.
+- **Fail-open, and why that is safe.** Redis unavailability, a timeout, or an
+  unexpected reply allows the request rather than returning a misleading 429
+  — a rate limiter is defence-in-depth, not the source of truth for
+  correctness. Every database-level guard that existed before this phase
+  (execution idempotency, approval-payload binding, deletion active-operation
+  uniqueness, preview-plan fingerprint binding) is completely unmodified and
+  stays authoritative regardless of the limiter's state; tests prove Redis
+  failure creates no duplicate execution or deletion operation.
+- **Layered without double-charging.** Each route declares exactly one
+  policy via one reusable dependency, evaluated once at route-declaration
+  time against a closed registry (an unregistered code fails at import time).
+  The sole exception, the shared deletion-confirmation route, resolves which
+  of two policies applies from a side-effect-free read of the operation's
+  type before charging exactly one of them — never both, and never zero.
+- **Idempotency is unaffected.** Rate limiting only gates whether a request
+  proceeds to the unchanged database logic; a blocked replay attempt cannot
+  duplicate a record because nothing runs, and an allowed replay still hits
+  the pre-existing idempotency guard, which returns the original result
+  unchanged.
+- **No migration.** Rate-limit state lives entirely in Redis plus validated
+  environment configuration (`RATE_LIMITING_ENABLED`, `RATE_LIMIT_KEY_SECRET`,
+  `RATE_LIMIT_POLICY_OVERRIDES_JSON`, `TRUSTED_PROXY_CIDRS`, reused from
+  Delivery Phase 1) — no new table, and no per-user configurable limits.
+- **Deferred controls remain deferred.** Phase 4 introduces no CAPTCHA,
+  account suspension, IP deny lists, or telemetry/log expansion beyond the
+  limiter's own safe policy-code/allow-block instrumentation. Those, and any
+  broader outage-resilience hardening, remain Delivery Phase 5.
+- **Uvicorn's own header trust is not the security boundary (found via
+  manual smoke test, fixed, regression-tested).** Uvicorn's
+  `--proxy-headers`/`--forwarded-allow-ips` machinery runs ahead of this
+  application and, by default, trusts `X-Forwarded-For` from any loopback
+  peer — rewriting `request.client` before `rate_limit_ip.py`'s own
+  `TRUSTED_PROXY_CIDRS` check ever runs, which let a spoofed header bypass an
+  empty (default-deny) allowlist during the required manual smoke test. No
+  automated test caught this before the smoke test, because
+  `httpx.ASGITransport` (used everywhere else in this suite) never runs
+  Uvicorn's header middleware at all. Fixed at every launch site with
+  `--forwarded-allow-ips=""` (ADR 0005 D81); enforced going forward by
+  `scripts/check_uvicorn_launch_safety.py` (pre-commit and `secret-scan.yml`)
+  and proven end-to-end by `test_rate_limit_uvicorn_regression.py`, which
+  drives a real Uvicorn subprocess over a real socket. A production
+  deployment behind a real reverse proxy must keep `--forwarded-allow-ips=""`
+  and configure `TRUSTED_PROXY_CIDRS` to the proxy's real address instead —
+  Uvicorn's independent forwarded-header trust must never be relied on as
+  the application's security boundary.
+
+## Outage resilience and privacy-safe telemetry (Stage 9 Delivery Phase 5, recorded 2026-07-28, converged 2026-07-29)
+
+Closes T31 (see the updated table row above) and extends T29's Redis-outage
+posture to a documented, closed-taxonomy failure model across Google,
+Redis, and PostgreSQL. Covered by `test_failure_taxonomy.py`, `test_timeouts.py`,
+`test_retry.py`, `test_execution_recovery_sweep.py`,
+`test_scheduled_briefs_enqueue_resilience.py`,
+`test_deletion_engine_enqueue_resilience.py`, `test_ready.py`,
+`test_correlation.py`, `test_metrics.py`, `test_e2e_test_controls.py`,
+updated `test_google_executors.py`/`test_google_route_integration.py`/
+`test_google_gmail_client.py`/`test_google_calendar_client.py`/
+`test_google_oauth.py`/`test_worker_app.py`, the frontend `connections` page
+suite, four real-stack Playwright journeys
+(`apps/web/e2e-resilience/`, run twice consecutively), and a live manual
+smoke test against the real Docker stack (see the Phase 5 completion
+report).
+
+- **T31 (telemetry privacy leak).** Every new operational-observability
+  surface (`failure_taxonomy.py`, `metrics.py`, `correlation.py`'s worker
+  extension) uses a small, fixed, hand-reviewed vocabulary — never
+  user-supplied or provider-supplied content. `test_metrics.py` asserts each
+  metric's label-name set directly, as a regression guard against a future
+  change accidentally widening a label to something unbounded.
+- **Write safety is unchanged by retries.** `retry.py::retry_read` is
+  structurally incapable of retrying a write: it is applied only at Gmail/
+  Calendar read call sites and the OAuth refresh call, never at
+  `create_draft`/`insert_event`. Two dedicated tests count actual transport
+  calls (not just observed outcomes) to prove a write is attempted exactly
+  once regardless of the failure classification.
+- **A local timeout is never mistaken for "no request was sent."** Every
+  Google timeout — connect, read, or the write path's longer budget — is
+  classified identically to a raw connection error (`GoogleTransientError`
+  → `uncertain`), never surfaced as a final failure and never silently
+  treated as success.
+- **T29 extended: Redis outage reporting is now explicit and non-blocking.**
+  `GET /ready` best-effort pings Redis and reports `degraded_dependencies:
+  ["redis"]` without ever returning `503` for it — proven live (Redis
+  stopped/started against the real Docker Compose service, `/ready` observed
+  at each step) and by `test_ready.py`'s equivalent automated case.
+  PostgreSQL unavailability, by contrast, does return `503` (also proven
+  live) — the API genuinely cannot serve its core functions without it,
+  unlike Redis.
+- **No new AuditEvent stream.** Every mechanism in this phase (stale-
+  execution recovery, enqueue-failure handling, metrics, correlation ids)
+  writes only to existing safe channels (structured logs, Prometheus
+  counters, or — for the execution-recovery sweep — the same
+  `execution.uncertain` audit event `execute()`'s own re-entry guard already
+  produces). No new audit event type was introduced.
+- **No new database guard was touched.** The stale-pending-execution sweep,
+  the Redis-enqueue hardening, and the timeout/retry changes are additive
+  observability and recovery around existing durable-state transitions —
+  `ActionExecution`'s pending→uncertain transition, `DataDeletionOperation`'s
+  state machine, and `ScheduledBriefRun`'s status column are exercised
+  through their pre-existing, unmodified write paths.
+- **Circuit breaker: evaluated, not built (see ADR 0005 D85).** Recorded
+  here because a circuit breaker is itself a common source of new privacy/
+  availability risk (shared state that could leak across users, or fail
+  closed for everyone on one user's account-specific problem) — the decision
+  not to add one avoids that risk entirely rather than mitigating it.
+- **Test-only fake-provider infrastructure cannot reach production (ADR 0005
+  D92).** `lifeflow_api/testing/fake_google_server.py` is a separate ASGI
+  app, never imported by `main.py`, that refuses to start without
+  `LIFEFLOW_E2E_FAKE_GOOGLE=1`. The real API only ever talks to it via
+  `google_api_origin_override`, itself inert unless
+  `e2e_test_controls_enabled=true` — and `create_app` refuses to start
+  (`RuntimeError`) if that flag is ever `true` with
+  `environment=production`, proven by
+  `test_e2e_test_controls_enabled_refuses_to_start_in_production`. The fake
+  server never accepts or validates a real bearer token and never makes an
+  outbound call to a real Google host — it is a pure in-memory stub. Its own
+  `/__control__/*` routes accept only a closed `Scenario` enum and a closed
+  operation-name set (422 on anything else), and expose only synthetic
+  object/call counts, never content.
 
 ## Out-of-scope threats (recorded, revisit at Stage 11)
 

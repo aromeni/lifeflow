@@ -200,13 +200,210 @@ Coverage: 51 new backend tests (registry/safety, inference lifecycle, precedence
 
 **Committed-state closure (2026-07-22).** Phase 3 was committed on branch `stage-8-memory` as `466de179a7af1fe6410ee4e4f661402bec5b8925` (parent `6da388c`). Stage 8 was then reviewed as one integrated milestone against the exact committed tree — git boundary, three-phase contract, cross-phase regression, migration/database review, every verification gate, the safety-invariant matrix, documentation truthfulness, and a 16-step integrated manual smoke — and **all three phases passed the committed-state closure review with no blockers**. Stage 8 is approved for remote completion; this documentation commit records that approval, after which branch `stage-8-memory` is pushed to `origin` and, once the remote branch is green, an annotated `stage-8-complete` tag is created on this closure commit and pushed. Stage 9 (privacy, audit UX, resilience) has not begun; all remaining work belongs to Stage 9.
 
+## Stage 9 Planning Gate — privacy & pilot-hardening architecture (recorded 2026-07-22)
+
+The Stage 9 Planning Gate (architecture/discovery only, no code) was approved. It reconstructed the Stage 9 contract, produced a system-wide data inventory and deletion-dependency map, and ratified the policy decisions now recorded in [ADR 0005](../architecture/adr/0005-stage9-privacy-hardening.md): the five-Delivery-Phase split (Privacy Centre → deletion/retention/account-deletion → audit history → rate limiting → resilience/telemetry); **account deletion = anonymise-and-minimise** keeping only content-free tombstones (D61, resolving the `AuditEvent.user_id` CASCADE tension); **retention as validated env settings**, not a table, with provisional product defaults (D62); the derived-data deletion rules (D63); and the rate-limiting keying/trusted-proxy architecture with thresholds deferred (D64). Key facts established: `SourceItem.retention_expires_at` exists but no enforcing job yet; `AuditEvent` already emits the full `proposal.*`/`execution.*`/`account.*`/`memory.*` vocabulary (so audit history is a read projection, no new model); disconnect is already distinct from deletion.
+
+## Stage 9 Delivery Phase 1 — Privacy & Connections Control Centre (recorded 2026-07-22)
+
+Delivery Phase 1 shipped one consolidated, **read-only, non-destructive** surface (ADR 0005 D65). Canonical page: the existing `/connections` route expanded into the "Privacy & Connections" Control Centre (one page, reusing the existing connect/disconnect/sync routes; the Stage 7 e2e stays green because "Connections" is a substring of the new heading). One new endpoint, `GET /privacy/summary` (`lifeflow_api.privacy`), returns the per-account connection summary (status, granted scopes with human labels via `google_scopes`, last sync, freshness band reusing `evidence_freshness._freshness_band`, ever-synced, can-disconnect/can-reconnect), owner-scoped inventory counts for all twelve categories (executions counted through the proposal join, mirroring `ActionExecutionRepository`), and the retention classes with `enforced=False`. Safety by construction: the response carries no token/ciphertext, sync cursor, `authorisation_revision`, provider message/event id, proposal payload/hash, or audit metadata — proven by sentinel-leak tests; it never touches Redis (proven against an unreachable Redis) and never triggers a sync. Four data controls (disconnect / delete-imported-data / delete-learned-preferences / delete-account) are explained as distinct operations; only disconnect (existing) and the memory-controls link are actionable — imported-data and account deletion are described but have no button (they arrive in Delivery Phase 2). Retention values live in validated `config.Settings` fields (positive ints, read from app state not the cached global). 15 backend + 14 frontend tests. Enforcement, deletion, audit UI, rate limiting, and resilience remain later Delivery Phases.
+
+## Stage 9 Delivery Phase 2 — durable deletion engine (recorded 2026-07-23)
+
+Delivery Phase 2 ships imported-data deletion, retention enforcement, and account deletion behind **one** durable model (`DataDeletionOperation`, migration `0011`), **one** planner (`deletion_planner.apply_derived_decisions`), and **one** worker (`deletion.run_operation`), per ADR 0005 D66–D72. A previewed operation is a durable, content-free record with a snapshot cutoff (`SourceItem.created_at`, D68), captured counts, disposition (preserved/minimised/recomputed), a typed-confirmation phrase (`DELETE IMPORTED DATA` / `DELETE MY LIFEFLOW ACCOUNT`, never stored), and an expiry. Confirm requires the exact phrase (422), expected version (409 stale), and non-expired preview (409); it is idempotent, and a partial unique index guarantees at most one active operation per (user, type, scope). The worker claims atomically (conditional `UPDATE … RETURNING`), processes bounded batches committing each with a resume cursor + heartbeat, and finalises with a content-free audit tombstone; the per-minute cron drains never-enqueued pending operations (Redis-outage-safe, D70) and recovers stale ones. Derived-data rules: fully-unsupported signals/proposals deleted, mixed pruned, approved/executed minimised to tombstones, pending/uncertain executions always preserved, confirmed preferences never deleted. Account deletion keeps a terminal anonymised `users` row (`account_state='deleted'`, random `deletion_subject_id`, cleared identity — D67), preserving the content-free audit/execution tombstones `AuditEvent.user_id` CASCADE-references; `get_current_user` rejects a deleted account (session invalidation) and `require_active_account` blocks sync/brief/proposal mutations while `deletion_pending`. Retention (D72) is opt-in (`RETENTION_ENFORCEMENT_ENABLED`), bounded, uses a controllable clock, and reuses the planner. 35 backend + 6 frontend tests. At the Phase 2 boundary, audit history (Phase 3), rate limiting (Phase 4), and resilience/telemetry (Phase 5) had not begun.
+
+**Remote completion (2026-07-23/24).** Delivery Phase 1 is remotely preserved
+at `49f121a`. Delivery Phase 2 is remotely finalised at `fdb4636` on
+`origin/stage-9-deletion-retention`. Delivery Phase 3 is remotely finalised at
+`a50cf06` on `origin/stage-9-audit-history`. Delivery Phase 4 is implemented,
+verified, and committed locally as six commits on `stage-9-rate-limiting`
+from that `a50cf06` parent, awaiting remote finalisation (not pushed, not
+tagged); Delivery Phase 5 has not begun. Stage 9 is not complete, has no
+`stage-9-complete` tag, and has not been merged to `main`.
+
+## Stage 9 Delivery Phase 3 — privacy-safe audit history (recorded 2026-07-24)
+
+Delivery Phase 3 is committed locally as five commits on
+`stage-9-audit-history` and awaits remote finalisation. It deliberately reuses
+the existing append-only `AuditEvent` model: a closed presentation registry
+(`audit_history_registry.py`, kept separate from the API module so it can be
+reviewed and committed independently) maps privacy-reviewed event types to
+fixed title/summary/category/tone values; unknown events remain internal and
+raw actor/metadata/entity/correlation fields are never serialised. `GET
+/audit-history` is owner-scoped and read-only, with closed activity/time
+filters and stable `(timestamp DESC, id DESC)` keyset pagination frozen to a
+first-page `as_of` boundary. Its strict, filter-bound cursor is navigation
+state rather than authority. `/audit-history` is the canonical accessible
+frontend and is linked from Privacy & Connections; it renders the user's
+configured timezone and supports an honest empty/error state and “Load more”.
+No migration, new capture model, deletion-semantic change, audit mutation
+route, provider scope, rate limiter, or telemetry hardening was added.
+Decisions are ratified as ADR 0005 D75–D80. Remotely finalised at `a50cf06`
+on `origin/stage-9-audit-history`.
+
+## Stage 9 Delivery Phase 4 — rate limiting (recorded 2026-07-24)
+
+Implemented on `stage-9-rate-limiting` (base: the Phase 3 tip `a50cf06`),
+enforcing the D64 architecture decided at the planning gate. A closed
+registry of sixteen named token-bucket policies
+(`apps/api/src/lifeflow_api/rate_limit_policy.py`) covers every
+state-changing route plus the two stronger read buckets; every route not on
+a short, tested exemption list (`/health`, `/ready`, `/config`, FastAPI's own
+docs routes) carries exactly one policy via one reusable dependency
+(`rate_limit_deps.RateLimited`). Authenticated policies key on the stable
+user id; anonymous policies key on a client IP resolved via a
+trusted-proxy-CIDR-gated `X-Forwarded-For` walk
+(`rate_limit_ip.py`) that falls back safely on anything malformed. One atomic
+Lua script (`rate_limiter.py`) performs the whole token-bucket
+read-refill-consume-write cycle using Redis's own clock, so concurrent
+requests can never overshoot capacity; Redis holds only an HMAC digest of the
+subject, never a raw id or IP. Any Redis failure fails open (allows the
+request) without touching any pre-existing database guard — execution
+idempotency, approval-payload binding, deletion active-operation uniqueness,
+and preview-plan fingerprint binding are all completely unmodified and stay
+authoritative regardless of limiter state. The one route serving two
+operation types through a single path (deletion confirmation) resolves its
+policy from a side-effect-free read before charging exactly one bucket, never
+two. The safe 429 contract reuses the existing `{"error": {...}}` envelope
+(429 was already mapped to `"rate_limited"`) plus a bounded
+`retry_after_seconds` field and a `Retry-After` header. The frontend renders
+a rounded, accessible retry message on brief generation, proposal approval/
+execution, and every deletion control — never as a provider failure or an
+uncertain outcome, never auto-resubmitted, and never discarding typed
+confirmation phrases or reviewed preview state. `RATE_LIMITING_ENABLED`
+defaults to `false` (every existing test and Playwright journey is
+unaffected); the new `rate-limiting.spec.ts` journeys enable it for the e2e
+process with small overrides scoped to exactly the policies they exercise. No
+migration was needed. Decisions are ratified as ADR 0005 D81.
+
+**Phase 4 closure (recorded 2026-07-24).** Phase 4 is committed locally as six
+commits on `stage-9-rate-limiting` from the approved parent `a50cf06` and
+awaits remote finalisation — not pushed, not tagged, not merged. All 47 routes
+are classified: each carries exactly one closed policy or sits on the short,
+tested exemption list. Redis state is ephemeral and TTL-bounded (an abandoned
+bucket always expires), holds only HMAC-pseudonymised subjects, and is
+consumed through one atomic Lua token bucket; any Redis failure is an
+availability-oriented fail-open, never a misleading 429, and never displaces
+the database and approval guards, which remain authoritative in every case.
+The immediate TCP socket peer is the sole trust anchor. Uvicorn's own
+forwarded-header rewriting is explicitly disabled at every live launch site
+with `--forwarded-allow-ips=""` (enforced by
+`scripts/check_uvicorn_launch_safety.py` in pre-commit and CI, and regression-
+tested against a real Uvicorn subprocess in
+`tests/test_rate_limit_uvicorn_regression.py`), so LifeFlow's own
+`TRUSTED_PROXY_CIDRS` resolver is the only place a forwarded address is ever
+trusted — including in production behind a real reverse proxy. A 429 returns
+only safe, bounded retry guidance. Rate-limit outcomes are operational metrics
+and two safe log lines, deliberately **not** an `AuditEvent` stream, so
+throttling never becomes audit noise. No migration was created and the Alembic
+head remains `0011`. Final verified numbers: 716 backend tests at 92%
+coverage (63 of them focused rate-limit tests), 86 frontend tests, 10
+Playwright journeys passing twice consecutively, and both the deterministic
+and action evaluations passing. Delivery Phase 5 has not begun, and Stage 9 is
+not complete, tagged, or merged.
+
+**Presentation completeness correction (recorded 2026-07-24, ADR 0005
+D79–D80).** A follow-up review found two pure presentation-layer gaps (a
+closed `action_type` and closed `reason`/`error_code` already written on every
+relevant audit call but never rendered — D79) and one genuine data gap (record
+counts were never written to `AuditEvent.safe_metadata_json` at all — only to
+`DataDeletionOperation`'s own columns). Rendering counts required one small,
+explicitly authorised, narrowly scoped addition to the already-committed
+Phase 2 `deletion.py` writer — audit metadata only, no change to deletion
+planning, batching, preservation, retention eligibility, account
+anonymisation, or state transitions (D80). `retention.py` has never populated
+`preserved_counts_json`, so `preserved_count` is correctly always absent on
+retention events specifically; no writer produces a per-record `failed_count`
+anywhere in the engine, so that field is always omitted. Implemented as two
+further commits (`69117f7`, `b707788`), both remotely finalised in `a50cf06`.
+
+## Stage 9 Delivery Phase 5 — outage resilience and privacy-safe telemetry (recorded 2026-07-28)
+
+Implemented on `stage-9-resilience-telemetry` (base: the Phase 4 tip
+`481a67b`, `origin/stage-9-rate-limiting`), decided as ADR 0005 D82–D91. A
+mandatory baseline repair preceded product work: the pre-existing failing
+test `test_proposal_generation_dedup.py::test_approval_inbox_route_returns_the_new_proposal`
+(a Stage-8-era test seeding a proposal from a frozen historical constant,
+then reading it back through `GET /action-proposals`, which expires
+proposals against the real wall clock) was corrected per the repository's
+own documented clock-control convention (`tests/helpers.py`): route-level
+tests must seed from a live reference, never a frozen one. Fixed with no
+production behaviour change and proved stable via a disposable
+future-dated-clock monkeypatch (~400 days forward) before being removed; a
+new regression test (`test_approval_inbox_route_expires_a_proposal_seeded_from_a_stale_reference`)
+locks in the fix.
+
+A dependency-and-failure-mode inventory across Google, Redis, PostgreSQL,
+and ARQ preceded design and surfaced two genuine pre-existing gaps (closed
+in D87) plus the absence of any timeout policy, retry policy, failure
+taxonomy, metrics, or worker-side correlation propagation (closed in
+D82–D84, D89–D90). Ten decisions were ratified (D82–D91, see ADR 0005):
+closed failure taxonomy; central validated timeout policy distinguishing a
+write's longer budget from a read's; bounded retry-with-backoff for reads
+only, provably never applied to a write, with exhaustion re-raising the
+original exception type unchanged; a circuit breaker evaluated and
+deliberately omitted (existing per-account status, timeouts, retries, and
+the durable uncertain-outcome model already provide its benefits at pilot
+scale); a proactive stale-pending-execution recovery sweep closing the one
+asymmetry between the durable-execution model and the deletion/
+scheduled-brief subsystems; Redis-enqueue-failure hardening in both those
+subsystems; non-blocking Redis-degraded reporting on `/ready`; worker-scoped
+correlation IDs; bounded-cardinality metrics via `prometheus-client`
+(`GET /metrics`); and an additive `retryable`/`dependency` extension to the
+existing safe error envelope, wired into the Google-sync route.
+
+The frontend gained one new degraded state — a Google sync failure now
+visibly distinguishes "temporarily unavailable, safe to retry" (`role="status"`,
+amber) from "will not succeed by retrying, reconnect" (`role="alert"`, red) —
+implemented in `apps/web/src/app/connections/page.tsx` and
+`apps/web/src/lib/api.ts`. Three other outage-adjacent UX requirements
+(worker-delay wording, uncertain-execution warning, deletion-in-progress
+wording) were found already correctly implemented in earlier stages/phases
+and were verified, not re-built.
+
+No migration was needed — every Phase 5 mechanism lives in application code,
+Redis, or in-process state; the Alembic head remains `0011`.
+
+**Known limitations — superseded (recorded 2026-07-28, resolved 2026-07-29).**
+An earlier pass of this phase recorded four scope reductions here: partial
+provider-metrics coverage, an unpopulated timeout counter, the four
+outage-simulation Playwright journeys not built, and the existing ten
+journeys run only once. All four were closed in a follow-up convergence
+pass (2026-07-29), continuing on the same branch: (1) `observe_provider_call`
+now wraps the full Gmail/Calendar ingestion read path
+(`list_messages`/`get_message`/`list_history`/`get_current_history_id`/
+`list_events`) and OAuth token refresh, with three additional closed outcome
+values (`history_expired`, `sync_token_expired`, `grant_invalid`) so routine
+resync/revocation conditions no longer fall into the `unknown_error`
+catch-all. (2) `lifeflow_provider_timeouts_total` is now populated whenever
+a `GoogleTransientError`'s `__cause__` is an `httpx.TimeoutException`,
+alongside (not instead of) the general `provider_requests_total{outcome="timeout"}`
+count — a documented deliberate double count. (3) All four outage-simulation
+Playwright journeys (`apps/web/e2e-resilience/`) are built and passing —
+against a dedicated stack (a test-only fake Google server plus a separate
+API/web instance, `scripts/e2e-resilience.sh`, never run alongside the
+shared stack) — twice consecutively, with clean teardown and no orphan
+processes both times. (4) The existing ten Playwright journeys were also
+re-run twice consecutively on the fully-converged code with zero
+regressions. The full 17-item manual smoke test (§21) was completed live
+against the real stack, including every item previously covered only by
+automated tests: provider-read retry/recovery, provider permanent failure,
+provider authentication expiry, an uncertain provider write, no automatic
+retry of that uncertain write, and worker correlation propagation — the
+last of which surfaced one genuine gap (`worker_app.py::on_startup` never
+called `configure_logging`, so the worker process silently never emitted
+the structured, correlation-id-bearing logs the rest of this phase already
+built) which was fixed and covered by a regression test. See the Phase 5
+completion report's Manual Smoke-Test Results and Playwright Results
+sections for the exact commands and observed output.
+
 ## Open questions deliberately deferred (with owner stage)
 
 - ~~Evaluation acceptance targets~~ — **ratified 2026-07-16 in [ADR 0002](../architecture/adr/0002-evaluation-targets.md)** after the deterministic baseline; real-model metrics still pending an Anthropic key (before the Stage 10 gate).
 - Holdout + adversarial evaluation set (blind, dataset v2) — authored and run before the Stage 10 pilot gate; current golden v1 numbers are development-set results (ADR 0002, Stage 5 gate).
 - Real LLM augmentation stays off by default (`LLM_EXTRACTION_ENABLED=false`) until the ADR 0002 real-provider evaluation is recorded (Stage 5 gate check).
 - ~~Job runner confirmation~~ — **confirmed 2026-07-21 in ADR 0004 D43, implemented 2026-07-21 in ADR 0004 D48**: arq + Redis, live in Stage 8 Phase 2 (the scheduled brief), optional for demo/CI.
-- Production hosting provider + deployment shape — ADR 0005 at Stage 11.
+- Production hosting provider + deployment shape — a later ADR (0006) at Stage 11.
 - Google OAuth app verification and security assessment — roadmap recorded in `docs/security/threat-model.md`; begins in earnest once a real pilot beyond named test users is planned.
 - Entitlements/billing model — interfaces only, Stage 11; no billing implementation without explicit request.
 

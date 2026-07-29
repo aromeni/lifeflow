@@ -90,6 +90,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/audit-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Audit History
+         * @description Return a read-only, privacy-reviewed projection of the owner's log.
+         */
+        get: operations["list_audit_history_audit_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/dev-login": {
         parameters: {
             query?: never;
@@ -474,6 +494,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Metrics */
+        get: operations["metrics_metrics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/preferences": {
         parameters: {
             query?: never;
@@ -501,6 +538,125 @@ export interface paths {
         get?: never;
         /** Set Preference */
         put: operations["set_preference_preferences__key__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/privacy/account-deletion/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Account Deletion */
+        post: operations["preview_account_deletion_privacy_account_deletion_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/privacy/deletion-operations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Deletion Operations */
+        get: operations["list_deletion_operations_privacy_deletion_operations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/privacy/deletion-operations/{operation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Deletion Operation */
+        get: operations["get_deletion_operation_privacy_deletion_operations__operation_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/privacy/deletion-operations/{operation_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel Deletion Operation */
+        post: operations["cancel_deletion_operation_privacy_deletion_operations__operation_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/privacy/deletion-operations/{operation_id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm Deletion Operation */
+        post: operations["confirm_deletion_operation_privacy_deletion_operations__operation_id__confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/privacy/imported-data/{account_id}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Imported Data Deletion */
+        post: operations["preview_imported_data_deletion_privacy_imported_data__account_id__preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/privacy/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Privacy Summary */
+        get: operations["get_privacy_summary_privacy_summary_get"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -717,6 +873,60 @@ export interface components {
             /** Proposal Version */
             proposal_version: number;
         };
+        /**
+         * AuditHistoryActor
+         * @enum {string}
+         */
+        AuditHistoryActor: "you" | "lifeflow";
+        /**
+         * AuditHistoryCategory
+         * @enum {string}
+         */
+        AuditHistoryCategory: "all" | "actions" | "briefs" | "connections" | "privacy" | "preferences" | "account";
+        /** AuditHistoryItem */
+        AuditHistoryItem: {
+            /** Action Type */
+            action_type?: string | null;
+            actor: components["schemas"]["AuditHistoryActor"];
+            category: components["schemas"]["AuditHistoryCategory"];
+            /** Deleted Count */
+            deleted_count?: number | null;
+            /** Failed Count */
+            failed_count?: number | null;
+            /** Id */
+            id: string;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+            /** Preserved Count */
+            preserved_count?: number | null;
+            /** Reason */
+            reason?: string | null;
+            /** Summary */
+            summary: string;
+            /** Title */
+            title: string;
+            tone: components["schemas"]["AuditHistoryTone"];
+        };
+        /**
+         * AuditHistoryPeriod
+         * @enum {string}
+         */
+        AuditHistoryPeriod: "7d" | "30d" | "90d" | "all";
+        /** AuditHistoryResponse */
+        AuditHistoryResponse: {
+            /** Items */
+            items: components["schemas"]["AuditHistoryItem"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+        };
+        /**
+         * AuditHistoryTone
+         * @enum {string}
+         */
+        AuditHistoryTone: "neutral" | "success" | "warning" | "failure";
         /** BriefEvidence */
         BriefEvidence: {
             /** Excerpt */
@@ -884,6 +1094,13 @@ export interface components {
             /** Title */
             title: string;
         };
+        /** ConfirmRequest */
+        ConfirmRequest: {
+            /** Confirmation Phrase */
+            confirmation_phrase: string;
+            /** Expected Version */
+            expected_version: number;
+        };
         /** ConnectedAccountView */
         ConnectedAccountView: {
             /** Granted Scopes */
@@ -899,6 +1116,79 @@ export interface components {
         ConnectedAccountsResponse: {
             /** Accounts */
             accounts: components["schemas"]["ConnectedAccountView"][];
+        };
+        /** ConnectionSummaryView */
+        ConnectionSummaryView: {
+            /** Account Id */
+            account_id: string;
+            /** Can Disconnect */
+            can_disconnect: boolean;
+            /** Can Reconnect */
+            can_reconnect: boolean;
+            /** Connected */
+            connected: boolean;
+            /** Ever Synced */
+            ever_synced: boolean;
+            /** Freshness Band */
+            freshness_band: ("fresh" | "aging" | "stale") | null;
+            /** Granted Scopes */
+            granted_scopes: components["schemas"]["GrantedScopeView"][];
+            /** Last Synced At */
+            last_synced_at: string | null;
+            /** Provider */
+            provider: string;
+            /** Status */
+            status: string;
+        };
+        /** DeletionOperationView */
+        DeletionOperationView: {
+            /** Completed At */
+            completed_at: string | null;
+            /** Confirmation Phrase */
+            confirmation_phrase: string | null;
+            /** Created At */
+            created_at: string | null;
+            /** Deleted Counts */
+            deleted_counts: {
+                [key: string]: number;
+            };
+            /** In Progress */
+            in_progress: boolean;
+            /** Is Terminal */
+            is_terminal: boolean;
+            /** Operation Id */
+            operation_id: string;
+            /** Operation Type */
+            operation_type: string;
+            /** Preserved Counts */
+            preserved_counts: {
+                [key: string]: number;
+            };
+            /** Preview Counts */
+            preview_counts: {
+                [key: string]: number;
+            };
+            /** Preview Expires At */
+            preview_expires_at: string | null;
+            /** Requester Type */
+            requester_type: string;
+            /** Safe Error Code */
+            safe_error_code: string | null;
+            /** Scope Label */
+            scope_label: string;
+            /** Started At */
+            started_at: string | null;
+            /** State */
+            state: string;
+            /** Version */
+            version: number;
+            /** Warnings */
+            warnings: string[];
+        };
+        /** DeletionOperationsResponse */
+        DeletionOperationsResponse: {
+            /** Operations */
+            operations: components["schemas"]["DeletionOperationView"][];
         };
         /** DemoStartResponse */
         DemoStartResponse: {
@@ -1034,6 +1324,13 @@ export interface components {
             /** Updated */
             updated: number;
         };
+        /** GrantedScopeView */
+        GrantedScopeView: {
+            /** Label */
+            label: string;
+            /** Scope */
+            scope: string;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -1043,6 +1340,36 @@ export interface components {
         HealthStatus: {
             /** Status */
             status: string;
+        };
+        /**
+         * InventoryView
+         * @description Owner-scoped counts only — never any stored content.
+         */
+        InventoryView: {
+            /** Action Executions */
+            action_executions: number;
+            /** Action Proposals */
+            action_proposals: number;
+            /** Audit Events */
+            audit_events: number;
+            /** Brief Versions */
+            brief_versions: number;
+            /** Briefs */
+            briefs: number;
+            /** Connected Accounts */
+            connected_accounts: number;
+            /** Memory Evidence */
+            memory_evidence: number;
+            /** Memory Items */
+            memory_items: number;
+            /** Preferences */
+            preferences: number;
+            /** Scheduled Brief Runs */
+            scheduled_brief_runs: number;
+            /** Signals */
+            signals: number;
+            /** Source Items */
+            source_items: number;
         };
         /** MeResponse */
         MeResponse: {
@@ -1204,6 +1531,13 @@ export interface components {
             /** Preferences */
             preferences: components["schemas"]["PreferenceItem"][];
         };
+        /** PrivacySummaryResponse */
+        PrivacySummaryResponse: {
+            /** Connections */
+            connections: components["schemas"]["ConnectionSummaryView"][];
+            inventory: components["schemas"]["InventoryView"];
+            retention: components["schemas"]["RetentionView"];
+        };
         /** ProposalApprovalRequest */
         ProposalApprovalRequest: {
             action_type: components["schemas"]["ActionType"];
@@ -1274,6 +1608,38 @@ export interface components {
         PublicConfig: {
             /** Google Oauth Enabled */
             google_oauth_enabled: boolean;
+        };
+        /** ReadyStatus */
+        ReadyStatus: {
+            /**
+             * Degraded Dependencies
+             * @default []
+             */
+            degraded_dependencies: string[];
+            /** Status */
+            status: string;
+        };
+        /** RetentionClassView */
+        RetentionClassView: {
+            /** Description */
+            description: string;
+            /** Enforced */
+            enforced: boolean;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Retention Days */
+            retention_days: number | null;
+        };
+        /** RetentionView */
+        RetentionView: {
+            /** Classes */
+            classes: components["schemas"]["RetentionClassView"][];
+            /** Enforcement Active */
+            enforcement_active: boolean;
+            /** Notes */
+            notes: string[];
         };
         /**
          * RiskLevel
@@ -1595,6 +1961,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ActionProposalResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_audit_history_audit_history_get: {
+        parameters: {
+            query?: {
+                category?: components["schemas"]["AuditHistoryCategory"];
+                period?: components["schemas"]["AuditHistoryPeriod"];
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditHistoryResponse"];
                 };
             };
             /** @description Validation Error */
@@ -2263,6 +2663,26 @@ export interface operations {
             };
         };
     };
+    metrics_metrics_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
     list_preferences_preferences_get: {
         parameters: {
             query?: never;
@@ -2318,6 +2738,194 @@ export interface operations {
             };
         };
     };
+    preview_account_deletion_privacy_account_deletion_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeletionOperationView"];
+                };
+            };
+        };
+    };
+    list_deletion_operations_privacy_deletion_operations_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeletionOperationsResponse"];
+                };
+            };
+        };
+    };
+    get_deletion_operation_privacy_deletion_operations__operation_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                operation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeletionOperationView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_deletion_operation_privacy_deletion_operations__operation_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                operation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeletionOperationView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_deletion_operation_privacy_deletion_operations__operation_id__confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                operation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfirmRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeletionOperationView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_imported_data_deletion_privacy_imported_data__account_id__preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeletionOperationView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_privacy_summary_privacy_summary_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrivacySummaryResponse"];
+                };
+            };
+        };
+    };
     ready_ready_get: {
         parameters: {
             query?: never;
@@ -2333,10 +2941,10 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HealthStatus"];
+                    "application/json": components["schemas"]["ReadyStatus"];
                 };
             };
-            /** @description A dependency is unavailable */
+            /** @description A required dependency is unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;

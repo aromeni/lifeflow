@@ -79,9 +79,27 @@ def web_tests() -> str:
     return f"{match.group(1)} passing" if rc == 0 and match else "unavailable (vitest failed)"
 
 
+def ci_status() -> str:
+    """Report whether GitHub Actions workflows are actually wired in.
+
+    Previously a hardcoded "not yet connected" placeholder that was never
+    updated once CI genuinely started running — a stale-metrics defect found
+    during the Stage 9 Final Integration audit. Reflects the repository
+    state (workflow files present), not live run status, since this script
+    has no network access to query Actions.
+    """
+    workflows_dir = ROOT / ".github" / "workflows"
+    if not workflows_dir.is_dir():
+        return "not yet connected — no .github/workflows directory"
+    names = sorted(p.name for p in workflows_dir.glob("*.yml"))
+    if not names:
+        return "not yet connected — no workflow files"
+    return f"connected — {', '.join(names)}"
+
+
 def stage_progress() -> tuple[str, str]:
     text = (ROOT / "docs" / "delivery" / "stage-plan.md").read_text(encoding="utf-8")
-    active = re.search(r"\*\*Active stage: (\d+)", text)
+    active = re.search(r"\*\*Status:\*\*\s*Stage (\d+)", text)
     current = active.group(1) if active else "?"
     approved = len(re.findall(r"\(approved\)", text))
     pending = " (+1 complete pending approval)" if "complete pending approval" in text else ""
@@ -98,14 +116,13 @@ def main() -> int:
     )
     api_tests, api_coverage = backend_tests_and_coverage()
     web = web_tests()
-    e2e_specs = (
-        sum(
-            len(re.findall(r"^test\(", path.read_text(), re.M))
-            for path in (ROOT / "apps/web/e2e").glob("*.spec.ts")
-        )
-        if (ROOT / "apps/web/e2e").exists()
-        else 0
+    e2e_specs = sum(
+        len(re.findall(r"^test\(", path.read_text(), re.M))
+        for e2e_dir in ("apps/web/e2e", "apps/web/e2e-resilience")
+        if (ROOT / e2e_dir).exists()
+        for path in (ROOT / e2e_dir).glob("*.spec.ts")
     )
+    ci = ci_status()
     current_stage, completed = stage_progress()
 
     doc = f"""# Repository Metrics
@@ -123,7 +140,7 @@ def main() -> int:
 | Frontend tests | {web} |
 | E2E journeys (Playwright) | {e2e_specs} |
 | Frontend coverage | not yet measured — coverage reporter deferred until the UI stabilises |
-| CI | not yet connected — activates on first GitHub push |
+| CI | {ci} |
 | Current stage | {current_stage} |
 | Approved stages | {completed} |
 

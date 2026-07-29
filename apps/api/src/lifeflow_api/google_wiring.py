@@ -16,6 +16,7 @@ import uuid
 from fastapi import Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from lifeflow_api.account_deletion import ProviderRevoker
 from lifeflow_api.accounts import GoogleTokenService
 from lifeflow_api.action_executors import (
     ExecutorRegistry,
@@ -23,8 +24,10 @@ from lifeflow_api.action_executors import (
     GoogleExecutorRegistry,
     GoogleGmailDraftExecutor,
 )
+from lifeflow_api.google.oauth import GoogleOAuthClient
 from lifeflow_api.google_sync import GoogleSyncService
-from lifeflow_api.models import ActionType
+from lifeflow_api.models import ActionType, ConnectedAccount
+from lifeflow_api.security.token_cipher import TokenCipher
 
 
 def google_integration_ready(request: Request) -> bool:
@@ -92,7 +95,25 @@ def build_google_sync_service(
     )
 
 
+def build_account_revoker(cipher: TokenCipher, oauth_client: GoogleOAuthClient) -> ProviderRevoker:
+    """The real, best-effort provider revoker the worker injects into account
+    deletion (Stage 9 Delivery Phase 2 focused remediation). Reuses the same
+    `GoogleOAuthClient.revoke_token` the disconnect path uses. It decrypts the
+    stored refresh token in-process and revokes it remotely; it never returns,
+    logs, or persists the token or provider response. Any failure propagates to
+    the caller, which erases local credentials regardless and records a safe
+    `partially_failed` outcome."""
+
+    async def revoke(account: ConnectedAccount) -> None:
+        if account.encrypted_refresh_token is None:
+            return
+        await oauth_client.revoke_token(token=cipher.decrypt(account.encrypted_refresh_token))
+
+    return revoke
+
+
 __all__ = [
+    "build_account_revoker",
     "build_google_executor_registry",
     "build_google_sync_service",
     "build_google_token_service",
