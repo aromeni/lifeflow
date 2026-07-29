@@ -25,6 +25,7 @@ from lifeflow_api.execution_context import (
     ApprovedExecutionAuthorization,
     ApprovedExecutionContextChangedError,
 )
+from lifeflow_api.failure_taxonomy import classify_exception
 from lifeflow_api.google.calendar_client import CalendarEventClient
 from lifeflow_api.google.errors import (
     GoogleApiError,
@@ -34,6 +35,11 @@ from lifeflow_api.google.errors import (
 )
 from lifeflow_api.google.gmail_client import GmailDraftClient
 from lifeflow_api.models import ActionType
+from lifeflow_api.retry import retry_read
+
+
+def _is_retryable(exc: BaseException) -> bool:
+    return classify_exception(exc).retryable
 
 
 class FinalExecutionError(RuntimeError):
@@ -248,8 +254,12 @@ class GoogleGmailDraftExecutor:
         # failure below means the write happened but could not be
         # independently confirmed, which is `uncertain`, never `failed`.
         try:
-            content = await self._client.get_draft(
-                access_token=access_token, draft_id=created.draft_id
+            content = await retry_read(
+                lambda: self._client.get_draft(
+                    access_token=access_token, draft_id=created.draft_id
+                ),
+                is_retryable=_is_retryable,
+                max_attempts=2,
             )
         except GoogleApiError:
             return ExecutorOutcome(
@@ -363,8 +373,10 @@ class GoogleCalendarEventExecutor:
         # independently confirmed, which is `uncertain`, never `failed`,
         # and is never retried automatically.
         try:
-            record = await self._client.get_event(
-                access_token=access_token, event_id=result.event_id
+            record = await retry_read(
+                lambda: self._client.get_event(access_token=access_token, event_id=result.event_id),
+                is_retryable=_is_retryable,
+                max_attempts=2,
             )
         except GoogleApiError:
             message = "Calendar did not confirm the created event's content in time."

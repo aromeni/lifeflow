@@ -130,8 +130,20 @@ class GmailDraftClient:
     per call. Takes an injected `httpx.AsyncClient` so tests substitute
     `httpx.MockTransport` — no live network call is possible in tests."""
 
-    def __init__(self, http_client: httpx.AsyncClient) -> None:
+    def __init__(
+        self,
+        http_client: httpx.AsyncClient,
+        *,
+        write_timeout: httpx.Timeout | None = None,
+    ) -> None:
         self._http = http_client
+        # Stage 9 Delivery Phase 5: the one write this client performs gets a
+        # longer, separately-configured read budget than the client's default
+        # (`timeouts.google_httpx_write_timeout`) — a local timeout here must
+        # never be mistaken for "Google didn't receive the request" (see
+        # `timeouts.py` module docstring). `None` (the default, used by every
+        # existing test) keeps the client's own default timeout.
+        self._write_timeout = write_timeout
 
     async def list_messages(
         self, *, access_token: str, query: str, page_token: str | None, max_results: int
@@ -236,8 +248,15 @@ class GmailDraftClient:
         payload: dict[str, Any] = {"message": {"raw": raw_message}}
         if thread_id:
             payload["message"]["threadId"] = thread_id
+        extra: dict[str, Any] = (
+            {"timeout": self._write_timeout} if self._write_timeout is not None else {}
+        )
         response = await _post(
-            self._http, f"{_BASE_URL}/drafts", json=payload, headers=_headers(access_token)
+            self._http,
+            f"{_BASE_URL}/drafts",
+            json=payload,
+            headers=_headers(access_token),
+            **extra,
         )
         _raise_for_error(response)
         result = response.json()

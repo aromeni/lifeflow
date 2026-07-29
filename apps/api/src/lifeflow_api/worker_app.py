@@ -39,13 +39,19 @@ from lifeflow_api.scheduled_briefs import (
     job_serializer,
     run_scheduled_generation,
 )
+from lifeflow_api.timeouts import (
+    database_statement_timeout_ms,
+    google_httpx_timeout,
+)
 
 logger = logging.getLogger(__name__)
 
 
 async def on_startup(ctx: dict[str, Any]) -> None:
     settings = get_settings()
-    engine = create_engine(settings.database_url)
+    engine = create_engine(
+        settings.database_url, statement_timeout_ms=database_statement_timeout_ms(settings)
+    )
     ctx["engine"] = engine
     ctx["sessionmaker"] = async_sessionmaker(engine, expire_on_commit=False)
     ctx["llm_provider"] = None
@@ -69,7 +75,7 @@ async def on_startup(ctx: dict[str, Any]) -> None:
         from lifeflow_api.google_wiring import build_account_revoker
         from lifeflow_api.security.token_cipher import AesGcmTokenCipher
 
-        http = httpx.AsyncClient(timeout=10.0)
+        http = httpx.AsyncClient(timeout=google_httpx_timeout(settings))
         ctx["google_http_client"] = http
         cipher = AesGcmTokenCipher(settings.token_key, settings.token_key_id)
         ctx["revoker"] = build_account_revoker(cipher, GoogleOAuthClient(http))

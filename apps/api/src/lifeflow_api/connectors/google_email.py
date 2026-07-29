@@ -21,9 +21,27 @@ import re
 from datetime import UTC, datetime
 
 from lifeflow_api.connectors.interfaces import EmailFolder, EmailMessage
+from lifeflow_api.failure_taxonomy import classify_exception
 from lifeflow_api.google.errors import GoogleClientError, GoogleHistoryExpiredError
-from lifeflow_api.google.gmail_client import GmailDraftClient, GmailMessage
+from lifeflow_api.google.gmail_client import (
+    GmailDraftClient,
+    GmailHistoryPage,
+    GmailMessage,
+    GmailMessageSummary,
+)
 from lifeflow_api.google_sync_cursor import GoogleSyncCursor, decode_window, encode_window
+from lifeflow_api.retry import retry_read
+
+
+# Stage 9 Delivery Phase 5: every Gmail read on this connector's hot path
+# (list_history/list_messages/get_current_history_id/get_message) is
+# idempotent and safe to retry — `retry_read` only ever retries when
+# `_is_retryable` is True, so a `GoogleClientError`/`GoogleHistoryExpiredError`
+# (final/resync signal, not transient) still propagates on the first
+# attempt exactly as before.
+def _is_retryable(exc: BaseException) -> bool:
+    return classify_exception(exc).retryable
+
 
 _MAX_HISTORY_PAGES = 10
 _MAX_WINDOW_PAGES = 5
@@ -178,11 +196,15 @@ class GoogleEmailConnector:
         current_page_token = page_token
         completed = False
         for _ in range(_MAX_HISTORY_PAGES):
-            page = await self._client.list_history(
-                access_token=self._access_token,
-                start_history_id=base_history_id,
-                page_token=current_page_token,
-            )
+
+            async def _fetch_page(token: str | None = current_page_token) -> GmailHistoryPage:
+                return await self._client.list_history(
+                    access_token=self._access_token,
+                    start_history_id=base_history_id,
+                    page_token=token,
+                )
+
+            page = await retry_read(_fetch_page, is_retryable=_is_retryable)
             message_ids.extend(page.message_ids)
             latest_history_id = page.history_id
             current_page_token = page.next_page_token
@@ -227,12 +249,18 @@ class GoogleEmailConnector:
         current_page_token = page_token
         completed = False
         for _ in range(_MAX_WINDOW_PAGES):
-            summaries, next_token = await self._client.list_messages(
-                access_token=self._access_token,
-                query=query,
-                page_token=current_page_token,
-                max_results=_PAGE_SIZE,
-            )
+
+            async def _fetch_page(
+                token: str | None = current_page_token,
+            ) -> tuple[tuple[GmailMessageSummary, ...], str | None]:
+                return await self._client.list_messages(
+                    access_token=self._access_token,
+                    query=query,
+                    page_token=token,
+                    max_results=_PAGE_SIZE,
+                )
+
+            summaries, next_token = await retry_read(_fetch_page, is_retryable=_is_retryable)
             message_ids.extend(summary.id for summary in summaries)
             current_page_token = next_token
             if not current_page_token:
@@ -240,8 +268,9 @@ class GoogleEmailConnector:
                 break
         messages = await self._resolve_messages(message_ids)
         if completed:
-            new_history_id = await self._client.get_current_history_id(
-                access_token=self._access_token
+            new_history_id = await retry_read(
+                lambda: self._client.get_current_history_id(access_token=self._access_token),
+                is_retryable=_is_retryable,
             )
             self.cursor_status = status_if_complete
             self.sync_complete = True
@@ -270,9 +299,13 @@ class GoogleEmailConnector:
         messages = []
         for message_id in message_ids:
             try:
-                raw = await self._client.get_message(
-                    access_token=self._access_token, message_id=message_id
-                )
+
+                async def _fetch_message(mid: str = message_id) -> GmailMessage:
+                    return await self._client.get_message(
+                        access_token=self._access_token, message_id=mid
+                    )
+
+                raw = await retry_read(_fetch_message, is_retryable=_is_retryable)
             except GoogleClientError as exc:
                 if exc.status_code != _MESSAGE_NOT_FOUND_STATUS:
                     raise

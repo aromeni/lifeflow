@@ -134,6 +134,20 @@ class Settings(BaseSettings):
     rate_limit_max_forwarded_hops: int = Field(default=10, gt=0)
     rate_limit_redis_timeout_seconds: float = Field(default=0.2, gt=0)
 
+    # Stage 9 Delivery Phase 5: central, validated timeout policy. Every
+    # network call in the app uses one of these — never a scattered magic
+    # number — so a deployment can tune them without hunting through call
+    # sites. Defaults are conservative pilot values, not tuned for scale.
+    google_connect_timeout_seconds: float = Field(default=5.0, gt=0)
+    google_read_timeout_seconds: float = Field(default=10.0, gt=0)
+    # Writes (Gmail draft creation, Calendar event insertion) get a longer
+    # budget than reads: they run once, only after explicit user approval,
+    # and an early local timeout on a write whose request Google may still
+    # process is exactly the "uncertain outcome" case this phase must handle
+    # correctly rather than avoid by racing a short clock.
+    google_write_timeout_seconds: float = Field(default=20.0, gt=0)
+    database_statement_timeout_seconds: float = Field(default=10.0, gt=0)
+
 
 @lru_cache
 def get_settings() -> Settings:

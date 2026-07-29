@@ -27,6 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from lifeflow_api.audit import record_audit_event
 from lifeflow_api.brief_composition import BriefService
+from lifeflow_api.failure_taxonomy import FailureCode
 from lifeflow_api.llm.provider import LLMProvider
 from lifeflow_api.models import Brief, Preference, ScheduledBriefRun, ScheduledRunStatus, User
 from lifeflow_api.preferences import (
@@ -46,16 +47,19 @@ STALE_RUNNING_THRESHOLD = timedelta(minutes=10)
 MAX_ATTEMPTS = 3
 
 # Closed vocabulary only — never a stack trace, prompt content, or brief
-# prose (skill security requirement; ADR 0004 D49).
+# prose (skill security requirement; ADR 0004 D49). The four
+# infrastructure-failure codes below are the app-wide closed taxonomy
+# (Stage 9 Delivery Phase 5, `failure_taxonomy.py`); the rest are
+# scheduling-specific skip reasons with no equivalent there.
 ERROR_MISSED_GRACE_WINDOW = "missed_grace_window"
-ERROR_WORKER_STALE_TIMEOUT = "worker_stale_timeout"
+ERROR_WORKER_STALE_TIMEOUT = FailureCode.worker_stale_timeout.value
 ERROR_USER_UNAVAILABLE = "user_unavailable"
 ERROR_SCHEDULE_DISABLED = "schedule_disabled_before_execution"
 ERROR_INVALID_TIMEZONE = "invalid_timezone"
-ERROR_DATABASE_UNAVAILABLE = "database_unavailable"
-ERROR_REDIS_UNAVAILABLE = "redis_unavailable"
-ERROR_GENERATION_FAILED = "generation_error"
-ERROR_WORKER_TIMEOUT = "worker_timeout"
+ERROR_DATABASE_UNAVAILABLE = FailureCode.database_unavailable.value
+ERROR_REDIS_UNAVAILABLE = FailureCode.redis_unavailable.value
+ERROR_GENERATION_FAILED = FailureCode.generation_error.value
+ERROR_WORKER_TIMEOUT = FailureCode.worker_timeout.value
 
 JOB_FUNCTION_NAME = "generate_scheduled_brief"
 

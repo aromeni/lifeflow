@@ -49,6 +49,11 @@ from lifeflow_api.security.csrf import CSRF_HEADER, CsrfProtectionMiddleware
 from lifeflow_api.security.token_cipher import AesGcmTokenCipher
 from lifeflow_api.signals import router as signals_router
 from lifeflow_api.source_items import router as source_items_router
+from lifeflow_api.timeouts import (
+    database_statement_timeout_ms,
+    google_httpx_timeout,
+    google_httpx_write_timeout,
+)
 
 _MIN_PRODUCTION_RATE_LIMIT_SECRET_LENGTH = 32
 
@@ -68,7 +73,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        app.state.engine = create_engine(settings.database_url)
+        app.state.engine = create_engine(
+            settings.database_url,
+            statement_timeout_ms=database_statement_timeout_ms(settings),
+        )
         app.state.sessionmaker = async_sessionmaker(app.state.engine, expire_on_commit=False)
         try:
             yield
@@ -134,10 +142,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             )
         if app.state.token_cipher is None:
             raise RuntimeError("GOOGLE_OAUTH_ENABLED=true requires TOKEN_KEY to be set.")
-        app.state.google_http_client = httpx.AsyncClient(timeout=10.0)
+        app.state.google_http_client = httpx.AsyncClient(timeout=google_httpx_timeout(settings))
         app.state.google_oauth_client = GoogleOAuthClient(app.state.google_http_client)
-        app.state.gmail_client = GmailDraftClient(app.state.google_http_client)
-        app.state.calendar_client = CalendarEventClient(app.state.google_http_client)
+        write_timeout = google_httpx_write_timeout(settings)
+        app.state.gmail_client = GmailDraftClient(
+            app.state.google_http_client, write_timeout=write_timeout
+        )
+        app.state.calendar_client = CalendarEventClient(
+            app.state.google_http_client, write_timeout=write_timeout
+        )
 
     # Stage 9 Delivery Phase 4 (ADR 0005 D64/D81): off by default, matching
     # every other Stage 8/9 feature flag. A missing/short key secret in

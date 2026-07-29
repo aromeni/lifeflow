@@ -430,3 +430,43 @@ async def test_calendar_event_final_error_on_client_rejection() -> None:
             approved_authorization=SAMPLE_AUTHORIZATION,
         )
     assert exc.value.error_code == "google_client_error_404"
+
+
+async def test_gmail_draft_create_is_never_automatically_retried() -> None:
+    """Stage 9 Delivery Phase 5 (§8): a write whose outcome is uncertain
+    must never be retried automatically, unlike a read. Counts the actual
+    number of POST requests the transport received — a real regression
+    (e.g. someone routing `create_draft` through `retry_read`) would send
+    more than one, even though the outcome (`uncertain`) looks identical
+    either way."""
+    post_count = {"n": 0}
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        if request.method == "POST":
+            post_count["n"] += 1
+            return httpx.Response(503, json={})
+        return httpx.Response(200, json=_get_draft_response())
+
+    outcome = await _gmail_executor(httpx.MockTransport(handle)).execute(
+        proposal_id=PROPOSAL_ID, payload=DRAFT_PAYLOAD, approved_authorization=SAMPLE_AUTHORIZATION
+    )
+    assert outcome.status == "uncertain"
+    assert post_count["n"] == 1
+
+
+async def test_calendar_event_insert_is_never_automatically_retried() -> None:
+    """The Calendar analogue of the Gmail test above — same proof, same
+    reasoning (§8)."""
+    post_count = {"n": 0}
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        if request.method == "POST":
+            post_count["n"] += 1
+            return httpx.Response(503, json={})
+        return httpx.Response(200, json={})
+
+    outcome = await _calendar_executor(httpx.MockTransport(handle)).execute(
+        proposal_id=PROPOSAL_ID, payload=EVENT_PAYLOAD, approved_authorization=SAMPLE_AUTHORIZATION
+    )
+    assert outcome.status == "uncertain"
+    assert post_count["n"] == 1

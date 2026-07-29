@@ -112,8 +112,16 @@ def _raise_for_error(response: httpx.Response) -> None:
 
 
 class CalendarEventClient:
-    def __init__(self, http_client: httpx.AsyncClient) -> None:
+    def __init__(
+        self,
+        http_client: httpx.AsyncClient,
+        *,
+        write_timeout: httpx.Timeout | None = None,
+    ) -> None:
         self._http = http_client
+        # Stage 9 Delivery Phase 5: see `GmailDraftClient.__init__` — the same
+        # longer, separately-configured write-read budget applies here.
+        self._write_timeout = write_timeout
 
     async def list_events(
         self,
@@ -186,12 +194,16 @@ class CalendarEventClient:
         }
         if location:
             body["location"] = location
+        extra: dict[str, Any] = (
+            {"timeout": self._write_timeout} if self._write_timeout is not None else {}
+        )
         response = await _post(
             self._http,
             _BASE_URL,
             params={"sendUpdates": "none"},
             json=body,
             headers=_headers(access_token),
+            **extra,
         )
         _raise_for_error(response)
         result = response.json()
