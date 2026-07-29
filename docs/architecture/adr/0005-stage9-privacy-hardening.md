@@ -1,6 +1,6 @@
 # ADR 0005 — Stage 9: privacy, deletion, retention, audit UX, resilience
 
-**Status:** accepted (planning gate approved 2026-07-22); Delivery Phase 1 implemented 2026-07-22; Delivery Phase 2 implemented 2026-07-23; Delivery Phase 3 committed and pushed 2026-07-24 (`origin/stage-9-audit-history` at `a50cf06`, D75–D80); Delivery Phase 4 (rate limiting, D81) is implemented, verified, and committed locally as six commits on `stage-9-rate-limiting` from the approved parent `a50cf06`, awaiting remote finalisation (not pushed, not tagged, not merged).
+**Status:** accepted (planning gate approved 2026-07-22); Delivery Phase 1 implemented 2026-07-22; Delivery Phase 2 implemented 2026-07-23; Delivery Phase 3 committed and pushed 2026-07-24 (`origin/stage-9-audit-history` at `a50cf06`, D75–D80); Delivery Phase 4 (rate limiting, D81) remotely finalised 2026-07-27 (`origin/stage-9-rate-limiting` at `481a67b`); Delivery Phase 5 (resilience and telemetry, D82–D95) remotely finalised 2026-07-29 (`origin/stage-9-resilience-telemetry` at `5a2ca516`). Stage 9 final integration (all five Delivery Phases plus CI resilience-suite coverage and documentation closure) is in progress on `stage-9-final-integration`, not yet merged to `main`, not tagged.
 **Context:** Stage 8 is complete and merged to `main` (`c5b60b1`). Stage 9's
 exit theme is *"trust features operational — users control their data; the
 product fails safely in outages."* This ADR records the ratified Stage 9

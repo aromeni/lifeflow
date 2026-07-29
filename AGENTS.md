@@ -37,14 +37,15 @@ Stages 0–8 are complete and approved. Stage 8 is merged to `main`
 complete.** Delivery Phase 1 is remotely preserved at `49f121a`. Delivery
 Phase 2 is remotely finalised at `fdb4636` on
 `origin/stage-9-deletion-retention`. Delivery Phase 3 (audit history) is
-remotely finalised at `a50cf06` on `origin/stage-9-audit-history`.
+remotely finalised at `a50cf06` on `origin/stage-9-audit-history`. Delivery
+Phase 4 (rate limiting) is remotely finalised at `481a67b` on
+`origin/stage-9-rate-limiting`. Delivery Phase 5 (resilience and telemetry)
+is remotely finalised at `5a2ca516` on `origin/stage-9-resilience-telemetry`.
 
-Delivery Phase 4 (rate limiting) is committed locally as six commits on
-`stage-9-rate-limiting` from the approved parent `a50cf06`, and awaits remote
-finalisation — not pushed, not tagged. Delivery Phase 5 (resilience and
-telemetry) has not begun. No `stage-9-complete` tag exists, and Stage 9 has
-not been merged to `main`. Do not begin a Delivery Phase without explicit
-approval.
+Stage 9 final integration is now in progress on `stage-9-final-integration`,
+targeting a pull request into `main`. No `stage-9-complete` tag exists, and
+Stage 9 has not been merged to `main`. Do not begin a further Delivery Phase
+or Stage 10 work without explicit approval.
 
 ## Permanent rules
 

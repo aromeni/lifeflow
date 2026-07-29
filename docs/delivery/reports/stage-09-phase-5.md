@@ -4,6 +4,24 @@
 **Date:** 2026-07-28 (convergence pass completed and committed 2026-07-29).
 **Status:** implemented, closed, verified, and **committed locally as eight commits** on `stage-9-resilience-telemetry` from the approved parent `481a67b`. Not pushed, not tagged, not merged — Phase 5 awaits remote finalisation. Stage 9 is not complete.
 
+## Remote finalisation (recorded 2026-07-29 — addendum, does not alter the historical claims below)
+
+The eight commits described in this report's "Commit split" section were
+assembled exactly as specified, verified against the assembled tree, and
+pushed: `stage-9-resilience-telemetry` was pushed to `origin` with final tip
+`5a2ca5165de4f4cab384d10fec51630c9ca368ac`, confirmed identical to the local
+tip and reachable at every one of the eight listed commit subjects. The
+GitHub Actions "Secret scanning" workflow ran against that push (run ID
+`30474886442`) and passed all five checks; `ci.yml` correctly did not
+trigger, since its `on: push: branches: [main]` / `pull_request` condition
+does not match a feature-branch push with no open pull request. A local-only
+`stage-9-final-integration` branch was then created at that exact tip. Stage
+9 final integration (all five Delivery Phases, plus CI resilience-suite
+coverage and documentation closure) is recorded in
+[the Stage 9 closure report](stage-09.md). This paragraph is the only part
+of this document reflecting anything after 2026-07-29; every claim below
+remains the original record of the Phase 5 commit-assembly review.
+
 ## Executive verdict
 
 **APPROVE DELIVERY PHASE 5 FOR COMMIT**

@@ -58,6 +58,7 @@ KNOWN_LAUNCH_SITES = (
     "apps/api/tests/test_rate_limit_uvicorn_regression.py",
     "scripts/e2e-resilience.sh",
     "apps/web/e2e-resilience/journey-b-uncertain-write.spec.ts",
+    "docs/delivery/reports/stage-09.md",
 )
 
 # Frozen historical records — see module docstring. Exact list, no wildcard,
