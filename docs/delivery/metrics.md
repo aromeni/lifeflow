@@ -4,7 +4,7 @@
 
 | Metric | Value |
 |---|---|
-| Python files | 183 |
+| Python files | 184 |
 | TypeScript files | 30 |
 | Prompt files | 2 |
 | Eval cases | 20 |
@@ -13,7 +13,7 @@
 | Frontend tests | 90 passing |
 | E2E journeys (Playwright) | 14 |
 | Frontend coverage | not yet measured — coverage reporter deferred until the UI stabilises |
-| CI | not yet connected — activates on first GitHub push |
+| CI | connected — ci.yml, secret-scan.yml |
 | Current stage | 9 |
 | Approved stages | 8/12 |
 
