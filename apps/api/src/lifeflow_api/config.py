@@ -149,6 +149,19 @@ class Settings(BaseSettings):
     database_statement_timeout_seconds: float = Field(default=10.0, gt=0)
     worker_health_check_timeout_seconds: float = Field(default=0.5, gt=0)
 
+    # Stage 9 Delivery Phase 5 (§20): the test-only provider-control boundary.
+    # Off by default like every other feature flag; `create_app` refuses to
+    # start if this is ever `true` in `environment=production` (belt-and-
+    # braces alongside the fact that no real deployment ever sets it). When
+    # `true`, `google_api_origin_override` (if non-empty) replaces the
+    # scheme+host+port every Google client talks to — never the path — so a
+    # local Playwright run can point the app at an in-process fake Google
+    # server instead of a real Google host. Both are ignored entirely
+    # (override never read) unless this flag is set, so setting the origin
+    # alone can never accidentally redirect real Google traffic.
+    e2e_test_controls_enabled: bool = False
+    google_api_origin_override: str = ""
+
 
 @lru_cache
 def get_settings() -> Settings:

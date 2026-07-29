@@ -118,11 +118,15 @@ class CalendarEventClient:
         http_client: httpx.AsyncClient,
         *,
         write_timeout: httpx.Timeout | None = None,
+        base_url: str = _BASE_URL,
     ) -> None:
         self._http = http_client
         # Stage 9 Delivery Phase 5: see `GmailDraftClient.__init__` — the same
         # longer, separately-configured write-read budget applies here.
         self._write_timeout = write_timeout
+        # Stage 9 Delivery Phase 5 (§20): see `GmailDraftClient.__init__` —
+        # the same fake-server override point applies here.
+        self._base_url = base_url
 
     async def list_events(
         self,
@@ -149,7 +153,7 @@ class CalendarEventClient:
                 params["timeMax"] = time_max.isoformat()
         async with observe_provider_call("calendar", "list_events"):
             response = await _get(
-                self._http, _BASE_URL, params=params, headers=_headers(access_token)
+                self._http, self._base_url, params=params, headers=_headers(access_token)
             )
             if response.status_code == 410:
                 raise GoogleSyncTokenExpiredError("Calendar syncToken is invalid.")
@@ -204,7 +208,7 @@ class CalendarEventClient:
         async with observe_provider_call("calendar", "insert_event"):
             response = await _post(
                 self._http,
-                _BASE_URL,
+                self._base_url,
                 params={"sendUpdates": "none"},
                 json=body,
                 headers=_headers(access_token),
@@ -226,7 +230,7 @@ class CalendarEventClient:
         response (D40). Read-only; the write surface is unchanged."""
         async with observe_provider_call("calendar", "get_event"):
             response = await _get(
-                self._http, f"{_BASE_URL}/{event_id}", headers=_headers(access_token)
+                self._http, f"{self._base_url}/{event_id}", headers=_headers(access_token)
             )
             _raise_for_error(response)
         body = response.json()

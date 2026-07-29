@@ -136,8 +136,15 @@ class GmailDraftClient:
         http_client: httpx.AsyncClient,
         *,
         write_timeout: httpx.Timeout | None = None,
+        base_url: str = _BASE_URL,
     ) -> None:
         self._http = http_client
+        # Stage 9 Delivery Phase 5 (§20): configurable so a local Playwright
+        # run can point this client at an in-process fake Gmail server
+        # instead of the real host — never used outside
+        # `e2e_test_controls_enabled` (see `main.py`); defaults to the real
+        # Gmail API and is never overridden by ordinary configuration.
+        self._base_url = base_url
         # Stage 9 Delivery Phase 5: the one write this client performs gets a
         # longer, separately-configured read budget than the client's default
         # (`timeouts.google_httpx_write_timeout`) — a local timeout here must
@@ -155,7 +162,10 @@ class GmailDraftClient:
             params["pageToken"] = page_token
         async with observe_provider_call("gmail", "list_messages"):
             response = await _get(
-                self._http, f"{_BASE_URL}/messages", params=params, headers=_headers(access_token)
+                self._http,
+                f"{self._base_url}/messages",
+                params=params,
+                headers=_headers(access_token),
             )
             _raise_for_error(response)
         body = response.json()
@@ -170,7 +180,7 @@ class GmailDraftClient:
         async with observe_provider_call("gmail", "get_message"):
             response = await _get(
                 self._http,
-                f"{_BASE_URL}/messages/{message_id}",
+                f"{self._base_url}/messages/{message_id}",
                 params={
                     "format": "metadata",
                     # List-Unsubscribe (RFC 2369/8058) is fetched solely as a
@@ -209,7 +219,10 @@ class GmailDraftClient:
             params["pageToken"] = page_token
         async with observe_provider_call("gmail", "list_history"):
             response = await _get(
-                self._http, f"{_BASE_URL}/history", params=params, headers=_headers(access_token)
+                self._http,
+                f"{self._base_url}/history",
+                params=params,
+                headers=_headers(access_token),
             )
             if response.status_code == 404:
                 raise GoogleHistoryExpiredError("Gmail historyId has expired.")
@@ -232,7 +245,7 @@ class GmailDraftClient:
         assert "profile" in _ALLOWED_READ_PATHS  # noqa: S101
         async with observe_provider_call("gmail", "get_current_history_id"):
             response = await _get(
-                self._http, f"{_BASE_URL}/profile", headers=_headers(access_token)
+                self._http, f"{self._base_url}/profile", headers=_headers(access_token)
             )
             _raise_for_error(response)
         return str(response.json()["historyId"])
@@ -262,7 +275,7 @@ class GmailDraftClient:
         async with observe_provider_call("gmail", "create_draft"):
             response = await _post(
                 self._http,
-                f"{_BASE_URL}/drafts",
+                f"{self._base_url}/drafts",
                 json=payload,
                 headers=_headers(access_token),
                 **extra,
@@ -285,7 +298,7 @@ class GmailDraftClient:
         async with observe_provider_call("gmail", "get_draft"):
             response = await _get(
                 self._http,
-                f"{_BASE_URL}/drafts/{draft_id}",
+                f"{self._base_url}/drafts/{draft_id}",
                 params={"format": "raw"},
                 headers=_headers(access_token),
             )

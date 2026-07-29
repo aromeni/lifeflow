@@ -95,6 +95,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         docs_url="/docs" if settings.environment != "production" else None,
     )
     app.state.settings = settings
+    # Stage 9 Delivery Phase 5 (§20): the test-only provider-control boundary
+    # must never be reachable in production — checked unconditionally, not
+    # only when a fake origin happens to be configured, so a stray `true` in
+    # a production environment fails startup outright rather than silently
+    # doing nothing.
+    if settings.e2e_test_controls_enabled and settings.environment == "production":
+        raise RuntimeError("E2E_TEST_CONTROLS_ENABLED=true must never be set in production.")
     # LLM provider is off by default (ADR 0001 D4, ADR 0002): a key alone must
     # not enable real model calls — LLM_EXTRACTION_ENABLED=true is required too,
     # and stays false until a real-provider evaluation satisfies ADR 0002.
@@ -145,11 +152,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.google_http_client = httpx.AsyncClient(timeout=google_httpx_timeout(settings))
         app.state.google_oauth_client = GoogleOAuthClient(app.state.google_http_client)
         write_timeout = google_httpx_write_timeout(settings)
+        gmail_kwargs: dict[str, str] = {}
+        calendar_kwargs: dict[str, str] = {}
+        # Stage 9 Delivery Phase 5 (§20): only ever honoured when the
+        # test-controls flag is explicitly on (see the production guard
+        # above) — an origin override left in the environment by mistake is
+        # otherwise inert.
+        if settings.e2e_test_controls_enabled and settings.google_api_origin_override:
+            origin = settings.google_api_origin_override.rstrip("/")
+            gmail_kwargs["base_url"] = f"{origin}/gmail/v1/users/me"
+            calendar_kwargs["base_url"] = f"{origin}/calendar/v3/calendars/primary/events"
         app.state.gmail_client = GmailDraftClient(
-            app.state.google_http_client, write_timeout=write_timeout
+            app.state.google_http_client, write_timeout=write_timeout, **gmail_kwargs
         )
         app.state.calendar_client = CalendarEventClient(
-            app.state.google_http_client, write_timeout=write_timeout
+            app.state.google_http_client, write_timeout=write_timeout, **calendar_kwargs
         )
 
     # Stage 9 Delivery Phase 4 (ADR 0005 D64/D81): off by default, matching
