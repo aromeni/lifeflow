@@ -23,6 +23,7 @@ from arq.connections import ArqRedis, RedisSettings
 from arq.cron import CronJob
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
+from lifeflow_api.action_proposal_service import recover_stale_pending_executions
 from lifeflow_api.config import get_settings
 from lifeflow_api.db import create_engine
 from lifeflow_api.deletion import (
@@ -102,13 +103,14 @@ async def dispatch_scheduled_briefs(ctx: dict[str, Any]) -> None:
         result = await dispatch_tick(redis, session, now=now)
     logger.info(
         "scheduled_briefs.dispatch_tick due=%s enqueued=%s deduplicated=%s "
-        "skipped_grace=%s recovered_stale=%s recovery_failed=%s",
+        "skipped_grace=%s recovered_stale=%s recovery_failed=%s drained=%s",
         result.due,
         result.enqueued,
         result.deduplicated,
         result.skipped_grace,
         result.recovered_stale,
         result.recovery_failed,
+        result.drained,
     )
 
 
@@ -218,6 +220,22 @@ async def dispatch_deletion_operations(ctx: dict[str, Any]) -> None:
     )
 
 
+async def recover_stale_action_executions(ctx: dict[str, Any]) -> None:
+    """Stage 9 Delivery Phase 5 (§10): per-minute cross-user sweep for
+    `ActionExecution` rows stuck `pending` past `STALE_PENDING_AGE` (a
+    worker that crashed after the durable pre-call commit but before the
+    real executor call resolved). Flips them to `uncertain` — the same
+    terminal-for-now, never-auto-retried state `execute()`'s own re-entry
+    guard already assigns — without depending on anyone ever revisiting
+    that specific proposal. One static cron job, never one entry per user."""
+    sessionmaker = ctx["sessionmaker"]
+    now = datetime.now(UTC)
+    async with sessionmaker() as session:
+        recovered = await recover_stale_pending_executions(session, now=now)
+    if recovered:
+        logger.info("execution.stale_pending_recovered count=%s", recovered)
+
+
 def _redis_settings() -> RedisSettings:
     return RedisSettings.from_dsn(get_settings().redis_url)
 
@@ -242,6 +260,11 @@ class WorkerSettings:
         # memory API is the fast path between runs; this guarantees expiry even
         # for a user who never opens Settings again.
         cron(expire_stale_memory, hour=3, minute=0, second=0, max_tries=1),
+        # Stage 9 Delivery Phase 5: cross-user stale-pending-execution sweep,
+        # once a minute — the durable-execution-recovery analogue of the two
+        # cron jobs above, closing the one gap those two didn't already
+        # cover (see `recover_stale_action_executions` docstring).
+        cron(recover_stale_action_executions, second=0, run_at_startup=True, max_tries=1),
     ]
     redis_settings = _redis_settings()
     on_startup = on_startup
@@ -262,5 +285,6 @@ __all__ = [
     "expire_stale_memory",
     "generate_scheduled_brief",
     "recompute_user_memory",
+    "recover_stale_action_executions",
     "run_deletion_operation",
 ]

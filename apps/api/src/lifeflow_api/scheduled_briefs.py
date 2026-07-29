@@ -297,6 +297,50 @@ class DispatchTickResult:
     skipped_grace: int = 0
     recovered_stale: int = 0
     recovery_failed: int = 0
+    drained: int = 0
+
+
+# Stage 9 Delivery Phase 5: a distinct sentinel from ARQ's own `None`
+# (meaning "deduplicated, a job with this id is already queued") — a Redis
+# failure must never be mistaken for a successful dedup.
+_ENQUEUE_FAILED = object()
+
+
+async def _try_enqueue_job(redis: ArqRedis, external_id: str, job_id: str | None) -> Any:
+    """Fails open, exactly like the deletion engine's `_enqueue` and the
+    memory-recompute enqueue: any Redis error is logged and reported via the
+    sentinel rather than raised, so one blip never aborts the whole cron
+    tick (or the exception-handling path in `run_scheduled_generation`) —
+    the row is simply left `enqueued_at=None` for `_recover_never_enqueued`
+    to pick up on a later tick."""
+    try:
+        return await redis.enqueue_job(JOB_FUNCTION_NAME, external_id, _job_id=job_id)
+    except Exception:
+        logger.warning("scheduled_briefs.enqueue_failed job_id=%s", job_id, exc_info=True)
+        return _ENQUEUE_FAILED
+
+
+async def _recover_never_enqueued(session: AsyncSession, redis: ArqRedis, *, now: datetime) -> int:
+    """The scheduled-brief analogue of the deletion engine's pending-drain
+    pass: a run left `status=pending, enqueued_at=None` — either because
+    `dispatch_tick`'s own enqueue attempt failed a moment ago, or because
+    the transient-retry re-enqueue in `run_scheduled_generation` failed —
+    is retried here on the next tick using its already-assigned
+    `queue_job_id`, so ARQ's own dedup guard still applies correctly."""
+    pending = await session.execute(
+        select(ScheduledBriefRun).where(
+            ScheduledBriefRun.status == ScheduledRunStatus.pending,
+            ScheduledBriefRun.enqueued_at.is_(None),
+        )
+    )
+    drained = 0
+    for run in pending.scalars():
+        job = await _try_enqueue_job(redis, str(run.id), run.queue_job_id)
+        if job is _ENQUEUE_FAILED:
+            continue
+        run.enqueued_at = now
+        drained += 1
+    return drained
 
 
 async def dispatch_tick(
@@ -308,7 +352,9 @@ async def dispatch_tick(
     enqueued = 0
     deduplicated = 0
     for run in plan.to_enqueue:
-        job = await redis.enqueue_job(JOB_FUNCTION_NAME, str(run.id), _job_id=run.queue_job_id)
+        job = await _try_enqueue_job(redis, str(run.id), run.queue_job_id)
+        if job is _ENQUEUE_FAILED:
+            continue
         run.enqueued_at = now
         if job is None:
             deduplicated += 1
@@ -334,6 +380,7 @@ async def dispatch_tick(
             )
     await session.flush()
     recovery = await recover_stale_running(session, redis, now=now)
+    drained = await _recover_never_enqueued(session, redis, now=now)
     await session.commit()
     return DispatchTickResult(
         due=len(plan.to_enqueue) + plan.skipped_grace,
@@ -341,6 +388,7 @@ async def dispatch_tick(
         deduplicated=deduplicated,
         skipped_grace=plan.skipped_grace,
         recovered_stale=recovery.requeued,
+        drained=drained,
         recovery_failed=recovery.failed,
     )
 
@@ -385,7 +433,14 @@ async def recover_stale_running(
         run.status = ScheduledRunStatus.pending
         run.queue_job_id = job_id_for(run.user_id, run.local_brief_date, run.attempt_count)
         run.started_at = None
-        await redis.enqueue_job(JOB_FUNCTION_NAME, str(run.id), _job_id=run.queue_job_id)
+        # A stale enqueue timestamp from the run's earlier (now-stale)
+        # attempt must never survive a failed re-enqueue here, or
+        # `_recover_never_enqueued`'s `enqueued_at IS NULL` filter would
+        # never find this row again on a later tick.
+        run.enqueued_at = None
+        job = await _try_enqueue_job(redis, str(run.id), run.queue_job_id)
+        if job is _ENQUEUE_FAILED:
+            continue
         run.enqueued_at = now
         record_audit_event(
             session,
@@ -576,11 +631,16 @@ async def run_scheduled_generation(
             )
             reloaded.error_code = error_code
             reloaded.error_message = message
+            # Cleared before committing (not just on a failed enqueue below):
+            # `_recover_never_enqueued`'s `enqueued_at IS NULL` filter must
+            # see this row as needing a retry even if Redis is down right
+            # now, and this commit is the durability checkpoint a crash
+            # right after it must leave consistent.
+            reloaded.enqueued_at = None
             await session.commit()
-            await redis.enqueue_job(
-                JOB_FUNCTION_NAME, str(reloaded.id), _job_id=reloaded.queue_job_id
-            )
-            reloaded.enqueued_at = now
+            job = await _try_enqueue_job(redis, str(reloaded.id), reloaded.queue_job_id)
+            if job is not _ENQUEUE_FAILED:
+                reloaded.enqueued_at = now
             await session.commit()
         else:
             await _mark_terminal(

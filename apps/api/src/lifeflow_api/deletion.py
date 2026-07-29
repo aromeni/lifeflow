@@ -482,16 +482,29 @@ async def recover_stale_operations(
         .all()
     )
     for operation in pending:
-        if redis is not None:
-            await _enqueue(redis, operation, now)
+        if redis is not None and await _enqueue(redis, operation, now):
             result.drained += 1
     await session.commit()
     return result
 
 
-async def _enqueue(redis: ArqRedis, operation: DataDeletionOperation, now: datetime) -> None:
-    await redis.enqueue_job(JOB_FUNCTION_NAME, str(operation.id))
+async def _enqueue(redis: ArqRedis, operation: DataDeletionOperation, now: datetime) -> bool:
+    """Stage 9 Delivery Phase 5: fails open, exactly like every other
+    best-effort Redis enqueue in this app (`memory_inference.enqueue_recompute`,
+    the rate limiter). Before this, a Redis blip mid-loop raised uncaught out
+    of `recover_stale_operations`, aborting the whole cron tick and rolling
+    back every operation's state change made earlier in that same loop
+    (nothing had been committed yet). Leaving `enqueued_at` unset on failure
+    is itself the recovery mechanism — the next tick's pending-drain pass
+    (`recover_stale_operations`, below) retries the enqueue; no other
+    signal is needed."""
+    try:
+        await redis.enqueue_job(JOB_FUNCTION_NAME, str(operation.id))
+    except Exception:
+        logger.warning("deletion.enqueue_failed operation_id=%s", operation.id, exc_info=True)
+        return False
     operation.enqueued_at = now
+    return True
 
 
 # --- run one operation to completion (bounded batches) ----------------------
