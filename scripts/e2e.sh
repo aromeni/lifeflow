@@ -30,7 +30,7 @@ export LIFEFLOW_E2E=1
 
 # Start the real ARQ worker (own process group). PYTHONPATH=src mirrors the
 # API's `--app-dir src`. Log to a temp file so a startup failure is visible.
-WORKER_LOG="$(mktemp -t lifeflow-e2e-worker)"
+WORKER_LOG="$(mktemp -t lifeflow-e2e-worker.XXXXXX)"
 (cd apps/api && PYTHONPATH=src exec uv run arq lifeflow_api.worker_app.WorkerSettings) \
   >"$WORKER_LOG" 2>&1 &
 WORKER_PID=$!

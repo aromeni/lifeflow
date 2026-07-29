@@ -34,7 +34,7 @@ export LIFEFLOW_E2E=1
 # shellcheck disable=SC1091
 source scripts/resilience-api-env.sh
 
-API_LOG="$(mktemp -t lifeflow-e2e-resilience-api)"
+API_LOG="$(mktemp -t lifeflow-e2e-resilience-api.XXXXXX)"
 (
   cd apps/api
   # shellcheck disable=SC1091
