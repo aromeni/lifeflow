@@ -56,6 +56,7 @@ KNOWN_LAUNCH_SITES = (
     "apps/api/src/lifeflow_api/main.py",
     "apps/web/playwright.config.ts",
     "apps/web/playwright.design.config.ts",
+    "apps/web/playwright.owner-validation.config.ts",
     "apps/api/tests/test_rate_limit_uvicorn_regression.py",
     "scripts/e2e-resilience.sh",
     "apps/web/e2e-resilience/journey-b-uncertain-write.spec.ts",
