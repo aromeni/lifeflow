@@ -1,14 +1,17 @@
 name: TEMP — generate Linux visual baselines
 
-# Throwaway, workflow_dispatch-only: generates apps/web/e2e-design pixel
+# Throwaway, scoped to this one branch: generates apps/web/e2e-design pixel
 # baselines on the exact ubuntu-latest/chromium environment the real
 # `e2e-design` CI job uses, since baselines captured on a developer's local
 # macOS machine are named *-darwin.png and Playwright looks for *-linux.png
-# on this runner. Uploads the snapshots directory as an artifact for a human
-# (or an agent with repo write access) to download and commit; this workflow
+# on this runner. Triggers on push rather than workflow_dispatch because
+# GitHub only allows dispatching a workflow that already exists on the
+# default branch, and this branch is not merged to main. Uploads the
+# snapshots directory as an artifact to download and commit; this workflow
 # file itself is removed once the correct baselines are committed.
 on:
-  workflow_dispatch:
+  push:
+    branches: [stage-10-product-design]
 
 jobs:
   generate:
