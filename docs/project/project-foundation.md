@@ -235,7 +235,7 @@ Every future capability must be built on the same trusted foundation established
 
 ## 7. Success Metrics
 
-LifeFlow AI will be considered successful if it achieves the following over the first twelve months after MVP completion. Several of these correspond to MVP stage-gate criteria in [../product/mvp-scope.md](../product/mvp-scope.md) (zero unauthorised actions = S1, zero cross-user leakage = S6, brief read in under 2 minutes = Q6); the rest are pilot-era outcomes measured after launch. The brief-generation latency target feeds the Stage 10 performance-profiling checklist.
+LifeFlow AI will be considered successful if it achieves the following over the first twelve months after MVP completion. Several of these correspond to MVP stage-gate criteria in [../product/mvp-scope.md](../product/mvp-scope.md) (zero unauthorised actions = S1, zero cross-user leakage = S6, brief read in under 2 minutes = Q6); the rest are pilot-era outcomes measured after launch. The brief-generation latency target feeds the Stage 11 performance-profiling checklist (renumbered 2026-07-30 — originally Stage 10; see `docs/delivery/stage-plan.md`).
 
 ### Technical
 

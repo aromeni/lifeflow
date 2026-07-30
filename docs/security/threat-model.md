@@ -1,6 +1,6 @@
 # Threat Model
 
-**Status:** Stage 7 reviewed (v5, focused remediation round 3) · **Date:** 2026-07-17 · **Review before:** Stage 11 (deployment)
+**Status:** Stage 7 reviewed (v5, focused remediation round 3) · **Date:** 2026-07-17 · **Review before:** Stage 12 (packaging/deployment; renumbered 2026-07-30 — originally Stage 11, see `docs/delivery/stage-plan.md`)
 
 Scope: the MVP described in [../product/mvp-scope.md](../product/mvp-scope.md), with components and trust boundaries from [../architecture/system-context.md](../architecture/system-context.md). T11/T19/T20/T22/T23 were mitigated in design **before** the Stage 7 OAuth implementation began, as required; this revision (v3) records how each mitigation was actually built.
 
@@ -384,6 +384,6 @@ report).
   operation-name set (422 on anything else), and expose only synthetic
   object/call counts, never content.
 
-## Out-of-scope threats (recorded, revisit at Stage 11)
+## Out-of-scope threats (recorded, revisit at Stage 12)
 
-Multi-region availability, DDoS at scale, malicious insiders with database access, and formal GDPR DPIA sign-off (draft privacy notice arrives in Stage 10 for professional review).
+Multi-region availability, DDoS at scale, malicious insiders with database access, and formal GDPR DPIA sign-off (draft privacy notice arrives in Stage 11 for professional review). (Renumbered 2026-07-30 — originally Stage 11/Stage 10 respectively; see `docs/delivery/stage-plan.md`.)
