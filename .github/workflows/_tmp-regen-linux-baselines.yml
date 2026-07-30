@@ -1,0 +1,49 @@
+name: _tmp regen linux visual baselines
+
+on:
+  push:
+    branches: [stage-11a-phase-1-synthetic-validation]
+
+jobs:
+  regen:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: lifeflow
+          POSTGRES_PASSWORD: lifeflow # pragma: allowlist secret
+          POSTGRES_DB: lifeflow
+        ports: ["5433:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7
+        ports: ["6380:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+      - run: pnpm install --frozen-lockfile
+      - run: cd apps/api && uv sync
+      - run: cd apps/web && pnpm exec playwright install --with-deps chromium
+      - run: ./scripts/e2e-design.sh visual-regression.spec.ts --update-snapshots
+        continue-on-error: true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-baselines
+          path: apps/web/e2e-design/visual-regression.spec.ts-snapshots/*-linux.png

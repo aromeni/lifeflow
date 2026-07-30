@@ -27,7 +27,9 @@ async function signInAndStartDemo(page: Page): Promise<string> {
   return (await login.json()).user_id as string;
 }
 
-test("Stage 11A Phase 1 — full owner-operated synthetic walkthrough", async ({ page }, testInfo) => {
+test("Stage 11A Phase 1 — full owner-operated synthetic walkthrough", async ({
+  page,
+}, testInfo) => {
   test.setTimeout(120_000);
 
   // 1. Landing page.
