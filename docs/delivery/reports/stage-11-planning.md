@@ -1,0 +1,71 @@
+# Stage 11 Planning Gate Report — Evaluation and Pilot Readiness
+
+**Status:** Planning complete; Stage 11 implementation not begun · **Date:** 2026-07-30
+
+## Executive verdict
+
+**PLANNING COMPLETE — SUBMITTED FOR REVIEW, NOT YET APPROVED FOR EXECUTION**
+
+This report covers planning only: the evaluation design, hypotheses, thresholds, participant materials, data-governance plan, and decision templates for Stage 11's human-evaluation track. No participant session has been conducted, no product behaviour has changed, and no paid infrastructure has been provisioned.
+
+## Scope
+
+Stage 11 (Evaluation and Pilot Readiness) is the evidence gate between the technically complete, visually polished Stage 10 product and Stages 12–14 (packaging, production deployment, controlled pilot). This planning gate designs the **human-evaluation track** of Stage 11 in full, and cross-references — without re-planning — the two other tracks already scoped elsewhere: the holdout+adversarial technical evaluation ([ADR 0002](../../architecture/adr/0002-evaluation-targets.md)) and the professional privacy-notice review (stage-plan.md's External Setup table).
+
+## What was delivered
+
+| Document | Purpose |
+|---|---|
+| [docs/delivery/stage-11-plan.md](../stage-11-plan.md) | Stage 11 purpose, target-user hypothesis, evaluation design summary, cost policy, exit criteria |
+| [docs/evaluation/stage-11/product-hypotheses.md](../../evaluation/stage-11/product-hypotheses.md) | 4 problem, 6 value, 6 usability, 8 safety hypotheses, each with evidence/task/metric/threshold/consequence |
+| [docs/evaluation/stage-11/success-criteria.md](../../evaluation/stage-11/success-criteria.md) | Fixed measurable thresholds, set before any session |
+| [docs/evaluation/stage-11/participant-information.md](../../evaluation/stage-11/participant-information.md) | Participant-facing information sheet template |
+| [docs/evaluation/stage-11/consent-form.md](../../evaluation/stage-11/consent-form.md) | Consent form template |
+| [docs/evaluation/stage-11/facilitator-guide.md](../../evaluation/stage-11/facilitator-guide.md) | Facilitator script and session-running procedure |
+| [docs/evaluation/stage-11/task-protocol.md](../../evaluation/stage-11/task-protocol.md) | 20 scripted participant journeys, each mapped to hypotheses |
+| [docs/evaluation/stage-11/observation-sheet.md](../../evaluation/stage-11/observation-sheet.md) | Per-task recording template |
+| [docs/evaluation/stage-11/safety-questionnaire.md](../../evaluation/stage-11/safety-questionnaire.md) | Safety-comprehension questionnaire, critical items flagged |
+| [docs/evaluation/stage-11/post-session-questionnaire.md](../../evaluation/stage-11/post-session-questionnaire.md) | Trust/usefulness ratings + SUS |
+| [docs/evaluation/stage-11/issue-register-template.md](../../evaluation/stage-11/issue-register-template.md) | P0–P3 severity framework and register |
+| [docs/evaluation/stage-11/data-governance.md](../../evaluation/stage-11/data-governance.md) | Full data-governance plan |
+| [docs/evaluation/stage-11/findings-template.md](../../evaluation/stage-11/findings-template.md) | Analysis-report template |
+| [docs/evaluation/stage-11/go-no-go-template.md](../../evaluation/stage-11/go-no-go-template.md) | GO / CONDITIONAL GO / NO-GO decision template |
+
+## Documents updated
+
+- [docs/delivery/stage-plan.md](../stage-plan.md) — added a note that human-evaluation planning is complete, without changing Stage 11's status (still "next, has not begun").
+- [docs/delivery/assumptions-and-decisions.md](../assumptions-and-decisions.md) — new decision-log entry recording the two-round evaluation design decision.
+- [docs/architecture/tree.md](../../architecture/tree.md) — added `docs/evaluation/` to the tree with an explicit "no participant data ever committed here" note.
+
+## Documents deliberately not changed
+
+- `README.md` — already correctly states "Stage 11 ... is next and has not begun"; no genuine status change occurred.
+- `docs/delivery/metrics.md` — current stage (11) and approved-stage count (11/15) are unchanged by planning; regenerating would produce a byte-identical file, so it was left as-is rather than re-run for no effect.
+- `CLAUDE.md` / `AGENTS.md` — current-stage statements remain accurate ("Stage 11 ... next, not yet started"); planning does not change this.
+
+## Verification results
+
+- `pre-commit run --all-files` — pass (see commit list below for the exact run associated with each commit).
+- `gitleaks protect --staged` and full-history `gitleaks detect` — 0 leaks.
+- `detect-secrets scan --baseline .secrets.baseline` — clean.
+- `git diff --check` — clean (no whitespace errors).
+- Internal-link spot check — every relative link added in the new documents resolves to a file that exists in this branch.
+- Terminology consistency — P0/P1/P2/P3 definitions appear identically in `issue-register-template.md` and are referenced, not redefined, everywhere else; threshold numbers in `product-hypotheses.md` and `go-no-go-template.md` are sourced from `success-criteria.md`, not restated independently.
+- Repository scan for committed participant data, real credentials, or infrastructure resources — none found; every evaluation document under `docs/evaluation/stage-11/` is a blank template, and `data-governance.md` explicitly states no participant data is ever committed to this repository.
+- No `apps/api`, `apps/web`, `prompts/`, `migrations/`, or `infra/` file touched.
+
+## Boundary confirmation
+
+- Branch `stage-11-evaluation-planning` created from `main` at `267dc3518ae930ab468411e0a53088a3cd5d534e` (the roadmap-reconciliation merge commit).
+- `stage-10-complete` tag unchanged throughout.
+- No Stage 11 completion tag created.
+- No participant recruitment, session, or product-behaviour change occurred.
+- No paid cloud infrastructure was provisioned.
+
+## Explicit exclusions
+
+This planning gate does not: conduct any evaluation session; change any product behaviour; provision paid infrastructure; connect a real Gmail or Calendar account; begin Stage 12 work; or claim any ethics/institutional approval that has not actually been obtained (see `participant-information.md` and `data-governance.md`'s explicit flags on this point).
+
+## Next authorised action
+
+This plan is submitted for review. Running Round 1 of the evaluation, and any further Stage 11 work, requires separate explicit approval and is not authorised by this report.
