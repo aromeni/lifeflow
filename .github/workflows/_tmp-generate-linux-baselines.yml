@@ -1,0 +1,39 @@
+name: TEMP — generate Linux visual baselines
+
+# Throwaway, workflow_dispatch-only: generates apps/web/e2e-design pixel
+# baselines on the exact ubuntu-latest/chromium environment the real
+# `e2e-design` CI job uses, since baselines captured on a developer's local
+# macOS machine are named *-darwin.png and Playwright looks for *-linux.png
+# on this runner. Uploads the snapshots directory as an artifact for a human
+# (or an agent with repo write access) to download and commit; this workflow
+# file itself is removed once the correct baselines are committed.
+on:
+  workflow_dispatch:
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: cd apps/api && uv sync --locked
+      - run: pnpm --filter @lifeflow/web exec playwright install chromium --with-deps
+      - run: ./scripts/e2e-design.sh visual-regression.spec.ts --update-snapshots
+      - name: Upload generated snapshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-visual-baselines
+          path: apps/web/e2e-design/visual-regression.spec.ts-snapshots/
+          retention-days: 1
