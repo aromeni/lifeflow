@@ -43,7 +43,7 @@ repos:
         pass_filenames: false
         always_run: true
       - id: check-ci-e2e-coverage
-        name: check both Playwright E2E suites remain wired into ci.yml
+        name: check all three Playwright E2E suites remain wired into ci.yml
         entry: python3 scripts/check_ci_e2e_coverage.py
         language: system
         files: ^\.github/workflows/ci\.yml$
