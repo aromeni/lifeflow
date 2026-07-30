@@ -63,7 +63,7 @@ Neutral cool-grey surface/text scale, one restrained indigo accent, four semanti
 | `pre-commit run --all-files` (12 hooks, against the exact staged boundary) | all pass |
 | `detect-secrets` | clean, no new findings (allowlist inspected — all entries pre-existing Stage 7 test fixtures) |
 | `gitleaks protect --staged` | 0 leaks |
-| `gitleaks detect` (full history, 59 commits) | 0 leaks |
+| `gitleaks detect` (full history) | 0 leaks (gitleaks's own progress counter reported 59 commits scanned at this point in the review; see the note below on why that figure undercounts the true git-verified total and should not be read as an authoritative commit count) |
 | Private-key detection | none found |
 | `.env.example` / Uvicorn launch-safety checks | pass (all launch sites classified, including the two new suite configs) |
 | CI suite-coverage validation | pass — all 3 suites wired as real `run:` steps |
@@ -72,6 +72,8 @@ Neutral cool-grey surface/text scale, one restrained indigo accent, four semanti
 ## Exact-boundary security proof
 
 `git add -A` staged the final boundary of 55 changed paths (26 new, 29 modified; `git diff --cached --stat`: 3552 insertions, 1151 deletions). Confirmed staged: all screenshot/snapshot files (8 PNGs under `e2e-design/visual-regression.spec.ts-snapshots/`), all new test fixtures, all configuration changes (`ci.yml`, `playwright.design.config.ts`, `package.json`, `pnpm-lock.yaml`, `scripts/e2e-design.sh`). Confirmed absent from the staged set: any `.env` file, credential, database/Redis dump, runtime log, Playwright report/trace/`test-results/` directory, cache, absolute local path, or throwaway script. The full hook/secret-scan matrix above was run against this exact staged tree. `.secrets.baseline`'s only observed diff across scans was its own `generated_at` timestamp, which was discarded (`git checkout --`) rather than treated as a real change. `git reset` afterward returned the index to empty with all 55 changed paths verified still present, unstaged, in the working tree — nothing was discarded. (An earlier intermediate run of this proof, before the documentation and metrics fixes below were made, staged 54/28 paths; this section reports only the final, authoritative count.)
+
+**Note on gitleaks's "N commits scanned" figure:** this is gitleaks's own internal progress counter, not equivalent to `git rev-list --count`/`git log --oneline | wc -l`. By default `git log -p` prints no diff for a merge commit (a combined/`-m` diff is needed to see one), and gitleaks's commit-boundary parser does not count a commit it shows no diff for — so its reported total is systematically lower than the repository's actual commit count by roughly the number of merge commits in the scanned range. It is a valid indicator that gitleaks is not scanning a suspiciously truncated slice of history, but it is not a substitute for `git rev-list --count` when an authoritative commit total is needed — see the Stage 10 merge report's "Commit-count reconciliation" section for the verified figures.
 
 ## Accessibility posture (honest, not certified)
 
