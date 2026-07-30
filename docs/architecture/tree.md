@@ -44,9 +44,13 @@ lifeflow-ai/
 │   ├── product/             # Vision, personas, journeys, MVP scope, wireframes.
 │   ├── architecture/        # System context, this tree, and adr/ (numbered decision records).
 │   ├── security/            # Threat model and security reviews.
-│   └── delivery/            # Stage plan, assumptions/decisions log, and
-│                            # runbooks/ (operational: outage response,
-│                            # provider failure, worker recovery, health).
+│   ├── delivery/            # Stage plan, assumptions/decisions log, and
+│   │                        # runbooks/ (operational: outage response,
+│   │                        # provider failure, worker recovery, health).
+│   └── evaluation/          # Human-evaluation materials, per stage (e.g.
+│                            # stage-11/: hypotheses, thresholds, participant
+│                            # protocol, consent/governance templates — no
+│                            # participant data is ever committed here).
 ├── .github/workflows/       # CI pipelines — mirror the local commands exactly, never diverge.
 ├── docker-compose.yml       # Local development stack (PostgreSQL now; Redis when Stage 8 needs it).
 ├── CLAUDE.md                # Repository operating instructions for AI sessions: commands, boundaries, rules.
