@@ -61,7 +61,13 @@ test("renders privacy-safe plain language, actor, category, outcome and local ti
 
   expect(await screen.findByRole("heading", { name: "Action rejected" })).toBeInTheDocument();
   expect(screen.getByText("You chose not to approve an action.")).toBeInTheDocument();
-  expect(screen.getByText(/You · Actions · Attention/)).toBeInTheDocument();
+  // Actor, category and tone are now three adjacent elements (the tone is
+  // its own coloured Badge) rather than one text node — verify each piece.
+  expect(screen.getByText("You")).toBeInTheDocument();
+  // "Actions" also appears as a <select> filter option — scope to the
+  // metadata row's own <span>.
+  expect(screen.getByText("Actions", { selector: "span" })).toBeInTheDocument();
+  expect(screen.getByText("Attention")).toBeInTheDocument();
   expect(screen.getByText(/22 Jul 2026/)).toBeInTheDocument();
   expect(screen.getByText(/Private content.*never shown here/i)).toBeInTheDocument();
   expect(screen.queryByText(/safe_metadata|entity_id|correlation_id/i)).toBeNull();

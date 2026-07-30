@@ -4,6 +4,9 @@ import { useMemo, useState } from "react";
 
 import { EvidenceDrawer } from "@/components/EvidenceDrawer";
 import { rateLimitMessage } from "@/components/RateLimitNotice";
+import { Badge, RiskBadge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import { Notice } from "@/components/ui/Notice";
 import { api, ApiError, RateLimitError } from "@/lib/api";
 import type { ActionPayload, ActionProposal } from "@/lib/types";
 
@@ -124,32 +127,50 @@ export function ExactPayloadPreview({
     <section
       aria-label="Exact approval preview"
       data-testid={testId}
-      className="flex flex-col gap-3 rounded-md border border-current/30 p-4"
+      className="flex flex-col gap-3 rounded-lg border-2 border-accent/30 bg-accent-subtle/20 p-4"
     >
       <div>
-        <h3 className="font-semibold">Exact approval preview</h3>
-        <p className="text-sm opacity-70">
+        <h3 className="font-semibold text-foreground">Exact approval preview</h3>
+        <p className="text-sm text-text-secondary">
           {ACTION_LABELS[actionType]} · proposal version {version}
         </p>
       </div>
       <dl className="grid gap-2 text-sm sm:grid-cols-[10rem_1fr]">
         {Object.entries(payload).map(([name, value]) => (
           <div key={name} className="contents">
-            <dt className="font-medium">{formatFieldName(name)}</dt>
-            <dd className="whitespace-pre-wrap break-words">{formatValue(value, timezone)}</dd>
+            <dt className="font-medium text-foreground">{formatFieldName(name)}</dt>
+            <dd className="wrap-break-word whitespace-pre-wrap text-text-secondary">
+              {formatValue(value, timezone)}
+            </dd>
           </div>
         ))}
       </dl>
       <details className="text-xs">
-        <summary className="cursor-pointer underline">Exact canonical JSON and hash</summary>
-        <pre className="mt-2 overflow-x-auto whitespace-pre-wrap break-all rounded bg-black/5 p-3 dark:bg-white/10">
+        <summary className="cursor-pointer text-text-secondary underline">
+          Exact canonical JSON and hash
+        </summary>
+        <pre className="mt-2 overflow-x-auto rounded-md bg-surface-raised p-3 whitespace-pre-wrap break-all">
           {JSON.stringify({ action_type: actionType, proposal_version: version, payload }, null, 2)}
         </pre>
-        <p className="mt-2 break-all font-mono">Payload SHA-256: {payloadHash}</p>
+        <p className="mt-2 font-mono break-all text-text-tertiary">
+          Payload SHA-256: {payloadHash}
+        </p>
       </details>
     </section>
   );
 }
+
+const STATUS_TONE: Record<string, "neutral" | "info" | "success" | "warning" | "danger"> = {
+  proposed: "neutral",
+  edited: "neutral",
+  approved: "info",
+  executing: "info",
+  executed: "success",
+  rejected: "neutral",
+  failed: "danger",
+  expired: "neutral",
+  "execution outcome uncertain": "warning",
+};
 
 export function ActionProposalPanel({
   proposal,
@@ -233,38 +254,42 @@ export function ActionProposalPanel({
     }
   }
 
+  const statusLabel = proposalStatusLabel(proposal);
+  const statusTone = STATUS_TONE[statusLabel.toLowerCase()] ?? "neutral";
+
   return (
     <article
       data-testid={`proposal-${proposal.action_type}`}
-      className="flex flex-col gap-5 rounded-lg border border-current/25 p-5"
+      className="flex flex-col gap-5 rounded-lg border border-border bg-surface p-5 shadow-sm"
     >
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex flex-col gap-1">
-          <h2 className="text-xl font-semibold">{ACTION_LABELS[proposal.action_type]}</h2>
-          <p>{proposal.rationale}</p>
+          <h2 className="text-xl font-semibold text-foreground">
+            {ACTION_LABELS[proposal.action_type]}
+          </h2>
+          <p className="text-text-secondary">{proposal.rationale}</p>
         </div>
-        <span
-          data-testid={`proposal-status-${proposal.action_type}`}
-          className="rounded-full border border-current/30 px-2.5 py-1 text-xs font-medium uppercase tracking-wide"
-        >
-          {proposalStatusLabel(proposal)}
-        </span>
+        <Badge tone={statusTone} testId={`proposal-status-${proposal.action_type}`}>
+          {statusLabel}
+        </Badge>
       </header>
 
-      <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm opacity-75">
-        <span>Risk: {proposal.risk_level}</span>
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-text-secondary">
+        <RiskBadge level={proposal.risk_level} />
         <span>Confidence: {Math.round(proposal.confidence * 100)}%</span>
-        <span>Expires: {formatDate(proposal.expires_at, timezone)}</span>
+        <span data-testid="proposal-expires">
+          Expires: {formatDate(proposal.expires_at, timezone)}
+        </span>
       </div>
 
-      <section
-        data-testid="execution-mode-notice"
-        data-execution-mode={proposal.execution_mode}
-        className="rounded-md border border-current/30 p-3 text-sm"
+      <Notice
+        tone={proposal.execution_mode === "unavailable" ? "warning" : "info"}
+        role="status"
+        testId="execution-mode-notice"
+        title={executionModeNotice(proposal).title}
       >
-        <p className="font-medium">{executionModeNotice(proposal).title}</p>
-        <p className="opacity-70">{executionModeNotice(proposal).body}</p>
-      </section>
+        {executionModeNotice(proposal).body}
+      </Notice>
 
       <EvidenceDrawer evidence={proposal.evidence} timezone={timezone} />
 
@@ -278,24 +303,24 @@ export function ActionProposalPanel({
       />
 
       {proposal.action_type === "create_calendar_event" ? (
-        <section
-          data-testid="guest-notifications-notice"
-          className="rounded-md border border-current/30 p-3 text-sm"
+        <Notice
+          tone="info"
+          role="status"
+          testId="guest-notifications-notice"
+          title="Guest notifications: off"
         >
-          <p className="font-medium">Guest notifications: off</p>
-          <p className="opacity-70">
-            Creating this event never emails attendees an invitation and never updates their
-            calendars — only your own calendar is affected.
-          </p>
-        </section>
+          Creating this event never emails attendees an invitation and never updates their calendars
+          — only your own calendar is affected.
+        </Notice>
       ) : null}
 
       {proposal.approval ? (
-        <section
-          data-testid="approval-binding"
-          className="rounded-md border border-green-700/40 p-3 text-sm"
+        <Notice
+          tone="success"
+          role="status"
+          testId="approval-binding"
+          title="Approved exact payload"
         >
-          <p className="font-medium">Approved exact payload</p>
           <p>
             Version {proposal.approval.proposal_version} · approved{" "}
             {formatDate(proposal.approval.approved_at, timezone)}
@@ -306,33 +331,31 @@ export function ActionProposalPanel({
               ? " (Google)"
               : " (simulation)"}
           </p>
-          <p className="mt-1 break-all font-mono text-xs">
+          <p className="mt-1 font-mono text-xs break-all">
             Binding SHA-256: {proposal.approval.binding_hash}
           </p>
-        </section>
+        </Notice>
       ) : null}
 
       {proposal.execution_context_changed ? (
-        <section
-          data-testid="execution-context-changed-notice"
+        <Notice
+          tone="warning"
           role="alert"
-          className="rounded-md border border-amber-700/40 bg-amber-100 p-3 text-sm text-amber-900 dark:bg-amber-900/40 dark:text-amber-200"
+          testId="execution-context-changed-notice"
+          title="Execution context changed since approval"
         >
-          <p className="font-medium">Execution context changed since approval</p>
-          <p className="opacity-90">
-            What this action would actually do has changed since it was approved (for example, the
-            connected Google account changed). Reload and review it again before approving or
-            executing.
-          </p>
-        </section>
+          What this action would actually do has changed since it was approved (for example, the
+          connected Google account changed). Reload and review it again before approving or
+          executing.
+        </Notice>
       ) : null}
 
       {editing ? (
         <section className="flex flex-col gap-2">
-          <label htmlFor={`payload-${proposal.id}`} className="font-medium">
+          <label htmlFor={`payload-${proposal.id}`} className="font-medium text-foreground">
             Edit every executor input field
           </label>
-          <p className="text-sm opacity-70">
+          <p className="text-sm text-text-secondary">
             Saving increments the proposal version. If this proposal was approved, saving also
             invalidates that approval and requires a fresh review.
           </p>
@@ -343,37 +366,33 @@ export function ActionProposalPanel({
             onChange={(event) => setDraft(event.target.value)}
             rows={12}
             spellCheck={false}
-            className="w-full rounded-md border border-current/30 bg-transparent p-3 font-mono text-sm"
+            className="w-full rounded-md border border-border-strong bg-surface p-3 font-mono text-sm text-foreground"
           />
           <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={saveEdit}
-              disabled={pending !== null}
-              className="rounded bg-foreground px-3 py-2 text-sm text-background disabled:opacity-50"
-            >
+            <Button type="button" variant="primary" onClick={saveEdit} disabled={pending !== null}>
               {pending === "edit" ? "Saving…" : "Save and invalidate approval"}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="secondary"
               onClick={() => {
                 setDraft(exactJson);
                 setEditing(false);
                 setError("");
               }}
               disabled={pending !== null}
-              className="rounded border border-current/30 px-3 py-2 text-sm disabled:opacity-50"
             >
               Cancel
-            </button>
+            </Button>
           </div>
         </section>
       ) : null}
 
       <div className="flex flex-wrap gap-2">
         {canApprove ? (
-          <button
+          <Button
             type="button"
+            variant="primary"
             data-testid={`approve-${proposal.action_type}`}
             onClick={() =>
               transition("approve", `/action-proposals/${proposal.id}/approve`, {
@@ -384,18 +403,17 @@ export function ActionProposalPanel({
               })
             }
             disabled={pending !== null}
-            className="rounded bg-foreground px-4 py-2 text-sm font-medium text-background disabled:opacity-50"
           >
             {pending === "approve" ? "Approving…" : "Approve exact payload"}
-          </button>
+          </Button>
         ) : null}
         {proposal.status === "approved" ? (
-          <button
+          <Button
             type="button"
+            variant="primary"
             data-testid={`execute-${proposal.action_type}`}
             onClick={() => transition("execute", `/action-proposals/${proposal.id}/execute`)}
             disabled={pending !== null || proposal.execution_context_changed}
-            className="rounded bg-foreground px-4 py-2 text-sm font-medium text-background disabled:opacity-50"
           >
             {proposal.execution_mode === "real"
               ? pending === "execute"
@@ -404,21 +422,22 @@ export function ActionProposalPanel({
               : pending === "execute"
                 ? "Simulating…"
                 : "Run approved simulation"}
-          </button>
+          </Button>
         ) : null}
         {canEdit && !editing ? (
-          <button
+          <Button
             type="button"
+            variant="secondary"
             onClick={() => setEditing(true)}
             disabled={pending !== null}
-            className="rounded border border-current/30 px-4 py-2 text-sm disabled:opacity-50"
           >
             Edit exact payload
-          </button>
+          </Button>
         ) : null}
         {canReject ? (
-          <button
+          <Button
             type="button"
+            variant="secondary"
             data-testid={`reject-${proposal.action_type}`}
             onClick={() =>
               transition("reject", `/action-proposals/${proposal.id}/reject`, {
@@ -427,10 +446,9 @@ export function ActionProposalPanel({
               })
             }
             disabled={pending !== null}
-            className="rounded border border-current/30 px-4 py-2 text-sm disabled:opacity-50"
           >
             {pending === "reject" ? "Rejecting…" : "Reject"}
-          </button>
+          </Button>
         ) : null}
       </div>
 
@@ -438,69 +456,70 @@ export function ActionProposalPanel({
         <section
           data-testid="execution-result"
           data-execution-mode={proposal.execution.execution_mode}
-          className="rounded-md border border-current/30 p-3 text-sm"
+          className="rounded-md border border-border bg-surface-raised p-3 text-sm text-foreground"
         >
           <h3 className="font-medium">{executionResultHeading(proposal)}</h3>
-          <p>
+          <p className="text-text-secondary">
             {proposal.execution.effective_status} · one execution record · version{" "}
             {proposal.execution.proposal_version}
           </p>
           {proposal.execution.effective_status === "uncertain" ? (
-            <p
-              role="status"
-              data-testid="execution-uncertain-warning"
-              className="mt-2 rounded bg-amber-100 p-2 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200"
-            >
-              We could not confirm this action completed. It has not been retried automatically —
-              check directly with the provider before assuming either outcome.
-            </p>
+            <div className="mt-2">
+              <Notice tone="warning" role="status" testId="execution-uncertain-warning">
+                We could not confirm this action completed. It has not been retried automatically —
+                check directly with the provider before assuming either outcome.
+              </Notice>
+            </div>
           ) : null}
           {proposal.execution.error_code === "approval_context_changed" ? (
-            <p
-              role="status"
-              data-testid="approval-context-changed-warning"
-              className="mt-2 rounded bg-amber-100 p-2 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200"
-            >
-              The connected account, its authorisation, or its permission changed after you approved
-              this — so no external action was attempted. This proposal cannot be retried. Reconnect
-              if needed, then check your next generated brief for a fresh proposal.
-            </p>
+            <div className="mt-2">
+              <Notice tone="warning" role="status" testId="approval-context-changed-warning">
+                The connected account, its authorisation, or its permission changed after you
+                approved this — so no external action was attempted. This proposal cannot be
+                retried. Reconnect if needed, then check your next generated brief for a fresh
+                proposal.
+              </Notice>
+            </div>
           ) : null}
-          <pre className="mt-2 overflow-x-auto whitespace-pre-wrap">
+          <pre className="mt-2 overflow-x-auto text-text-secondary whitespace-pre-wrap">
             {JSON.stringify(proposal.execution.result, null, 2)}
           </pre>
         </section>
       ) : null}
 
       <details data-testid={`audit-trail-${proposal.action_type}`} className="text-sm">
-        <summary className="cursor-pointer underline">
+        <summary className="cursor-pointer text-text-secondary underline">
           Audit trail ({proposal.audit_events.length} event
           {proposal.audit_events.length === 1 ? "" : "s"})
         </summary>
         {proposal.audit_events.length ? (
-          <ol className="mt-2 flex flex-col gap-2 border-l-2 border-current/20 pl-3">
+          <ol className="mt-2 flex flex-col gap-2 border-l-2 border-border pl-3">
             {proposal.audit_events.map((event, index) => (
               <li key={`${event.timestamp}-${event.event_type}-${index}`}>
-                <span className="font-medium">{event.event_type.replaceAll(".", " ")}</span>
-                <span className="block opacity-70">
+                <span className="font-medium text-foreground">
+                  {event.event_type.replaceAll(".", " ")}
+                </span>
+                <span className="block text-text-tertiary">
                   {formatDate(event.timestamp, timezone)} · {event.actor}
                 </span>
               </li>
             ))}
           </ol>
         ) : (
-          <p className="mt-2 opacity-70">No recorded transitions yet.</p>
+          <p className="mt-2 text-text-tertiary">No recorded transitions yet.</p>
         )}
       </details>
 
       {terminal ? (
-        <p className="text-sm opacity-70">
+        <p className="text-sm text-text-tertiary">
           This proposal is terminal and cannot be approved again.
         </p>
       ) : null}
-      <p role="alert" aria-live="polite" className="text-sm text-red-700 dark:text-red-400">
-        {error}
-      </p>
+      {error ? (
+        <Notice tone="danger" role="alert">
+          {error}
+        </Notice>
+      ) : null}
     </article>
   );
 }

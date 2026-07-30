@@ -25,7 +25,9 @@ beforeEach(() => {
 test("home page states the product promise and demo path", () => {
   render(<Home />);
   expect(screen.getByRole("heading", { level: 1, name: "LifeFlow AI" })).toBeInTheDocument();
-  expect(screen.getByText(/prepares the next step — for your approval/i)).toBeInTheDocument();
+  expect(
+    screen.getByText(/prepares the next step — nothing is ever sent or changed/i),
+  ).toBeInTheDocument();
   expect(screen.getByRole("button", { name: /try demo/i })).toBeInTheDocument();
 });
 

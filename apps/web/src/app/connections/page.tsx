@@ -8,6 +8,10 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import { rateLimitMessage } from "@/components/RateLimitNotice";
+import { AppShell, PageHeader } from "@/components/ui/AppShell";
+import { Button } from "@/components/ui/Button";
+import { FormSection } from "@/components/ui/Form";
+import { Notice } from "@/components/ui/Notice";
 import { API_URL, api, ApiError, RateLimitError } from "@/lib/api";
 import type { GoogleSyncResult, PrivacySummary } from "@/lib/types";
 
@@ -127,269 +131,295 @@ export default function ConnectionsPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col gap-10 px-6 py-12">
-      <header className="flex flex-col gap-3">
-        <Link href="/today" className="text-sm underline">
-          ← Back to Today
-        </Link>
-        <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Privacy &amp; Connections</h1>
-          <p className="mt-2 max-w-2xl" data-testid="privacy-overview">
-            One place to see what LifeFlow is connected to, exactly what access you granted, what it
-            has stored, and how long it is ordinarily kept. Everything here is read-only — LifeFlow
-            never sends email, never changes your calendar, and never deletes anything on this page.
-          </p>
-        </div>
-        <p aria-live="polite" className="text-sm opacity-70">
-          {state === "loading" && "Loading your privacy summary…"}
-          {state === "error" && "Could not load your privacy summary. Is the API running?"}
-        </p>
-      </header>
+    <AppShell>
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 py-8 sm:px-6 sm:py-10">
+        <PageHeader
+          title="Privacy & Connections"
+          description={
+            <>
+              <span data-testid="privacy-overview" className="block">
+                One place to see what LifeFlow is connected to, exactly what access you granted,
+                what it has stored, and how long it is ordinarily kept. Everything here is read-only
+                — LifeFlow never sends email, never changes your calendar, and never deletes
+                anything on this page.
+              </span>
+              <span aria-live="polite" className="mt-2 block">
+                {state === "loading" && "Loading your privacy summary…"}
+                {state === "error" && "Could not load your privacy summary. Is the API running?"}
+              </span>
+            </>
+          }
+        />
 
-      {state === "ready" && summary ? (
-        <>
-          {/* 2. Connected accounts */}
-          <section
-            data-testid="google-connection-card"
-            className="flex flex-col gap-2 rounded-lg border border-current/25 p-5"
-          >
-            <h2 className="font-semibold">Connected accounts</h2>
-            {google ? (
-              <div className="mt-1 flex flex-col gap-2 text-sm">
-                <p>
-                  Google — status:{" "}
-                  <span data-testid="google-connection-status">{google.status}</span>
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {google.connected ? (
-                    <>
-                      <button
-                        type="button"
-                        data-testid="sync-google-now"
-                        onClick={syncGoogle}
-                        disabled={syncing}
-                        className="mt-1 w-fit rounded bg-foreground px-4 py-2 text-sm font-medium text-background disabled:opacity-50"
+        {state === "ready" && summary ? (
+          <>
+            {/* 2. Connected accounts */}
+            <FormSection legend="Connected accounts">
+              <div data-testid="google-connection-card" className="contents">
+                {google ? (
+                  <div className="flex flex-col gap-3 text-sm">
+                    <p className="text-text-secondary">
+                      Google — status:{" "}
+                      <span
+                        data-testid="google-connection-status"
+                        className="font-medium text-foreground"
                       >
-                        {syncing ? "Syncing…" : "Sync now"}
-                      </button>
-                      <button
-                        type="button"
-                        data-testid="disconnect-google"
-                        onClick={disconnectGoogle}
-                        disabled={pending}
-                        className="mt-1 w-fit rounded border border-current/30 px-4 py-2 text-sm disabled:opacity-50"
+                        {google.status}
+                      </span>
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {google.connected ? (
+                        <>
+                          <Button
+                            type="button"
+                            variant="primary"
+                            data-testid="sync-google-now"
+                            onClick={syncGoogle}
+                            disabled={syncing}
+                          >
+                            {syncing ? "Syncing…" : "Sync now"}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            data-testid="disconnect-google"
+                            onClick={disconnectGoogle}
+                            disabled={pending}
+                          >
+                            {pending ? "Disconnecting…" : "Disconnect Google"}
+                          </Button>
+                        </>
+                      ) : (
+                        <a
+                          href={`${API_URL}/connected-accounts/google/connect`}
+                          className="inline-flex w-fit items-center justify-center rounded-md bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover"
+                        >
+                          Connect Google
+                        </a>
+                      )}
+                    </div>
+                    {syncError ? (
+                      syncError.retryable === true ? (
+                        <Notice tone="warning" role="status" testId="sync-degraded-notice">
+                          {syncError.message} It is safe to try syncing again in a moment.
+                        </Notice>
+                      ) : (
+                        <Notice tone="danger" role="alert" testId="sync-error-notice">
+                          {syncError.message}
+                          {syncError.retryable === false
+                            ? " Retrying now will not help — reconnect Google if this continues."
+                            : ""}
+                        </Notice>
+                      )
+                    ) : null}
+                    {syncResult ? (
+                      <div
+                        data-testid="sync-result"
+                        className="rounded-md border border-border bg-surface-raised p-3"
                       >
-                        {pending ? "Disconnecting…" : "Disconnect Google"}
-                      </button>
-                    </>
-                  ) : (
+                        <p>
+                          Imported {syncResult.imported}, updated {syncResult.updated}, unchanged{" "}
+                          {syncResult.unchanged}.
+                        </p>
+                        {syncResult.gmail_excluded > 0 ? (
+                          <p data-testid="gmail-excluded-notice" className="text-text-tertiary">
+                            {syncResult.gmail_excluded} Gmail message
+                            {syncResult.gmail_excluded === 1 ? "" : "s"} outside Inbox/Sent{" "}
+                            {syncResult.gmail_excluded === 1 ? "was" : "were"} not imported — by
+                            design, only Inbox and Sent are read.
+                          </p>
+                        ) : null}
+                        {syncResult.gmail_incomplete > 0 ? (
+                          <p
+                            role="alert"
+                            data-testid="gmail-incomplete-notice"
+                            className="text-warning-text"
+                          >
+                            {syncResult.gmail_incomplete} Gmail message
+                            {syncResult.gmail_incomplete === 1 ? "" : "s"} could not be read fully.
+                          </p>
+                        ) : null}
+                        {syncResult.calendar_incomplete > 0 ? (
+                          <p
+                            role="alert"
+                            data-testid="calendar-incomplete-notice"
+                            className="text-warning-text"
+                          >
+                            {syncResult.calendar_incomplete} calendar event
+                            {syncResult.calendar_incomplete === 1 ? "" : "s"} could not be read
+                            fully.
+                          </p>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-3 text-sm">
+                    <p className="text-text-secondary">Not connected.</p>
                     <a
                       href={`${API_URL}/connected-accounts/google/connect`}
-                      className="mt-1 w-fit rounded bg-foreground px-4 py-2 text-sm font-medium text-background"
+                      className="inline-flex w-fit items-center justify-center rounded-md bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover"
                     >
                       Connect Google
                     </a>
-                  )}
-                </div>
-                {syncError ? (
-                  syncError.retryable === true ? (
-                    <p
-                      role="status"
-                      data-testid="sync-degraded-notice"
-                      className="rounded bg-amber-100 p-2 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200"
-                    >
-                      {syncError.message} It is safe to try syncing again in a moment.
-                    </p>
-                  ) : (
-                    <p
-                      role="alert"
-                      data-testid="sync-error-notice"
-                      className="text-red-700 dark:text-red-400"
-                    >
-                      {syncError.message}
-                      {syncError.retryable === false
-                        ? " Retrying now will not help — reconnect Google if this continues."
-                        : ""}
-                    </p>
-                  )
-                ) : null}
-                {syncResult ? (
-                  <div data-testid="sync-result" className="rounded border border-current/20 p-3">
-                    <p>
-                      Imported {syncResult.imported}, updated {syncResult.updated}, unchanged{" "}
-                      {syncResult.unchanged}.
-                    </p>
-                    {syncResult.gmail_excluded > 0 ? (
-                      <p data-testid="gmail-excluded-notice" className="opacity-70">
-                        {syncResult.gmail_excluded} Gmail message
-                        {syncResult.gmail_excluded === 1 ? "" : "s"} outside Inbox/Sent{" "}
-                        {syncResult.gmail_excluded === 1 ? "was" : "were"} not imported — by design,
-                        only Inbox and Sent are read.
-                      </p>
-                    ) : null}
-                    {syncResult.gmail_incomplete > 0 ? (
-                      <p
-                        role="alert"
-                        data-testid="gmail-incomplete-notice"
-                        className="text-amber-700 dark:text-amber-400"
-                      >
-                        {syncResult.gmail_incomplete} Gmail message
-                        {syncResult.gmail_incomplete === 1 ? "" : "s"} could not be read fully.
-                      </p>
-                    ) : null}
-                    {syncResult.calendar_incomplete > 0 ? (
-                      <p
-                        role="alert"
-                        data-testid="calendar-incomplete-notice"
-                        className="text-amber-700 dark:text-amber-400"
-                      >
-                        {syncResult.calendar_incomplete} calendar event
-                        {syncResult.calendar_incomplete === 1 ? "" : "s"} could not be read fully.
-                      </p>
-                    ) : null}
                   </div>
-                ) : null}
+                )}
               </div>
-            ) : (
-              <div className="mt-1 flex flex-col gap-2 text-sm">
-                <p className="opacity-70">Not connected.</p>
-                <a
-                  href={`${API_URL}/connected-accounts/google/connect`}
-                  className="mt-1 w-fit rounded bg-foreground px-4 py-2 text-sm font-medium text-background"
-                >
-                  Connect Google
-                </a>
-              </div>
-            )}
-          </section>
+            </FormSection>
 
-          {/* 3. Granted access */}
-          <section data-testid="granted-access" className="flex flex-col gap-2">
-            <h2 className="font-semibold">Granted access</h2>
-            {google && google.granted_scopes.length > 0 ? (
-              <>
-                <ul className="flex flex-col gap-1 text-sm">
-                  {google.granted_scopes.map((scope) => (
-                    <li key={scope.scope}>{scope.label}</li>
-                  ))}
-                </ul>
-                <details data-testid="scope-technical-details" className="text-sm">
-                  <summary className="cursor-pointer opacity-70">Technical detail</summary>
-                  <ul className="mt-1 flex flex-col gap-1 font-mono text-xs opacity-80">
+            {/* 3. Granted access */}
+            <FormSection legend="Granted access" testId="granted-access">
+              {google && google.granted_scopes.length > 0 ? (
+                <>
+                  <ul className="flex flex-col gap-1 text-sm text-text-secondary">
                     {google.granted_scopes.map((scope) => (
-                      <li key={scope.scope}>{scope.scope}</li>
+                      <li key={scope.scope}>{scope.label}</li>
                     ))}
                   </ul>
-                </details>
-              </>
-            ) : (
-              <p className="text-sm opacity-70">No access granted.</p>
-            )}
-          </section>
+                  <details data-testid="scope-technical-details" className="text-sm">
+                    <summary className="cursor-pointer text-text-tertiary">
+                      Technical detail
+                    </summary>
+                    <ul className="mt-1 flex flex-col gap-1 font-mono text-xs text-text-tertiary">
+                      {google.granted_scopes.map((scope) => (
+                        <li key={scope.scope}>{scope.scope}</li>
+                      ))}
+                    </ul>
+                  </details>
+                </>
+              ) : (
+                <p className="text-sm text-text-tertiary">No access granted.</p>
+              )}
+            </FormSection>
 
-          {/* 4. Evidence freshness */}
-          <section data-testid="evidence-freshness" className="flex flex-col gap-2">
-            <h2 className="font-semibold">Evidence freshness</h2>
-            {google ? (
-              <p className="text-sm">
-                {google.ever_synced && google.freshness_band
-                  ? FRESHNESS_COPY[google.freshness_band]
-                  : "Never synced — no evidence has been imported yet."}
+            {/* 4. Evidence freshness */}
+            <FormSection legend="Evidence freshness" testId="evidence-freshness">
+              {google ? (
+                <p className="text-sm text-text-secondary">
+                  {google.ever_synced && google.freshness_band
+                    ? FRESHNESS_COPY[google.freshness_band]
+                    : "Never synced — no evidence has been imported yet."}
+                </p>
+              ) : (
+                <p className="text-sm text-text-tertiary">Connect an account to sync evidence.</p>
+              )}
+              <p className="text-xs text-text-tertiary">
+                Scheduled briefs only ever use evidence from a sync you started — LifeFlow never
+                syncs on its own.
               </p>
-            ) : (
-              <p className="text-sm opacity-70">Connect an account to sync evidence.</p>
-            )}
-            <p className="text-xs opacity-60">
-              Scheduled briefs only ever use evidence from a sync you started — LifeFlow never syncs
-              on its own.
-            </p>
-          </section>
+            </FormSection>
 
-          {/* 5. Data stored by LifeFlow */}
-          <section data-testid="data-inventory" className="flex flex-col gap-2">
-            <h2 className="font-semibold">Data stored by LifeFlow</h2>
-            <dl className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm">
-              {INVENTORY_LABELS.map(({ key, label }) => (
-                <div key={key} className="flex justify-between gap-2">
-                  <dt className="opacity-80">{label}</dt>
-                  <dd data-testid={`inventory-${key}`} className="font-medium tabular-nums">
-                    {summary.inventory[key]}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          </section>
+            {/* 5. Data stored by LifeFlow */}
+            <FormSection legend="Data stored by LifeFlow" testId="data-inventory">
+              <dl className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
+                {INVENTORY_LABELS.map(({ key, label }) => (
+                  <div key={key} className="flex justify-between gap-2">
+                    <dt className="text-text-secondary">{label}</dt>
+                    <dd
+                      data-testid={`inventory-${key}`}
+                      className="font-medium text-foreground tabular-nums"
+                    >
+                      {summary.inventory[key]}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </FormSection>
 
-          {/* 6. Retention summary */}
-          <section data-testid="retention-summary" className="flex flex-col gap-2">
-            <h2 className="font-semibold">How long data is kept</h2>
-            <p className="text-sm" data-testid="retention-not-enforced">
-              These are provisional product defaults for the pilot, not legal requirements.{" "}
-              <strong>Automatic deletion is not switched on yet</strong> — it arrives in a later
-              update. Nothing here is deleted automatically today.
-            </p>
-            <ul className="flex flex-col gap-1 text-sm">
-              {summary.retention.classes.map((cls) => (
-                <li key={cls.key} className="flex justify-between gap-3">
-                  <span className="opacity-80">{cls.label}</span>
-                  <span className="tabular-nums opacity-70">
-                    {cls.retention_days === null
-                      ? "kept until reconciled / tied to its source"
-                      : `${cls.retention_days} days`}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </section>
-
-          {/* 7. Data controls — four distinct operations */}
-          <section data-testid="data-controls" className="flex flex-col gap-3">
-            <h2 className="font-semibold">Data controls</h2>
-
-            <div data-testid="control-disconnect" className="rounded border border-current/20 p-4">
-              <h3 className="text-sm font-semibold">Disconnect a provider</h3>
-              <p className="mt-1 text-sm opacity-80">
-                Revokes LifeFlow&apos;s access and stops future syncing.{" "}
-                <strong>The data LifeFlow already imported stays</strong> until you delete it
-                separately.
+            {/* 6. Retention summary */}
+            <FormSection legend="How long data is kept" testId="retention-summary">
+              <p className="text-sm text-text-secondary" data-testid="retention-not-enforced">
+                These are provisional product defaults for the pilot, not legal requirements.{" "}
+                <strong className="text-foreground">
+                  Automatic deletion is not switched on yet
+                </strong>{" "}
+                — it arrives in a later update. Nothing here is deleted automatically today.
               </p>
-            </div>
+              <ul className="flex flex-col gap-1 text-sm">
+                {summary.retention.classes.map((cls) => (
+                  <li key={cls.key} className="flex justify-between gap-3">
+                    <span className="text-text-secondary">{cls.label}</span>
+                    <span className="text-text-tertiary tabular-nums">
+                      {cls.retention_days === null
+                        ? "kept until reconciled / tied to its source"
+                        : `${cls.retention_days} days`}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </FormSection>
 
-            <DeletionControls
-              googleAccountId={google && google.connected ? google.account_id : null}
-              onChanged={load}
-            />
-
-            <div
-              data-testid="control-delete-memory"
-              className="rounded border border-current/20 p-4"
+            {/* 7. Data controls — four distinct operations */}
+            <FormSection
+              legend="Data controls"
+              description="Disconnecting, deleting imported data, and deleting your account are separate operations with separate consequences — each is explained before you act."
+              testId="data-controls"
             >
-              <h3 className="text-sm font-semibold">Delete learned preferences</h3>
-              <p className="mt-1 text-sm opacity-80">
-                Clears what LifeFlow inferred from your own actions. It does not touch imported
-                Gmail/Calendar evidence or your explicit settings.{" "}
-                <Link href="/settings" data-testid="learned-preferences-link" className="underline">
-                  Manage learned preferences
-                </Link>
-                .
-              </p>
-            </div>
-          </section>
+              <div data-testid="control-disconnect" className="rounded-md border border-border p-4">
+                <h3 className="text-sm font-semibold text-foreground">Disconnect a provider</h3>
+                <p className="mt-1 text-sm text-text-secondary">
+                  Revokes LifeFlow&apos;s access and stops future syncing.{" "}
+                  <strong className="text-foreground">
+                    The data LifeFlow already imported stays
+                  </strong>{" "}
+                  until you delete it separately.
+                </p>
+              </div>
 
-          {/* 8. Links out */}
-          <section className="flex flex-wrap gap-4 text-sm">
-            <Link href="/audit-history" data-testid="audit-history-link" className="underline">
-              View audit history
-            </Link>
-            <Link href="/settings" data-testid="preferences-link" className="underline">
-              Explicit preferences
-            </Link>
-            <Link href="/settings" data-testid="settings-link" className="underline">
-              Learned preferences
-            </Link>
-          </section>
-        </>
-      ) : null}
-    </main>
+              <DeletionControls
+                googleAccountId={google && google.connected ? google.account_id : null}
+                onChanged={load}
+              />
+
+              <div
+                data-testid="control-delete-memory"
+                className="rounded-md border border-border p-4"
+              >
+                <h3 className="text-sm font-semibold text-foreground">
+                  Delete learned preferences
+                </h3>
+                <p className="mt-1 text-sm text-text-secondary">
+                  Clears what LifeFlow inferred from your own actions. It does not touch imported
+                  Gmail/Calendar evidence or your explicit settings.{" "}
+                  <Link
+                    href="/settings"
+                    data-testid="learned-preferences-link"
+                    className="text-accent underline"
+                  >
+                    Manage learned preferences
+                  </Link>
+                  .
+                </p>
+              </div>
+            </FormSection>
+
+            {/* 8. Links out */}
+            <section className="flex flex-wrap gap-4 text-sm">
+              <Link
+                href="/audit-history"
+                data-testid="audit-history-link"
+                className="text-accent underline"
+              >
+                View audit history
+              </Link>
+              <Link
+                href="/settings"
+                data-testid="preferences-link"
+                className="text-accent underline"
+              >
+                Explicit preferences
+              </Link>
+              <Link
+                href="/settings"
+                data-testid="learned-preferences-footer-link"
+                className="text-accent underline"
+              >
+                Learned preferences
+              </Link>
+            </section>
+          </>
+        ) : null}
+      </div>
+    </AppShell>
   );
 }
