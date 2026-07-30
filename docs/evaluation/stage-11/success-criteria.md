@@ -13,9 +13,9 @@ Thresholds below are provisional but must be finalised (this document, as commit
 | Onboarding completion | % completing onboarding without facilitator help | ≥ 80% | T2, observation sheet |
 | Core task completion without help | % completing T4–T12 without facilitator intervention | ≥ 80% | Observation sheet |
 | Brief comprehension | Average rating, "I understood what the brief was telling me" (1–5) | ≥ 4/5 | Post-session questionnaire |
-| Priority relevance | % agreeing the top-ranked item was genuinely the most important | ≥ 80% | Post-session questionnaire, T5 |
-| Explanation usefulness | Average rating, "the reasons given were useful" (1–5) | ≥ 4/5 | Post-session questionnaire, T6–T7 |
-| Proposed-action usefulness | % judging shown proposals as useful | ≥ 70% | Post-session questionnaire, T9, T11 |
+| Priority relevance | % agreeing[^likert] the top-ranked item was genuinely the most important | ≥ 80% | Post-session questionnaire Q2, T5 |
+| Explanation usefulness | Average rating, "the reasons given were useful" (1–5) | ≥ 4/5 | Post-session questionnaire |
+| Proposed-action usefulness | % judging[^likert] shown proposals as useful | ≥ 70% | Post-session questionnaire Q4, T9, T11 |
 | Approval-payload comprehension | % correctly stating the exact consequence of approving | ≥ 90% | Safety questionnaire, T9–T11 |
 | Safety-model comprehension | % correct on all safety-questionnaire items | ≥ 90% overall; **critical items (S-H1–S-H3, S-H5, S-H8) require 100%** | Safety questionnaire |
 | Deletion-choice comprehension | % correctly distinguishing disconnect / data deletion / memory deletion / account deletion | ≥ 90% | Safety questionnaire, T16–T19 |
@@ -31,6 +31,9 @@ Thresholds below are provisional but must be finalised (this document, as commit
 
 These thresholds are the single source of truth referenced by [product-hypotheses.md](product-hypotheses.md) and [go-no-go-template.md](go-no-go-template.md). If a number needs to change, it changes here first, and the change is dated in the changelog below.
 
+[^likert]: [post-session-questionnaire.md](post-session-questionnaire.md)'s rating items use a 1–5 Likert scale, not a direct agree/disagree count. For every "% agreeing" / "% judging useful" metric above, "agreeing" / "useful" means a rating of ≥ 4 on that item's 1–5 scale — fixed here (found and corrected during the Round 1 desk rehearsal, see [round-1-desk-rehearsal-findings.md](round-1-desk-rehearsal-findings.md)) so the threshold and the instrument that measures it cannot silently disagree on what counts as a pass.
+
 ## Changelog
 
 - 2026-07-30 — Initial thresholds set during Stage 11 planning, before any participant session. No revisions yet.
+- 2026-07-30 (Round 1 desk rehearsal) — Added the Likert-to-percentage scoring rule (footnote above) for "Priority relevance" and "Proposed-action usefulness," which previously stated a "%" threshold without defining how a 1–5 rating converts to one. No threshold *value* changed.

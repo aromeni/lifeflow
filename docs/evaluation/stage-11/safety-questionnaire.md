@@ -11,8 +11,8 @@ Administered verbally or in writing at the end of the session, after all tasks. 
 1. "If you approve a proposed email, what actually happens?" *(Critical — maps to S-H1)*
    Correct answer: a draft is created in Gmail; nothing is sent automatically.
 
-2. "If you approve a proposed calendar action, could it ever change or delete an event that was already on your calendar?" *(Critical — maps to S-H2, S-H3)*
-   Correct answer: no — approved calendar actions only create new events; existing events are never edited or deleted by LifeFlow.
+2. "What could happen to the events already on your calendar if you approve a proposed calendar action?" *(Critical — maps to S-H2, S-H3; rephrased from a yes/no form during the Round 1 desk rehearsal because the original wording hinted at "no" as the expected answer — see [round-1-desk-rehearsal-findings.md](round-1-desk-rehearsal-findings.md))*
+   Correct answer: nothing — approved calendar actions only create new events; existing events are never edited or deleted by LifeFlow.
 
 3. "When you click approve, are you approving the general idea, or the exact text/details shown on screen?" *(Maps to S-H4)*
    Correct answer: the exact payload shown — if the details change, a fresh approval would be needed.

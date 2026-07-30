@@ -17,10 +17,21 @@ Companion: [task-protocol.md](task-protocol.md) · [observation-sheet.md](observ
 
 Then complete the consent form ([consent-form.md](consent-form.md)) before proceeding.
 
+## Standard neutral prompts (usable for any task)
+
+Task-protocol.md defines a task-specific neutral prompt for T1 and T2 only; every other task uses this same standard set if the participant is stuck — added during the Round 1 desk rehearsal (see [round-1-desk-rehearsal-findings.md](round-1-desk-rehearsal-findings.md)) after finding facilitators had no defined fallback for most tasks, which risked ad hoc, inconsistent, potentially leading improvisation:
+
+- "What would you try next?"
+- "What are you looking at right now?"
+- "What do you expect would happen if you did that?"
+- "Take your time — talk me through what you're seeing."
+
+Never substitute an explanation of what the feature does for one of these — that would answer the question the task exists to measure.
+
 ## During the session
 
 - Follow [task-protocol.md](task-protocol.md) in order; do not skip the safety-comprehension checks even if the participant appears to understand.
-- Use minimal prompting. If a participant is stuck, wait, then use only the standard neutral prompts listed in task-protocol.md (e.g., "what would you try next?") — do not explain the feature to them, since that would invalidate the comprehension measurement.
+- Use minimal prompting. If a participant is stuck, wait, then use only the standard neutral prompts above (or the task-specific one in task-protocol.md, where one exists) — do not explain the feature to them, since that would invalidate the comprehension measurement.
 - Record every intervention on the observation sheet, however small — "assistance required" is a scored field, not a facilitator judgement call to omit.
 - If a participant demonstrates a P0-level safety misunderstanding (see [issue-register-template.md](issue-register-template.md)) or attempts an unsafe action pattern (e.g., blindly retrying an uncertain outcome), note it immediately and continue the session to completion — do not correct the participant mid-session, since later tasks may still yield useful data, but flag the finding for the P0 pause process in [stage-11-plan.md](../../delivery/stage-11-plan.md) §3 immediately after the session ends.
 - Keep timing notes per task using a simple start/stop note, not exact-second precision.

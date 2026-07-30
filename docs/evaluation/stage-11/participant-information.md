@@ -12,7 +12,7 @@ You're invited to take part in a short evaluation session for LifeFlow, a tool t
 
 ## What will I be asked to do?
 
-You'll use a demo version of LifeFlow that only contains made-up, fictional data — no real email account or calendar of yours will be connected. A facilitator will ask you to complete a series of short tasks (such as finding out what LifeFlow thinks needs your attention, and reviewing a suggested action) while thinking aloud about what you see and expect. The session takes approximately [45–60] minutes.
+You'll use a demo version of LifeFlow that only contains made-up, fictional data — no real email account or calendar of yours will be connected. A facilitator will ask you to complete a series of short tasks (such as finding out what LifeFlow thinks needs your attention, and reviewing a suggested action) while thinking aloud about what you see and expect. The session, including two short questionnaires at the end, takes approximately **60–75 minutes** (a rehearsal estimate, not yet observed with a real participant — see [round-1-desk-rehearsal-findings.md](round-1-desk-rehearsal-findings.md)).
 
 ## What will happen to what I say and do?
 
