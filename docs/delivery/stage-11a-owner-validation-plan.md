@@ -127,3 +127,7 @@ It does not recruit, contact, or collect data from any participant. It does not 
 ## Exit
 
 Governed by [owner-validation-exit-template.md](../evaluation/stage-11/owner-validation-exit-template.md): READY FOR INDEPENDENT ETHICS AND RECRUITMENT PREPARATION, CONDITIONAL READINESS, or NOT READY — none of which themselves authorise recruitment.
+
+## Phase 1 status (updated 2026-07-31)
+
+**Phase 1 — Synthetic Acceptance Validation is complete: PASS — READY FOR PHASE 2.** See [stage-11a-phase-1-plan.md](stage-11a-phase-1-plan.md) and the full evidence pack in [docs/evaluation/stage-11/owner-validation/phase-1/](../evaluation/stage-11/owner-validation/phase-1/). Phases B (dedicated test accounts) and C (the soak period) remain planning-only — no test account was created or connected, and the soak period has not started. Phase 2 (failure and recovery exercises, §D) requires its own separate, explicit-approval task; it is not authorised by Phase 1's PASS decision.

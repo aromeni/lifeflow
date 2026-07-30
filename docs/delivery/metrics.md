@@ -4,11 +4,11 @@
 
 | Metric | Value |
 |---|---|
-| Python files | 185 |
+| Python files | 187 |
 | TypeScript files | 36 |
 | Prompt files | 2 |
 | Eval cases | 20 |
-| Backend tests | 800 passing |
+| Backend tests | 807 passing |
 | Backend coverage | 90% |
 | Frontend tests | 90 passing |
 | E2E journeys (Playwright, total) | 42 |
