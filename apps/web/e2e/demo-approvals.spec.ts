@@ -50,6 +50,7 @@ async function startIsolatedDemo(page: Page) {
   expect(demo.ok()).toBeTruthy();
   await page.goto("/onboarding");
   await expect(page.getByRole("heading", { name: "Set up your demo" })).toBeVisible();
+  await page.getByRole("button", { name: "Continue" }).click();
   await page.getByRole("button", { name: "Finish and open Today" }).click();
   await expect(page).toHaveURL(/\/today/);
   await page.getByTestId("generate-brief").click();
@@ -187,7 +188,7 @@ test("approval inbox preserves exact, grounded, idempotent proposal transitions"
   expect((await terminalApproval.json()).error.code).toBe("invalid_transition");
 
   const beforeRegeneration = await proposalList(page.request);
-  await page.getByRole("link", { name: /Back to Today/ }).click();
+  await page.getByTestId("nav-today").click();
   await page.getByTestId("generate-brief").click();
   await expect(page.getByTestId("brief-status")).toContainText(/version 2 · complete/, {
     timeout: 15_000,

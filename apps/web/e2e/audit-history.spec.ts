@@ -126,7 +126,7 @@ test("owner reviews privacy-safe audit history from Privacy & Connections", asyn
   await page.getByLabel("Time period").selectOption("30d");
   await expect(page.getByRole("heading", { name: "Action rejected" })).toBeVisible();
 
-  await page.getByRole("link", { name: "Privacy & Connections" }).click();
+  await page.getByTestId("connections-link").click();
   await expect(page).toHaveURL(/\/connections$/);
   await expect(page.getByTestId("audit-history-link")).toBeVisible();
 });
