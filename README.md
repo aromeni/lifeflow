@@ -9,7 +9,7 @@ A permissioned, inspectable, human-in-the-loop personal operations agent. LifeFl
 - Threat model: [docs/security/threat-model.md](docs/security/threat-model.md)
 - Metrics dashboard: [docs/delivery/metrics.md](docs/delivery/metrics.md) (regenerate with `python3 scripts/metrics.py`) · Stage reports: [docs/delivery/reports/](docs/delivery/reports/)
 
-**Status:** Stages 0–8 are complete and approved; Stage 8 is merged to `main` (`c5b60b1`) and tagged `stage-8-complete`. Stage 9 (privacy, audit UX, resilience) is **in progress and is not complete**: the Planning Gate is approved ([ADR 0005](docs/architecture/adr/0005-stage9-privacy-hardening.md)); **Delivery Phase 1 — the read-only Privacy & Connections Control Centre** is remotely preserved at `49f121a`; **Delivery Phase 2 — the durable deletion engine** is remotely finalised at `fdb4636` on `origin/stage-9-deletion-retention`; **Delivery Phase 3 — audit history** is remotely finalised at `a50cf06` on `origin/stage-9-audit-history`; **Delivery Phase 4 — rate limiting** is remotely finalised at `481a67b` on `origin/stage-9-rate-limiting`; and **Delivery Phase 5 — outage resilience and privacy-safe telemetry** is remotely finalised at `5a2ca516` on `origin/stage-9-resilience-telemetry`. Stage 9 final integration is now in progress on `stage-9-final-integration`, targeting a pull request into `main`. No `stage-9-complete` tag exists, and Stage 9 has not been merged to `main`. See the [Phase 1](docs/delivery/reports/stage-09-phase-1.md), [Phase 2](docs/delivery/reports/stage-09-phase-2.md), [Phase 3](docs/delivery/reports/stage-09-phase-3.md), [Phase 4](docs/delivery/reports/stage-09-phase-4.md), and [Phase 5](docs/delivery/reports/stage-09-phase-5.md) reports.
+**Status:** Stages 0–9 are complete and approved; Stage 9 (privacy, audit UX, resilience) is merged to `main` (`e347b75`) and tagged `stage-9-complete`. See the [Phase 1](docs/delivery/reports/stage-09-phase-1.md), [Phase 2](docs/delivery/reports/stage-09-phase-2.md), [Phase 3](docs/delivery/reports/stage-09-phase-3.md), [Phase 4](docs/delivery/reports/stage-09-phase-4.md), [Phase 5](docs/delivery/reports/stage-09-phase-5.md), and [closure](docs/delivery/reports/stage-09.md) reports. Stage 10 (product design system and UX completion) is **in progress and is not complete** on `stage-10-product-design` — a token-based design system and a full visual/interaction-design pass across every screen, with no change to any safety/privacy/approval behaviour. See [ADR 0006](docs/architecture/adr/0006-stage10-product-design-system.md) and [docs/product/design-system.md](docs/product/design-system.md).
 
 ## Your privacy & data
 
@@ -158,6 +158,11 @@ pnpm web:test && pnpm web:lint && pnpm web:typecheck && pnpm web:build
 # never run this alongside ./scripts/e2e.sh, since it stops/starts the real
 # Postgres/Redis containers.
 ./scripts/e2e-resilience.sh
+
+# Playwright design/accessibility/responsive/visual-regression suite
+# (Stage 10) — runs against the same plain demo stack as ./scripts/e2e.sh,
+# so never run the two at the same time.
+./scripts/e2e-design.sh
 
 # Golden-dataset evals (all six modes)
 ./scripts/run-evals.sh det              # deterministic baseline only
