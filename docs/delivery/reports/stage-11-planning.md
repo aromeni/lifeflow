@@ -69,3 +69,7 @@ This planning gate does not: conduct any evaluation session; change any product 
 ## Next authorised action
 
 This plan is submitted for review. Running Round 1 of the evaluation, and any further Stage 11 work, requires separate explicit approval and is not authorised by this report.
+
+## Addendum — Round 1 ethics and execution readiness (added 2026-07-30, after this report was originally written)
+
+This report covered planning only. A follow-on readiness gate then prepared Round 1 for safe execution without authorising it: an evaluation-context decision gate (currently UNDECIDED — the project owner has not yet selected university-linked research, independent product evaluation, or informal feedback), ethics/privacy enquiry packs for each possible category, a recruitment-authorisation checklist (currently RECRUITMENT NOT AUTHORISED), a participant screener, an operational runbook, a synthetic-scenario manifest with an automated validator, a desk-based protocol rehearsal that found and corrected five ordinary readiness defects, an evidence register, and a readiness decision (READY TO REQUEST RECRUITMENT AUTHORISATION — a materials-readiness statement, not an approval). See [docs/delivery/stage-11-plan.md](../stage-11-plan.md) §12 and the Stage 11 Round 1 Ethics and Execution Readiness Report for the full detail. Nothing in this report's original claims changes as a result — Stage 11 implementation, participant recruitment, and evaluation sessions had not begun when this report was written and still have not begun.
