@@ -35,7 +35,7 @@ Companion documents: [vision.md](vision.md) · [user-journeys.md](user-journeys.
 - Multi-agent orchestration where ordinary functions and services suffice.
 - Fine-tuning.
 - Continuous surveillance or unrestricted mailbox ingestion.
-- Full billing (entitlement interfaces only, defined in Stage 11).
+- Full billing (entitlement interfaces only, defined in Stage 12 — renumbered 2026-07-30, originally Stage 11; see `docs/delivery/stage-plan.md`).
 
 ## Prohibited in the MVP (hard safety boundary)
 

@@ -19,7 +19,10 @@ from datetime import date
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-TOTAL_STAGES = 12  # stages 0-11
+TOTAL_STAGES = 15  # stages 0-14 (renumbered 2026-07-30: a product-design stage was
+# inserted as Stage 10, shifting every originally-planned future stage forward by
+# one, and two new stages — production deployment and controlled pilot — were
+# added explicitly; see docs/delivery/stage-plan.md's roadmap note)
 
 EXCLUDED_DIRS = {
     ".venv",

@@ -9,7 +9,7 @@ A permissioned, inspectable, human-in-the-loop personal operations agent. LifeFl
 - Threat model: [docs/security/threat-model.md](docs/security/threat-model.md)
 - Metrics dashboard: [docs/delivery/metrics.md](docs/delivery/metrics.md) (regenerate with `python3 scripts/metrics.py`) · Stage reports: [docs/delivery/reports/](docs/delivery/reports/)
 
-**Status:** Stages 0–9 are complete and approved; Stage 9 (privacy, audit UX, resilience) is merged to `main` (`e347b75`) and tagged `stage-9-complete`. See the [Phase 1](docs/delivery/reports/stage-09-phase-1.md), [Phase 2](docs/delivery/reports/stage-09-phase-2.md), [Phase 3](docs/delivery/reports/stage-09-phase-3.md), [Phase 4](docs/delivery/reports/stage-09-phase-4.md), [Phase 5](docs/delivery/reports/stage-09-phase-5.md), and [closure](docs/delivery/reports/stage-09.md) reports. Stage 10 (product design system and UX completion) is **in progress and is not complete** on `stage-10-product-design` — a token-based design system and a full visual/interaction-design pass across every screen, with no change to any safety/privacy/approval behaviour. See [ADR 0006](docs/architecture/adr/0006-stage10-product-design-system.md) and [docs/product/design-system.md](docs/product/design-system.md).
+**Status:** Stages 0–10 are complete and approved. Stage 9 (privacy, audit UX, resilience) is merged to `main` (`e347b75`) and tagged `stage-9-complete` — see the [Phase 1](docs/delivery/reports/stage-09-phase-1.md), [Phase 2](docs/delivery/reports/stage-09-phase-2.md), [Phase 3](docs/delivery/reports/stage-09-phase-3.md), [Phase 4](docs/delivery/reports/stage-09-phase-4.md), [Phase 5](docs/delivery/reports/stage-09-phase-5.md), and [closure](docs/delivery/reports/stage-09.md) reports. Stage 10 (product design system and UX completion) is merged to `main` (`0ecf390`) and tagged `stage-10-complete` — a token-based design system and a full visual/interaction-design pass across every screen, with no change to any safety/privacy/approval behaviour. See [ADR 0006](docs/architecture/adr/0006-stage10-product-design-system.md), [docs/product/design-system.md](docs/product/design-system.md), and the [closure report](docs/delivery/reports/stage-10.md). **Stage 11 (evaluation and pilot readiness) is next and has not begun** — see [docs/delivery/stage-plan.md](docs/delivery/stage-plan.md) for the full, corrected stage sequence (a product-design stage was inserted as Stage 10, shifting every originally-planned future stage forward by one).
 
 ## Your privacy & data
 
@@ -47,7 +47,7 @@ packages/contracts  OpenAPI-generated shared types, consumed by apps/web
 prompts/            Versioned prompts and output contracts for LLM-assisted extraction and brief composition
 evals/              Golden datasets and scoring for signals, briefs, and actions
 workers/            Background jobs for scheduled briefs, memory, deletion, and retention
-infra/              Deployment configuration beyond local Docker Compose — Stage 11, not yet populated
+infra/              Deployment configuration beyond local Docker Compose — Stage 12, not yet populated (renumbered 2026-07-30 — originally Stage 11)
 docs/               Product, architecture, security, and delivery docs
 ```
 

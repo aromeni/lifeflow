@@ -34,7 +34,8 @@ lifeflow-ai/
 │                            # Safety and quality metrics live here — not in the unit-test suites.
 ├── workers/                 # Background job entry points (scheduled briefs, retention, sync).
 │                            # Thin wrappers only — jobs call domain services in apps/api, no logic of their own.
-├── infra/                   # Deployment configuration beyond local Docker Compose (Stage 11+).
+├── infra/                   # Deployment configuration beyond local Docker Compose (Stage 12+;
+│                            # renumbered 2026-07-30 — originally Stage 11, see docs/delivery/stage-plan.md).
 │                            # Environment-specific config, IaC, and observability setup.
 ├── scripts/                 # Repeatable local maintenance scripts (idempotent, documented).
 │                            # Nothing here is required for the app to run — conveniences only.

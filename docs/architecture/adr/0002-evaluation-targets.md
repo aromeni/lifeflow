@@ -26,7 +26,8 @@ The mock numbers measure the *pipeline* (validation, dedupe, capping), not
 model quality — the fixture deliberately includes a fabrication and a
 duplicate to prove the guards. Real-model metrics require an Anthropic key
 (`./scripts/run-evals.sh det+anthropic`) and must be recorded here before the
-Stage 10 pilot gate.
+Stage 11 pilot gate (renumbered 2026-07-30 — originally Stage 10; see
+`docs/delivery/stage-plan.md`).
 
 ## Decision — ratified targets
 
@@ -66,7 +67,7 @@ cases were consulted while the det-v1 detectors were written and tuned, so
 they measure regression safety, not generalisation. They must not be quoted
 as expected real-world performance.
 
-Before the Stage 10 pilot gate, a **separate holdout evaluation set** will be
+Before the Stage 11 pilot gate (renumbered 2026-07-30 — originally Stage 10), a **separate holdout evaluation set** will be
 created and run once, blind:
 
 - authored against a *new* synthetic dataset version (v2 scenarios written

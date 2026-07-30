@@ -30,22 +30,23 @@ with this file, `CLAUDE.md`, and the phase specification.
 
 ## Current build status
 
-Stages 0–8 are complete and approved. Stage 8 is merged to `main`
+Stages 0–10 are complete and approved. Stage 8 is merged to `main`
 (`c5b60b1`) and tagged `stage-8-complete`.
 
-**Stage 9 — privacy, audit UX, and resilience — is in progress but is not
-complete.** Delivery Phase 1 is remotely preserved at `49f121a`. Delivery
-Phase 2 is remotely finalised at `fdb4636` on
-`origin/stage-9-deletion-retention`. Delivery Phase 3 (audit history) is
-remotely finalised at `a50cf06` on `origin/stage-9-audit-history`. Delivery
-Phase 4 (rate limiting) is remotely finalised at `481a67b` on
-`origin/stage-9-rate-limiting`. Delivery Phase 5 (resilience and telemetry)
-is remotely finalised at `5a2ca516` on `origin/stage-9-resilience-telemetry`.
+**Stage 9 — privacy, audit UX, and resilience — is complete, approved, and
+merged to `main`.** All five Delivery Phases were integrated and merged via
+PR #4 at `e347b75e27399eb353a6d57aa87fe4c2282a803a`, tagged `stage-9-complete`.
 
-Stage 9 final integration is now in progress on `stage-9-final-integration`,
-targeting a pull request into `main`. No `stage-9-complete` tag exists, and
-Stage 9 has not been merged to `main`. Do not begin a further Delivery Phase
-or Stage 10 work without explicit approval.
+**Stage 10 — product design system and UX completion — is complete,
+approved, and merged to `main`.** This stage was inserted after the original
+plan below was written; it is merged via PR #5 at
+`0ecf390389ec523d99c924f62cc2651a32399e06` and tagged `stage-10-complete`.
+Because of this insertion, every originally-planned future stage has shifted
+forward by one number — see [docs/delivery/stage-plan.md](docs/delivery/stage-plan.md)'s
+roadmap note for the full reconciliation.
+
+**Stage 11 — evaluation and pilot readiness — is next and has not begun.**
+Do not begin Stage 11 work without explicit approval.
 
 ## Permanent rules
 

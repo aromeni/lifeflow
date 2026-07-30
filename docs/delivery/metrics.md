@@ -17,7 +17,7 @@
 | — design/a11y/responsive/visual (`apps/web/e2e-design`, `scripts/e2e-design.sh`) | 26 |
 | Frontend coverage | not yet measured — coverage reporter deferred until the UI stabilises |
 | CI | connected — ci.yml, secret-scan.yml |
-| Current stage | 10 |
-| Approved stages | 8/12 |
+| Current stage | 11 |
+| Approved stages | 11/15 |
 
 Stage detail: [stage-plan.md](stage-plan.md). Quality-gate evidence lives in each stage completion report.

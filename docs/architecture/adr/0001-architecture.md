@@ -54,9 +54,9 @@ OAuth refresh/access tokens are encrypted (AES-GCM via a `TokenCipher` interface
 
 **Stage 7 implementation note:** a token refresh that omits a new `refresh_token` (Google's normal behaviour outside the initial `access_type=offline` grant) never clears the previously stored encrypted refresh token — see [ADR 0003](0003-stage7-google-integration.md) D18. Refreshes are row-locked per account to avoid racing writes (D19).
 
-### D8 — Hosting decision deferred to Stage 11; UK/EU data residency as a constraint
+### D8 — Hosting decision deferred to Stage 12; UK/EU data residency as a constraint
 
-Local Docker Compose covers Stages 1–10. Production hosting (UK/EU region, GDPR-aligned processor terms) is selected in a Stage 11 ADR. Nothing before Stage 11 depends on a hosting provider.
+Local Docker Compose covers Stages 1–11. Production hosting (UK/EU region, GDPR-aligned processor terms) is selected in a Stage 12 ADR. Nothing before Stage 12 depends on a hosting provider. (Renumbered 2026-07-30: originally Stage 11 — Packaging & commercial base; an unplanned product-design stage was inserted as Stage 10, shifting every originally-planned future stage forward by one. See `docs/delivery/stage-plan.md`'s roadmap note. This does not reopen or change the decision itself, only its stage label.)
 
 ### D9 — Tooling
 
@@ -75,4 +75,4 @@ Local Docker Compose covers Stages 1–10. Production hosting (UK/EU region, GDP
 - 0002 (Stage 4): evaluation acceptance targets after deterministic baseline. **Filed.**
 - 0003 (Stage 7): Google OAuth, durable execution outcomes, and transport-client design. **Filed** — [0003-stage7-google-integration.md](0003-stage7-google-integration.md).
 - 0004 (Stage 8): job runner confirmation (arq) and scheduling design.
-- 0005 (Stage 11): production deployment architecture and hosting provider.
+- A future ADR, number not yet assigned (ADRs 0001–0006 are already filed for other decisions — 0005 for Stage 9 privacy hardening, 0006 for Stage 10 product design), at Stage 12 (renumbered 2026-07-30 — originally Stage 11): production deployment architecture and hosting provider.

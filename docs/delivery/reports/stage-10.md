@@ -94,6 +94,10 @@ Three full passes were performed, all with real screenshots (not descriptions), 
 
 No backend, prompt, connector, or policy-engine change of any kind. No new database migration. No change to any approval/execution/audit semantics. No Stage 11 (packaging/commercial base) functionality. Not committed, not pushed, not tagged, per instruction.
 
+## Addendum — roadmap renumbering (added 2026-07-30, after this report was originally written)
+
+The "No Stage 11 (packaging/commercial base) functionality" line above is left unchanged as written, since this is a frozen point-in-time completion report. For clarity to future readers: the stage numbering used throughout this report reflects the *original* plan, under which this stage itself did not yet exist as a numbered gate. This stage was subsequently inserted, implemented, merged, and tagged as Stage 10, which shifted every originally-planned future stage forward by one: "Evaluation & pilot readiness" (referenced elsewhere in this repository as the next stage) is now Stage 11, not Stage 10; "Packaging & commercial base," referenced in the exclusion above as Stage 11, is now Stage 12. See [docs/delivery/stage-plan.md](../stage-plan.md) for the corrected, canonical roadmap. Nothing in this report's actual claims about what was or was not implemented changes as a result — only the stage *number* attached to work that had not begun.
+
 ## Git state
 
 Working tree on `stage-10-product-design` (branched from `main` @ `e347b75e27399eb353a6d57aa87fe4c2282a803a` / tag `stage-9-complete`) contains all Stage 10 changes, uncommitted. No commit, push, or tag has been made. The index is empty (verified via the exact-boundary security proof above).
