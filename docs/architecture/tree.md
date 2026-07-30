@@ -7,10 +7,18 @@ lifeflow-ai/
 ├── apps/
 │   ├── web/                 # Next.js frontend: all screens, routes, and UI components.
 │   │                        # Client code only — no business logic; talks to the API via generated contracts.
+│   │                        # src/components/ui/ is the shared design-system component
+│   │                        # library (Badge, Notice, Button, AppShell, Form primitives —
+│   │                        # see docs/product/design-system.md). Pages/features compose
+│   │                        # these rather than styling native elements directly.
 │   │                        # e2e/ holds Playwright journeys (run via scripts/e2e.sh); unit tests sit beside components.
 │   │                        # e2e-resilience/ holds the Stage 9 Delivery Phase 5 outage
 │   │                        # journeys (run via scripts/e2e-resilience.sh, a separate
 │   │                        # dedicated stack — never run alongside scripts/e2e.sh).
+│   │                        # e2e-design/ holds the Stage 10 design/accessibility/
+│   │                        # responsive/visual-regression suite (run via
+│   │                        # scripts/e2e-design.sh, the same plain demo stack as
+│   │                        # scripts/e2e.sh — never run the two concurrently).
 │   └── api/                 # FastAPI backend: domain models, services, policy engine, executors, audit.
 │                            # ALL business logic lives here, behind connector/LLM interfaces.
 │                            # src/lifeflow_api/testing/ is test-only fault-injection

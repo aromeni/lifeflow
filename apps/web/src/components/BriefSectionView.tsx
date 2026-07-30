@@ -1,4 +1,5 @@
 import { EvidenceDrawer } from "@/components/EvidenceDrawer";
+import { Badge, PriorityBadge } from "@/components/ui/Badge";
 import type { BriefItem, BriefSection } from "@/lib/types";
 
 function formatDue(iso: string, timezone: string): string {
@@ -35,31 +36,49 @@ function reasonLabel(code: string): string {
   return REASON_LABELS[code] ?? code.replaceAll("_", " ");
 }
 
+// A thin left-edge colour bar reinforces priority at a glance without
+// relying on colour alone — the text badge alongside it still names the
+// band explicitly (Stage 10 §8).
+const PRIORITY_EDGE: Record<string, string> = {
+  high: "border-l-[var(--color-danger-icon)]",
+  medium: "border-l-[var(--color-warning-icon)]",
+  low: "border-l-[var(--color-info-icon)]",
+};
+
 function BriefItemView({ item, timezone }: { item: BriefItem; timezone: string }) {
+  const edgeColor = PRIORITY_EDGE[item.priority_band] ?? "border-l-border-strong";
   return (
-    <li className="flex flex-col gap-1 py-3">
-      <div className="flex items-baseline justify-between gap-3">
-        <span className="font-medium">{item.title}</span>
-        <span className="shrink-0 rounded border border-current/30 px-1.5 py-0.5 text-xs uppercase tracking-wide opacity-80">
-          {item.priority_band} priority
-        </span>
+    <li
+      className={`flex flex-col gap-2 rounded-lg border border-border border-l-4 bg-surface p-4 shadow-xs ${edgeColor}`}
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <span className="font-medium text-foreground">{item.title}</span>
+        <PriorityBadge band={item.priority_band} />
       </div>
-      <p className="text-sm opacity-80">{item.summary}</p>
-      {item.due_at ? <p className="text-sm">Due {formatDue(item.due_at, timezone)}</p> : null}
-      <ul className="flex flex-wrap gap-1.5 text-xs" aria-label="Why this matters">
+      <p className="text-sm text-text-secondary">{item.summary}</p>
+      {item.due_at ? (
+        <p className="text-sm text-foreground" data-testid="brief-item-due">
+          Due {formatDue(item.due_at, timezone)}
+        </p>
+      ) : null}
+      <ul className="flex flex-wrap gap-1.5" aria-label="Why this matters">
         {item.reason_codes.map((code) => (
-          <li key={code} className="rounded-full border border-current/20 px-2 py-0.5 opacity-80">
-            {reasonLabel(code)}
+          <li key={code}>
+            <Badge tone="neutral" uppercase={false}>
+              {reasonLabel(code)}
+            </Badge>
           </li>
         ))}
-        <li className="rounded-full border border-current/20 px-2 py-0.5 opacity-80">
-          confidence {Math.round(item.confidence * 100)}%
+        <li>
+          <Badge tone="neutral" uppercase={false}>
+            confidence {Math.round(item.confidence * 100)}%
+          </Badge>
         </li>
       </ul>
       {item.suggested_action ? (
-        <p className="text-sm">
+        <p className="text-sm text-foreground">
           <span className="font-medium">Suggested next step:</span> {item.suggested_action}{" "}
-          <span className="opacity-70">(nothing happens without your approval)</span>
+          <span className="text-text-tertiary">(nothing happens without your approval)</span>
         </p>
       ) : null}
       <EvidenceDrawer evidence={item.evidence} timezone={timezone} />
@@ -76,15 +95,21 @@ export function BriefSectionView({
 }) {
   const headingId = `section-${section.key}`;
   return (
-    <section aria-labelledby={headingId} className="flex flex-col gap-2">
-      <h2 id={headingId} className="text-xl font-medium">
+    <section
+      id={headingId}
+      aria-labelledby={headingId}
+      className="flex scroll-mt-20 flex-col gap-3"
+    >
+      <h2 id={headingId} className="text-lg font-semibold text-foreground">
         {section.label}
-        <span className="ml-2 text-sm font-normal opacity-70">({section.items.length})</span>
+        <span className="ml-2 text-sm font-normal text-text-tertiary">
+          ({section.items.length})
+        </span>
       </h2>
       {section.items.length === 0 ? (
-        <p className="text-sm opacity-70">Nothing here right now.</p>
+        <p className="text-sm text-text-tertiary">Nothing here right now.</p>
       ) : (
-        <ul className="flex flex-col divide-y divide-current/10">
+        <ul className="flex flex-col gap-3">
           {section.items.map((item) => (
             <BriefItemView key={item.signal_id} item={item} timezone={timezone} />
           ))}

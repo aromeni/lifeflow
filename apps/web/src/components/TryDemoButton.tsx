@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { Button } from "@/components/ui/Button";
 import { api, ApiError } from "@/lib/api";
 import type { DemoStart } from "@/lib/types";
 
@@ -30,15 +31,16 @@ export function TryDemoButton() {
 
   return (
     <div className="flex flex-col gap-2">
-      <button
-        type="button"
-        onClick={startDemo}
-        disabled={status === "starting"}
-        className="w-fit rounded-md bg-foreground px-5 py-2.5 font-medium text-background transition-opacity hover:opacity-85 disabled:opacity-50"
-      >
+      <Button type="button" variant="primary" onClick={startDemo} disabled={status === "starting"}>
         {status === "starting" ? "Preparing your demo…" : "Try demo (no account needed)"}
-      </button>
-      <p aria-live="polite" className={status === "error" ? "text-sm text-red-600" : "text-sm"}>
+      </Button>
+      {/* Always mounted (not conditionally rendered) so screen readers that
+          require a live region to exist before its content changes still
+          announce this reliably — only the visible styling reacts to tone. */}
+      <p
+        aria-live="polite"
+        className={status === "error" ? "text-sm text-danger-text" : "text-sm text-text-secondary"}
+      >
         {message}
       </p>
     </div>

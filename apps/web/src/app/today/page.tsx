@@ -5,6 +5,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { BriefSectionView } from "@/components/BriefSectionView";
 import { RateLimitNotice } from "@/components/RateLimitNotice";
+import { Button } from "@/components/ui/Button";
+import { AppShell, PageHeader } from "@/components/ui/AppShell";
+import { Notice } from "@/components/ui/Notice";
 import { api, ApiError, RateLimitError } from "@/lib/api";
 import type { Brief, Me } from "@/lib/types";
 
@@ -27,6 +30,30 @@ function formatGeneratedAt(iso: string, timezone: string): string {
     minute: "2-digit",
     timeZone: timezone,
   }).format(new Date(iso));
+}
+
+// A compact orientation strip — counts only, no charts. Included because a
+// brief with several sections genuinely benefits from an at-a-glance total
+// before scrolling (Stage 10 §8); each count still links to its own
+// section heading so the strip is a shortcut, not a second source of truth.
+function SummaryStrip({ brief }: { brief: Brief }) {
+  const counted = brief.sections.filter((section) => section.items.length > 0);
+  if (counted.length === 0) return null;
+  return (
+    <ul className="flex flex-wrap gap-2" aria-label="Counts by section">
+      {counted.map((section) => (
+        <li key={section.key}>
+          <a
+            href={`#section-${section.key}`}
+            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1 text-sm text-text-secondary transition-colors hover:border-border-strong hover:text-foreground"
+          >
+            <span className="font-semibold text-foreground">{section.items.length}</span>
+            {section.label}
+          </a>
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 export default function TodayPage() {
@@ -107,94 +134,99 @@ export default function TodayPage() {
   const timezone = me?.timezone ?? "Europe/London";
   const statusMessage = brief ? STATUS_MESSAGES[brief.status] : undefined;
 
+  // Computed once, then rendered into a single element that stays mounted
+  // across every state transition — screen readers that require a live
+  // region to already exist before its content changes must not lose this
+  // announcement to a state-driven remount (see TryDemoButton for the same
+  // pattern).
+  let briefStatusText = "";
+  if (state === "ready" && brief) {
+    briefStatusText = `Generated ${formatGeneratedAt(brief.generated_at, timezone)} · version ${brief.version} · ${brief.status} · ${brief.generation_trigger === "scheduled" ? "scheduled" : "manual"}`;
+  } else if (state === "loading") {
+    briefStatusText = "Loading your brief…";
+  } else if (state === "generating") {
+    briefStatusText = "Generating a fresh brief from your sources…";
+  } else if (state === "no-brief") {
+    briefStatusText = "No brief yet.";
+  } else if (state === "error") {
+    briefStatusText = "Could not load your brief. Is the API running?";
+  }
+
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col gap-8 px-6 py-12">
-      <header className="flex flex-col gap-2">
-        <div className="flex items-baseline justify-between gap-4">
-          <h1 className="text-3xl font-semibold tracking-tight">Today</h1>
-          <div className="flex items-center gap-3">
-            <Link href="/approvals" data-testid="approval-inbox-link" className="text-sm underline">
-              Review approvals
-            </Link>
-            <Link href="/connections" data-testid="connections-link" className="text-sm underline">
-              Connections
-            </Link>
-            <Link href="/settings" data-testid="settings-link" className="text-sm underline">
-              Settings
-            </Link>
-            <button
+    <AppShell>
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-8 sm:px-6 sm:py-10">
+        <PageHeader
+          title="Today"
+          description={
+            <span data-testid="brief-status" aria-live="polite">
+              {briefStatusText}
+            </span>
+          }
+          actions={
+            <Button
               data-testid="generate-brief"
               type="button"
+              variant="primary"
               onClick={generate}
               disabled={state === "generating"}
-              className="rounded border border-current/40 px-3 py-1 text-sm disabled:opacity-50"
             >
               {state === "generating" ? "Generating…" : "Generate brief"}
-            </button>
-          </div>
-        </div>
-        <p data-testid="brief-status" aria-live="polite" className="text-sm opacity-70">
-          {state === "loading" && "Loading your brief…"}
-          {state === "generating" && "Generating a fresh brief from your sources…"}
-          {state === "ready" &&
-            brief &&
-            `Generated ${formatGeneratedAt(brief.generated_at, timezone)} · version ${brief.version} · ${brief.status} · ${brief.generation_trigger === "scheduled" ? "scheduled" : "manual"}`}
-          {state === "no-brief" && "No brief yet."}
-          {state === "error" && "Could not load your brief. Is the API running?"}
-        </p>
+            </Button>
+          }
+        />
+
         {generateRetryAfter !== null && <RateLimitNotice retryAfterSeconds={generateRetryAfter} />}
-      </header>
 
-      {state === "no-brief" && (
-        <section className="flex flex-col gap-3">
-          <p>
-            Generate your first daily brief. It is composed from your imported information, every
-            item carries its source evidence, and nothing is actioned without your approval.
-          </p>
-        </section>
-      )}
-
-      {state === "ready" && brief && (
-        <>
-          <section aria-labelledby="summary-heading" className="flex flex-col gap-2">
-            <h2 id="summary-heading" className="sr-only">
-              Summary
-            </h2>
-            <p className="text-lg">{brief.summary}</p>
-            {statusMessage ? (
-              <p role="status" className="rounded border border-current/30 px-3 py-2 text-sm">
-                Note: {statusMessage}
-              </p>
-            ) : null}
-            {brief.notices.map((notice) => (
-              <p
-                key={notice.code}
-                role="status"
-                className="rounded border border-current/30 px-3 py-2 text-sm"
-              >
-                {notice.message}
-              </p>
-            ))}
+        {state === "no-brief" && (
+          <section className="flex flex-col gap-3">
+            <p className="text-text-secondary">
+              Generate your first daily brief. It is composed from your imported information, every
+              item carries its source evidence, and nothing is actioned without your approval.
+            </p>
           </section>
+        )}
 
-          {brief.sections.map((section) => (
-            <BriefSectionView key={section.key} section={section} timezone={timezone} />
-          ))}
+        {state === "ready" && brief && (
+          <>
+            <section aria-labelledby="summary-heading" className="flex flex-col gap-3">
+              <h2 id="summary-heading" className="sr-only">
+                Summary
+              </h2>
+              <p className="text-lg text-foreground">{brief.summary}</p>
+              <SummaryStrip brief={brief} />
+              {statusMessage ? (
+                <Notice tone="info" role="status">
+                  {statusMessage}
+                </Notice>
+              ) : null}
+              {brief.notices.map((notice) => (
+                <Notice key={notice.code} tone="info" role="status">
+                  {notice.message}
+                </Notice>
+              ))}
+            </section>
 
-          <footer className="flex flex-col gap-1 text-sm opacity-70">
-            <span>
-              Source window: {brief.source_window} · composed deterministically
-              {brief.generation_metadata &&
-              (brief.generation_metadata as Record<string, unknown>).llm_summary_used === true
-                ? " · summary sentences selected by the model from evidence-backed text"
-                : ""}
-            </span>
-            <Link href="/debug/source-items" className="underline">
-              Developer view: raw normalised items
-            </Link>
-          </footer>
-        </>
-      )}
-    </main>
+            <div className="flex flex-col gap-8">
+              {brief.sections.map((section) => (
+                <BriefSectionView key={section.key} section={section} timezone={timezone} />
+              ))}
+            </div>
+
+            <footer className="flex flex-col gap-1 border-t border-border pt-4 text-sm text-text-tertiary">
+              <span>
+                Source window: {brief.source_window} · composed deterministically
+                {brief.generation_metadata &&
+                (brief.generation_metadata as Record<string, unknown>).llm_summary_used === true
+                  ? " · summary sentences selected by the model from evidence-backed text"
+                  : ""}
+              </span>
+              <Link href="/debug/source-items" className="underline">
+                Developer view: raw normalised items
+              </Link>
+            </footer>
+          </>
+        )}
+      </div>
+    </AppShell>
   );
 }

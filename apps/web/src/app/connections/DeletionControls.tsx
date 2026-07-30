@@ -10,6 +10,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { rateLimitMessage } from "@/components/RateLimitNotice";
+import { Button } from "@/components/ui/Button";
+import { Notice } from "@/components/ui/Notice";
+import { TextInput } from "@/components/ui/Form";
 import { api, ApiError, RateLimitError } from "@/lib/api";
 import type { DeletionOperation } from "@/lib/types";
 
@@ -49,7 +52,12 @@ function StatusLine({ operation }: { operation: DeletionOperation }) {
     text = "Mostly done — some steps could not finish. Your data was still erased.";
   else if (operation.state === "failed") text = "This could not be completed.";
   return (
-    <p data-testid="operation-status" role="status" aria-live="polite" className="text-sm">
+    <p
+      data-testid="operation-status"
+      role="status"
+      aria-live="polite"
+      className="text-sm text-foreground"
+    >
       {text}
     </p>
   );
@@ -68,12 +76,12 @@ function CountBlock({
   if (rows.length === 0) return null;
   return (
     <div data-testid={testid} className="text-sm">
-      <p className="font-medium">{title}</p>
+      <p className="font-medium text-foreground">{title}</p>
       <ul className="mt-1 flex flex-col gap-0.5">
         {rows.map(([key, n]) => (
           <li key={key} className="flex justify-between gap-3">
-            <span className="opacity-80">{COUNT_LABELS[key] ?? key}</span>
-            <span className="tabular-nums opacity-70">{n}</span>
+            <span className="text-text-secondary">{COUNT_LABELS[key] ?? key}</span>
+            <span className="text-text-tertiary tabular-nums">{n}</span>
           </li>
         ))}
       </ul>
@@ -214,27 +222,30 @@ function DeletionFlow({
   return (
     <div
       data-testid={`${testidPrefix}-control`}
-      className={`rounded border p-4 ${highRisk ? "border-red-600/60" : "border-current/20"}`}
+      className={`rounded-md border p-4 ${highRisk ? "border-danger-border bg-danger-bg/40" : "border-border"}`}
     >
-      <h3 className="text-sm font-semibold">{title}</h3>
-      <div className="mt-1 text-sm opacity-80">{description}</div>
+      <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+      <div className="mt-1 text-sm text-text-secondary">{description}</div>
 
       {error ? (
-        <p role="alert" className="mt-2 text-sm text-red-700 dark:text-red-400">
-          {error}
-        </p>
+        <div className="mt-2">
+          <Notice tone="danger" role="alert">
+            {error}
+          </Notice>
+        </div>
       ) : null}
 
       {operation === null ? (
-        <button
+        <Button
           type="button"
-          data-testid={`${testidPrefix}-preview`}
+          variant="secondary"
+          className="mt-3"
           onClick={preview}
           disabled={busy}
-          className="mt-3 w-fit rounded border border-current/30 px-4 py-2 text-sm disabled:opacity-50"
+          data-testid={`${testidPrefix}-preview`}
         >
           {busy ? "Preparing…" : "Preview what will be deleted"}
-        </button>
+        </Button>
       ) : null}
 
       {previewing ? (
@@ -250,48 +261,46 @@ function DeletionFlow({
             testid={`${testidPrefix}-preserved-counts`}
           />
           {operation.warnings.length > 0 ? (
-            <ul data-testid={`${testidPrefix}-warnings`} className="flex flex-col gap-1 text-sm">
+            <ul
+              data-testid={`${testidPrefix}-warnings`}
+              className="flex flex-col gap-1 text-sm text-text-secondary"
+            >
               {operation.warnings.map((w) => (
-                <li key={w} className="opacity-80">
-                  • {w}
-                </li>
+                <li key={w}>• {w}</li>
               ))}
             </ul>
           ) : null}
           <label className="flex flex-col gap-1 text-sm">
-            <span>
+            <span className="text-foreground">
               Type <strong>{operation.confirmation_phrase}</strong> to confirm.
             </span>
-            <input
+            <TextInput
               data-testid={`${testidPrefix}-confirm-input`}
               type="text"
               value={typed}
               onChange={(e) => setTyped(e.target.value)}
               aria-label={`Type ${operation.confirmation_phrase} to confirm`}
-              className="w-full rounded border border-current/30 bg-transparent px-3 py-2"
             />
           </label>
           <div className="flex flex-wrap gap-2">
-            <button
+            <Button
               type="button"
+              variant={highRisk ? "danger" : "primary"}
               data-testid={`${testidPrefix}-confirm`}
               onClick={confirm}
               disabled={busy || !phraseMatches}
-              className={`w-fit rounded px-4 py-2 text-sm font-medium disabled:opacity-40 ${
-                highRisk ? "bg-red-700 text-white" : "bg-foreground text-background"
-              }`}
             >
               {busy ? "Working…" : "Delete permanently"}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="secondary"
               data-testid={`${testidPrefix}-cancel`}
               onClick={cancel}
               disabled={busy}
-              className="w-fit rounded border border-current/30 px-4 py-2 text-sm disabled:opacity-50"
             >
               Cancel
-            </button>
+            </Button>
           </div>
         </div>
       ) : null}

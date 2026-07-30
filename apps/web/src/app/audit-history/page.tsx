@@ -3,6 +3,10 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
+import { AppShell, PageHeader } from "@/components/ui/AppShell";
+import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import { Notice } from "@/components/ui/Notice";
 import { api, ApiError } from "@/lib/api";
 import type {
   AuditHistoryCategory,
@@ -40,6 +44,13 @@ const TONE_LABELS: Record<AuditHistoryItem["tone"], string> = {
   success: "Completed",
   warning: "Attention",
   failure: "Not completed",
+};
+
+const TONE_BADGE: Record<AuditHistoryItem["tone"], "neutral" | "success" | "warning" | "danger"> = {
+  neutral: "neutral",
+  success: "success",
+  warning: "warning",
+  failure: "danger",
 };
 
 function historyPath(
@@ -82,6 +93,9 @@ function countLines(item: AuditHistoryItem): string[] {
   }
   return lines;
 }
+
+const selectStyle =
+  "rounded-md border border-border-strong bg-surface px-3 py-2 text-sm text-foreground";
 
 export default function AuditHistoryPage() {
   const [state, setState] = useState<LoadState>("loading");
@@ -144,149 +158,148 @@ export default function AuditHistoryPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col gap-8 px-6 py-12">
-      <header className="flex flex-col gap-3">
-        <div className="flex flex-wrap gap-4 text-sm">
-          <Link href="/today" className="underline">
-            ← Back to Today
-          </Link>
-          <Link href="/connections" className="underline">
-            Privacy &amp; Connections
-          </Link>
-        </div>
-        <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Audit history</h1>
-          <p className="mt-2 max-w-2xl">
-            A plain-language record of important LifeFlow activity. Private content, provider
-            identifiers, technical metadata, and error details are never shown here.
-          </p>
-        </div>
-      </header>
+    <AppShell>
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-8 sm:px-6 sm:py-10">
+        <PageHeader
+          title="Audit history"
+          description="A plain-language record of important LifeFlow activity. Private content, provider identifiers, technical metadata, and error details are never shown here."
+        />
 
-      <section aria-labelledby="audit-history-filters" className="flex flex-col gap-3">
-        <h2 id="audit-history-filters" className="font-semibold">
-          Filter history
-        </h2>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label className="flex flex-col gap-1 text-sm">
-            Activity
-            <select
-              value={category}
-              onChange={(event) => setCategory(event.target.value as AuditHistoryCategory)}
-              className="rounded border border-current/30 bg-background px-3 py-2"
-            >
-              {CATEGORY_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="flex flex-col gap-1 text-sm">
-            Time period
-            <select
-              value={period}
-              onChange={(event) => setPeriod(event.target.value as AuditHistoryPeriod)}
-              className="rounded border border-current/30 bg-background px-3 py-2"
-            >
-              {PERIOD_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-      </section>
-
-      <p aria-live="polite" className="text-sm opacity-70">
-        {state === "loading" && "Loading your audit history…"}
-        {state === "error" && "Could not load your audit history. Is the API running?"}
-      </p>
-
-      {state === "error" ? (
-        <button
-          type="button"
-          onClick={() => {
-            setState("loading");
-            void loadFirstPage();
-          }}
-          className="w-fit rounded border border-current/30 px-4 py-2 text-sm"
+        <section
+          aria-labelledby="audit-history-filters"
+          className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-5 shadow-xs"
         >
-          Try again
-        </button>
-      ) : null}
-
-      {state === "ready" ? (
-        <section aria-labelledby="audit-history-results" data-testid="audit-history">
-          <h2 id="audit-history-results" className="sr-only">
-            Audit history results
+          <h2 id="audit-history-filters" className="text-sm font-semibold text-foreground">
+            Filter history
           </h2>
-          {items.length === 0 ? (
-            <p className="rounded border border-current/20 p-5 text-sm">
-              No {CATEGORY_LABELS[category].toLowerCase()} was recorded in this time period.
-            </p>
-          ) : (
-            <ol className="flex flex-col gap-3">
-              {items.map((item) => (
-                <li
-                  key={item.id}
-                  className="grid gap-2 rounded-lg border border-current/20 p-5 sm:grid-cols-[1fr_auto]"
-                >
-                  <div>
-                    <h3 className="font-semibold">
-                      {item.title}
-                      {item.action_type ? (
-                        <span
-                          data-testid="audit-action-type"
-                          className="ml-2 rounded-full border border-current/30 px-2 py-0.5 text-xs font-normal opacity-80"
-                        >
-                          {item.action_type}
-                        </span>
-                      ) : null}
-                    </h3>
-                    <p className="mt-1 text-sm opacity-80">{item.summary}</p>
-                    {item.reason ? (
-                      <p data-testid="audit-reason" className="mt-1 text-xs opacity-70">
-                        Reason: {item.reason}
-                      </p>
-                    ) : null}
-                    {countLines(item).length > 0 ? (
-                      <ul data-testid="audit-counts" className="mt-1 text-xs opacity-70">
-                        {countLines(item).map((line) => (
-                          <li key={line}>{line}</li>
-                        ))}
-                      </ul>
-                    ) : null}
-                    <p className="mt-2 text-xs opacity-65">
-                      {item.actor === "you" ? "You" : "LifeFlow"} · {CATEGORY_LABELS[item.category]}{" "}
-                      · {TONE_LABELS[item.tone]}
-                    </p>
-                  </div>
-                  <time dateTime={item.occurred_at} className="text-xs opacity-65 sm:text-right">
-                    {formatTimestamp(item.occurred_at, timezone)}
-                  </time>
-                </li>
-              ))}
-            </ol>
-          )}
-          {loadMoreError ? (
-            <p role="alert" className="mt-4 text-sm text-red-700 dark:text-red-400">
-              {loadMoreError}
-            </p>
-          ) : null}
-          {nextCursor ? (
-            <button
-              type="button"
-              onClick={loadMore}
-              disabled={loadingMore}
-              className="mt-5 rounded border border-current/30 px-4 py-2 text-sm disabled:opacity-50"
-            >
-              {loadingMore ? "Loading…" : "Load more"}
-            </button>
-          ) : null}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="flex flex-col gap-1 text-sm text-foreground">
+              Activity
+              <select
+                value={category}
+                onChange={(event) => setCategory(event.target.value as AuditHistoryCategory)}
+                className={selectStyle}
+              >
+                {CATEGORY_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1 text-sm text-foreground">
+              Time period
+              <select
+                value={period}
+                onChange={(event) => setPeriod(event.target.value as AuditHistoryPeriod)}
+                className={selectStyle}
+              >
+                {PERIOD_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
         </section>
-      ) : null}
-    </main>
+
+        <p aria-live="polite" className="text-sm text-text-secondary">
+          {state === "loading" && "Loading your audit history…"}
+          {state === "error" && "Could not load your audit history. Is the API running?"}
+        </p>
+
+        {state === "error" ? (
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => {
+              setState("loading");
+              void loadFirstPage();
+            }}
+          >
+            Try again
+          </Button>
+        ) : null}
+
+        {state === "ready" ? (
+          <section aria-labelledby="audit-history-results" data-testid="audit-history">
+            <h2 id="audit-history-results" className="sr-only">
+              Audit history results
+            </h2>
+            {items.length === 0 ? (
+              <p className="rounded-lg border border-border bg-surface p-5 text-sm text-text-secondary">
+                No {CATEGORY_LABELS[category].toLowerCase()} was recorded in this time period.
+              </p>
+            ) : (
+              <ol className="flex flex-col gap-3">
+                {items.map((item) => (
+                  <li
+                    key={item.id}
+                    className="grid gap-2 rounded-lg border border-border bg-surface p-5 shadow-xs sm:grid-cols-[1fr_auto]"
+                  >
+                    <div>
+                      <h3 className="flex flex-wrap items-center gap-2 font-semibold text-foreground">
+                        {item.title}
+                        {item.action_type ? (
+                          <Badge tone="neutral" uppercase={false} testId="audit-action-type">
+                            {item.action_type}
+                          </Badge>
+                        ) : null}
+                      </h3>
+                      <p className="mt-1 text-sm text-text-secondary">{item.summary}</p>
+                      {item.reason ? (
+                        <p data-testid="audit-reason" className="mt-1 text-xs text-text-tertiary">
+                          Reason: {item.reason}
+                        </p>
+                      ) : null}
+                      {countLines(item).length > 0 ? (
+                        <ul data-testid="audit-counts" className="mt-1 text-xs text-text-tertiary">
+                          {countLines(item).map((line) => (
+                            <li key={line}>{line}</li>
+                          ))}
+                        </ul>
+                      ) : null}
+                      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-text-tertiary">
+                        <span>{item.actor === "you" ? "You" : "LifeFlow"}</span>
+                        <span aria-hidden="true">·</span>
+                        <span>{CATEGORY_LABELS[item.category]}</span>
+                        <Badge tone={TONE_BADGE[item.tone]} uppercase={false}>
+                          {TONE_LABELS[item.tone]}
+                        </Badge>
+                      </div>
+                    </div>
+                    <time
+                      dateTime={item.occurred_at}
+                      className="text-xs text-text-tertiary sm:text-right"
+                    >
+                      {formatTimestamp(item.occurred_at, timezone)}
+                    </time>
+                  </li>
+                ))}
+              </ol>
+            )}
+            {loadMoreError ? (
+              <div className="mt-4">
+                <Notice tone="danger" role="alert">
+                  {loadMoreError}
+                </Notice>
+              </div>
+            ) : null}
+            {nextCursor ? (
+              <Button
+                type="button"
+                variant="secondary"
+                className="mt-5"
+                onClick={loadMore}
+                disabled={loadingMore}
+              >
+                {loadingMore ? "Loading…" : "Load more"}
+              </Button>
+            ) : null}
+          </section>
+        ) : null}
+      </div>
+    </AppShell>
   );
 }

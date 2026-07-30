@@ -116,12 +116,22 @@ def main() -> int:
     )
     api_tests, api_coverage = backend_tests_and_coverage()
     web = web_tests()
-    e2e_specs = sum(
-        len(re.findall(r"^test\(", path.read_text(), re.M))
-        for e2e_dir in ("apps/web/e2e", "apps/web/e2e-resilience")
-        if (ROOT / e2e_dir).exists()
-        for path in (ROOT / e2e_dir).glob("*.spec.ts")
-    )
+
+    def count_tests(e2e_dir: str) -> int:
+        path = ROOT / e2e_dir
+        if not path.exists():
+            return 0
+        return sum(
+            len(re.findall(r"^test\(", spec.read_text(), re.M)) for spec in path.glob("*.spec.ts")
+        )
+
+    # Reported as three independently-countable suites, not one combined
+    # figure (Stage 10 final closure, ADR 0006 D105) — a single opaque total
+    # previously let one suite's test count silently inflate another's.
+    e2e_functional = count_tests("apps/web/e2e")
+    e2e_resilience = count_tests("apps/web/e2e-resilience")
+    e2e_design = count_tests("apps/web/e2e-design")
+    e2e_specs = e2e_functional + e2e_resilience + e2e_design
     ci = ci_status()
     current_stage, completed = stage_progress()
 
@@ -138,7 +148,10 @@ def main() -> int:
 | Backend tests | {api_tests} |
 | Backend coverage | {api_coverage} |
 | Frontend tests | {web} |
-| E2E journeys (Playwright) | {e2e_specs} |
+| E2E journeys (Playwright, total) | {e2e_specs} |
+| — functional (`apps/web/e2e`, `scripts/e2e.sh`) | {e2e_functional} |
+| — resilience (`apps/web/e2e-resilience`, `scripts/e2e-resilience.sh`) | {e2e_resilience} |
+| — design/a11y/responsive/visual (`apps/web/e2e-design`, `scripts/e2e-design.sh`) | {e2e_design} |
 | Frontend coverage | not yet measured — coverage reporter deferred until the UI stabilises |
 | CI | {ci} |
 | Current stage | {current_stage} |

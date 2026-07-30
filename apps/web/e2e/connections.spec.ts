@@ -39,7 +39,7 @@ test("connections screen shows the not-connected state and links back to Today",
   await expect(page.getByTestId("sync-google-now")).toHaveCount(0);
   await expect(page.getByTestId("google-connection-status")).toHaveCount(0);
 
-  await page.getByRole("link", { name: /Back to Today/ }).click();
+  await page.getByTestId("nav-today").click();
   await expect(page).toHaveURL(/\/today/);
   await expect(page.getByTestId("connections-link")).toBeVisible();
 });

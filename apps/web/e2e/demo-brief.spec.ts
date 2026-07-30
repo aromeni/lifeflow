@@ -35,6 +35,7 @@ test("demo user generates a brief and inspects the evidence behind an item", asy
   await expect(
     page.getByText(/nothing is ever sent or changed without your explicit/),
   ).toBeVisible();
+  await page.getByRole("button", { name: "Continue" }).click();
   await page.getByRole("button", { name: "Finish and open Today" }).click();
   await expect(page).toHaveURL(/\/today/);
 
@@ -71,6 +72,7 @@ test("demo user generates a brief and inspects the evidence behind an item", asy
 test("regenerating creates a new persisted version", async ({ page }) => {
   await signInAndStartDemo(page);
   await page.goto("/onboarding");
+  await page.getByRole("button", { name: "Continue" }).click();
   await page.getByRole("button", { name: "Finish and open Today" }).click();
   const status = page.getByTestId("brief-status");
   await expect(status).not.toHaveText("Loading your brief…");

@@ -1,26 +1,221 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/*
+ * LifeFlow product design system (Stage 10, ADR 0006).
+ *
+ * A calm, cool-neutral "personal operations control centre": one restrained
+ * accent, semantic colour used purposefully (never decoratively), generous
+ * whitespace, and every coloured state also carries a text label so meaning
+ * never depends on colour alone (WCAG 1.4.1).
+ *
+ * Tokens are plain CSS custom properties, re-exposed to Tailwind v4 via
+ * `@theme inline` so utilities like `bg-surface` / `text-danger` exist
+ * without a tailwind.config.js. Do not add colour literals in components —
+ * add or reuse a token here instead.
+ */
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: Arial, Helvetica, sans-serif;
-  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+:root {
+  /* Neutral surfaces (cool-neutral, not pure grey) */
+  --color-bg: #f7f8fa;
+  --color-surface: #ffffff;
+  --color-surface-raised: #ffffff;
+  --color-border: #e2e5ea;
+  /* WCAG 1.4.11 non-text contrast: >= 3:1 against surface and bg (verified
+     via scripts/check_contrast.py) — this is the border used for inputs,
+     secondary-button outlines and other interactive boundaries. */
+  --color-border-strong: #838d9c;
+
+  /* Text hierarchy — text-secondary/tertiary verified >= 4.5:1 (WCAG AA,
+     normal text) against both --color-surface and --color-bg. */
+  --color-text-primary: #14181f;
+  --color-text-secondary: #4c5563;
+  --color-text-tertiary: #646c7b;
+  --color-text-on-accent: #ffffff;
+  --color-text-on-danger: #ffffff;
+
+  /* Brand accent — restrained indigo, used for the single primary action
+     per view and for focus rings. Never used for large decorative fills. */
+  --color-accent: #4338ca;
+  --color-accent-hover: #372da3;
+  --color-accent-subtle: #eeecfd;
+  --color-accent-subtle-text: #372da3;
+
+  /* Semantic states — each has a subtle background, a readable text colour
+     (>= 4.5:1 on its own background) and a stronger border/icon colour. */
+  --color-success-bg: #eaf7ee;
+  --color-success-border: #a9dab8;
+  --color-success-text: #1e6b37;
+  --color-success-icon: #2f9e52;
+
+  --color-warning-bg: #fdf3e2;
+  --color-warning-border: #f0cf8f;
+  --color-warning-text: #7a4e05;
+  --color-warning-icon: #b3790a;
+
+  --color-danger-bg: #fdecec;
+  --color-danger-border: #f2b8b8;
+  --color-danger-text: #9c2626;
+  --color-danger-icon: #c53030;
+  --color-danger-solid: #b42323;
+  --color-danger-solid-hover: #991e1e;
+
+  --color-info-bg: #eaf1fd;
+  --color-info-border: #b9d0f5;
+  --color-info-text: #1d4e8f;
+  --color-info-icon: #2f6fca;
+
+  /* Priority (Today brief items) and risk (Approvals) deliberately reuse
+     this same three-step semantic scale rather than a separate palette —
+     both answer "how much attention does this deserve", and every badge
+     keeps its text label regardless ("HIGH PRIORITY", "Risk: medium", ...)
+     so colour is reinforcement, never the only signal. See Badge.tsx's
+     PRIORITY_TONE mapping and docs/product/design-system.md. */
+
+  /* Focus ring — always visible, never colour-only (also offset + width) */
+  --focus-ring-color: #4338ca;
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
+
+  /* Radii */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 0.875rem;
+  --radius-full: 999px;
+
+  /* Shadows — subtle depth only, never decorative drop shadows */
+  --shadow-xs: 0 1px 2px 0 rgb(20 24 31 / 0.04);
+  --shadow-sm: 0 1px 3px 0 rgb(20 24 31 / 0.08), 0 1px 2px -1px rgb(20 24 31 / 0.06);
+  --shadow-md: 0 4px 12px -2px rgb(20 24 31 / 0.1), 0 2px 4px -2px rgb(20 24 31 / 0.06);
+
+  /* Typography — a contemporary system stack, no webfont dependency */
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono:
+    ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --color-bg: #10131a;
+    --color-surface: #171b24;
+    --color-surface-raised: #1d222c;
+    --color-border: #2b3140;
+    --color-border-strong: #606b80;
+
+    --color-text-primary: #edf0f5;
+    --color-text-secondary: #b6bccc;
+    --color-text-tertiary: #838ba0;
+
+    --color-accent: #8b7ff5;
+    --color-accent-hover: #a49af7;
+    --color-accent-subtle: #262247;
+    --color-accent-subtle-text: #c3bbfa;
+
+    --color-success-bg: #12281c;
+    --color-success-border: #235c39;
+    --color-success-text: #7fd89b;
+    --color-success-icon: #7fd89b;
+
+    --color-warning-bg: #2c2311;
+    --color-warning-border: #6b4f14;
+    --color-warning-text: #f0c674;
+    --color-warning-icon: #f0c674;
+
+    --color-danger-bg: #2c1616;
+    --color-danger-border: #6b2b2b;
+    --color-danger-text: #f4a6a6;
+    --color-danger-icon: #f4a6a6;
+    --color-danger-solid: #c53030;
+    --color-danger-solid-hover: #d64545;
+
+    --color-info-bg: #131f2e;
+    --color-info-border: #2a4a71;
+    --color-info-text: #9dc2f2;
+    --color-info-icon: #9dc2f2;
+
+    --focus-ring-color: #a49af7;
+    --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+    --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.4), 0 1px 2px -1px rgb(0 0 0 / 0.3);
+    --shadow-md: 0 4px 12px -2px rgb(0 0 0 / 0.45), 0 2px 4px -2px rgb(0 0 0 / 0.3);
   }
 }
 
+@theme inline {
+  --color-background: var(--color-bg);
+  --color-foreground: var(--color-text-primary);
+
+  --color-surface: var(--color-surface);
+  --color-surface-raised: var(--color-surface-raised);
+  --color-border: var(--color-border);
+  --color-border-strong: var(--color-border-strong);
+
+  --color-text-primary: var(--color-text-primary);
+  --color-text-secondary: var(--color-text-secondary);
+  --color-text-tertiary: var(--color-text-tertiary);
+
+  --color-accent: var(--color-accent);
+  --color-accent-hover: var(--color-accent-hover);
+  --color-accent-subtle: var(--color-accent-subtle);
+  --color-accent-subtle-text: var(--color-accent-subtle-text);
+
+  --color-success-bg: var(--color-success-bg);
+  --color-success-border: var(--color-success-border);
+  --color-success-text: var(--color-success-text);
+  --color-success-icon: var(--color-success-icon);
+
+  --color-warning-bg: var(--color-warning-bg);
+  --color-warning-border: var(--color-warning-border);
+  --color-warning-text: var(--color-warning-text);
+  --color-warning-icon: var(--color-warning-icon);
+
+  --color-danger-bg: var(--color-danger-bg);
+  --color-danger-border: var(--color-danger-border);
+  --color-danger-text: var(--color-danger-text);
+  --color-danger-icon: var(--color-danger-icon);
+  --color-danger-solid: var(--color-danger-solid);
+  --color-danger-solid-hover: var(--color-danger-solid-hover);
+
+  --color-info-bg: var(--color-info-bg);
+  --color-info-border: var(--color-info-border);
+  --color-info-text: var(--color-info-text);
+  --color-info-icon: var(--color-info-icon);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-full: var(--radius-full);
+
+  --shadow-xs: var(--shadow-xs);
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-bg);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+}
+
+/* One visible, consistent focus treatment everywhere — never colour alone
+   (a 2px ring plus offset remains visible to non-colour-perceiving users
+   and under Windows High Contrast Mode, which preserves outlines). */
+:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+  border-radius: var(--radius-sm);
+}
+
+/* Respect the user's reduced-motion preference everywhere, not per-component. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }

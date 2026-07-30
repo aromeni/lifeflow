@@ -3,6 +3,11 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
+import { AppShell, PageHeader } from "@/components/ui/AppShell";
+import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import { Checkbox, Field, FormSection, TextInput, TimeInput } from "@/components/ui/Form";
+import { Notice } from "@/components/ui/Notice";
 import { api, ApiError } from "@/lib/api";
 import type { EvidenceFreshness, MemoryItem, MemoryList, ScheduledBriefStatus } from "@/lib/types";
 
@@ -294,364 +299,339 @@ export default function SettingsPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col gap-8 px-6 py-12">
-      <header className="flex items-baseline justify-between gap-4">
-        <h1 className="text-3xl font-semibold tracking-tight">Settings</h1>
-        <Link href="/today" className="text-sm underline">
-          Back to Today
-        </Link>
-      </header>
-      <p className="text-sm text-neutral-600 dark:text-neutral-300">
-        Everything here is explicit: LifeFlow only adapts in ways you set yourself, each change is
-        recorded in your audit history, and none of these settings can approve or execute anything
-        on your behalf.
-      </p>
+    <AppShell>
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-8 sm:px-6 sm:py-10">
+        <PageHeader
+          title="Settings"
+          description="Everything here is explicit: LifeFlow only adapts in ways you set yourself, each change is recorded in your audit history, and none of these settings can approve or execute anything on your behalf."
+        />
 
-      <section aria-labelledby="settings-time" className="flex flex-col gap-3">
-        <h2 id="settings-time" className="text-xl font-medium">
-          Time
-        </h2>
-        <label className="flex flex-col gap-1 text-sm">
-          Timezone (IANA name)
-          <input
-            data-testid="settings-timezone"
-            className="w-64 rounded border px-2 py-1"
-            value={timezone}
-            onChange={(event) => setTimezone(event.target.value)}
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          Daily briefing time
-          <span className="text-neutral-600 dark:text-neutral-300">
-            {scheduleStatus?.enabled
-              ? "Used by scheduled daily briefs below."
-              : "Saved now, but not yet in use: briefs are currently generated on demand. This " +
-                "time takes effect once you enable scheduled daily briefs below."}
-          </span>
-          <input
-            data-testid="settings-briefing-time"
-            type="time"
-            className="w-32 rounded border px-2 py-1"
-            value={briefingTime}
-            onChange={(event) => setBriefingTime(event.target.value)}
-          />
-        </label>
-        <div className="flex items-end gap-3">
-          <label className="flex flex-col gap-1 text-sm">
-            Working hours start
-            <input
-              data-testid="settings-work-start"
-              type="time"
-              className="w-32 rounded border px-2 py-1"
-              value={workStart}
-              onChange={(event) => setWorkStart(event.target.value)}
+        <FormSection legend="Time">
+          <Field htmlFor="settings-timezone" label="Timezone (IANA name)">
+            <TextInput
+              id="settings-timezone"
+              data-testid="settings-timezone"
+              value={timezone}
+              onChange={(event) => setTimezone(event.target.value)}
             />
-          </label>
-          <label className="flex flex-col gap-1 text-sm">
-            Working hours end
-            <input
-              data-testid="settings-work-end"
-              type="time"
-              className="w-32 rounded border px-2 py-1"
-              value={workEnd}
-              onChange={(event) => setWorkEnd(event.target.value)}
+          </Field>
+          <Field
+            htmlFor="settings-briefing-time"
+            label="Daily briefing time"
+            helper={
+              scheduleStatus?.enabled
+                ? "Used by scheduled daily briefs below."
+                : "Saved now, but not yet in use: briefs are currently generated on demand. This " +
+                  "time takes effect once you enable scheduled daily briefs below."
+            }
+          >
+            <TimeInput
+              id="settings-briefing-time"
+              data-testid="settings-briefing-time"
+              value={briefingTime}
+              onChange={(event) => setBriefingTime(event.target.value)}
             />
-          </label>
-        </div>
-      </section>
+          </Field>
+          <div className="flex flex-wrap items-end gap-3">
+            <Field htmlFor="settings-work-start" label="Working hours start">
+              <TimeInput
+                id="settings-work-start"
+                data-testid="settings-work-start"
+                value={workStart}
+                onChange={(event) => setWorkStart(event.target.value)}
+              />
+            </Field>
+            <Field htmlFor="settings-work-end" label="Working hours end">
+              <TimeInput
+                id="settings-work-end"
+                data-testid="settings-work-end"
+                value={workEnd}
+                onChange={(event) => setWorkEnd(event.target.value)}
+              />
+            </Field>
+          </div>
+        </FormSection>
 
-      <section aria-labelledby="settings-schedule" className="flex flex-col gap-3">
-        <h2 id="settings-schedule" className="text-xl font-medium">
-          Scheduled daily briefs
-        </h2>
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
+        <FormSection legend="Scheduled daily briefs">
+          <Checkbox
             data-testid="settings-schedule-enabled"
             checked={scheduledEnabled}
             onChange={(event) => setScheduledEnabled(event.target.checked)}
+            label="Automatically generate my daily brief at my briefing time above"
+            description="A scheduled brief uses the same evidence as your last sync — it never contacts Gmail or Calendar on its own. It never approves or executes anything: any suggested actions still wait for you in the approval inbox, exactly like a brief you generate yourself."
           />
-          Automatically generate my daily brief at my briefing time above
-        </label>
-        <p className="text-sm text-neutral-600 dark:text-neutral-300">
-          A scheduled brief uses the same evidence as your last sync — it never contacts Gmail or
-          Calendar on its own. It never approves or executes anything: any suggested actions still
-          wait for you in the approval inbox, exactly like a brief you generate yourself.
-        </p>
-        {evidenceFreshness ? (
-          <div data-testid="settings-evidence-freshness" className="flex flex-col gap-1 text-sm">
-            {evidenceFreshness.accounts.length === 0 ? (
-              <p>No accounts connected yet — connect Google from Connections to add evidence.</p>
-            ) : (
-              evidenceFreshness.accounts.map((account) => (
-                <p key={account.provider} data-testid={`evidence-freshness-${account.provider}`}>
-                  {PROVIDER_LABELS[account.provider] ?? account.provider}
-                  {": "}
-                  {!account.connected ? "disconnected" : null}
-                  {account.connected && account.sync_state === "never_synced"
-                    ? "connected, never synced yet — sync from Connections to give the scheduled brief real evidence"
-                    : null}
-                  {account.last_synced_at
-                    ? `${account.connected ? "" : "disconnected; "}last synced ${formatInTimezone(account.last_synced_at, scheduleStatus?.timezone ?? timezone)}${
-                        account.freshness_band
-                          ? ` (${FRESHNESS_LABELS[account.freshness_band]})`
-                          : ""
-                      }`
-                    : null}
+          {evidenceFreshness ? (
+            <div
+              data-testid="settings-evidence-freshness"
+              className="flex flex-col gap-1 text-sm text-text-secondary"
+            >
+              {evidenceFreshness.accounts.length === 0 ? (
+                <p>No accounts connected yet — connect Google from Connections to add evidence.</p>
+              ) : (
+                evidenceFreshness.accounts.map((account) => (
+                  <p key={account.provider} data-testid={`evidence-freshness-${account.provider}`}>
+                    {PROVIDER_LABELS[account.provider] ?? account.provider}
+                    {": "}
+                    {!account.connected ? "disconnected" : null}
+                    {account.connected && account.sync_state === "never_synced"
+                      ? "connected, never synced yet — sync from Connections to give the scheduled brief real evidence"
+                      : null}
+                    {account.last_synced_at
+                      ? `${account.connected ? "" : "disconnected; "}last synced ${formatInTimezone(account.last_synced_at, scheduleStatus?.timezone ?? timezone)}${
+                          account.freshness_band
+                            ? ` (${FRESHNESS_LABELS[account.freshness_band]})`
+                            : ""
+                        }`
+                      : null}
+                  </p>
+                ))
+              )}
+            </div>
+          ) : null}
+          {scheduleStatus?.enabled ? (
+            <div
+              data-testid="settings-schedule-status"
+              className="flex flex-col gap-1 rounded-md border border-border bg-surface-raised px-3 py-2 text-sm text-text-secondary"
+            >
+              {scheduleStatus.scheduler_available ? null : (
+                <p role="status" data-testid="settings-schedule-unavailable">
+                  The scheduler is not currently reachable — scheduled briefs may be delayed until
+                  it is back.
                 </p>
-              ))
-            )}
+              )}
+              {scheduleStatus.next_run_at ? (
+                <p>
+                  Next scheduled brief:{" "}
+                  {formatInTimezone(scheduleStatus.next_run_at, scheduleStatus.timezone)}
+                </p>
+              ) : null}
+              {scheduleStatus.latest_run_status ? (
+                <p>
+                  Last scheduled run:{" "}
+                  {RUN_STATUS_LABELS[scheduleStatus.latest_run_status] ??
+                    scheduleStatus.latest_run_status}
+                  {scheduleStatus.latest_run_completed_at
+                    ? ` (${formatInTimezone(scheduleStatus.latest_run_completed_at, scheduleStatus.timezone)})`
+                    : ""}
+                  {scheduleStatus.latest_brief_version
+                    ? ` · brief version ${scheduleStatus.latest_brief_version}`
+                    : ""}
+                </p>
+              ) : (
+                <p>No scheduled brief has run yet.</p>
+              )}
+            </div>
+          ) : null}
+        </FormSection>
+
+        <FormSection
+          legend="Brief sections"
+          description={
+            <>
+              Choose which sections your brief shows.{" "}
+              <strong className="text-foreground">Needs attention</strong> is always shown —
+              high-priority items can never be hidden. Hiding a section only changes the display:
+              signals are still detected and any suggested actions still appear in the approval
+              inbox.
+            </>
+          }
+        >
+          <div className="flex flex-col gap-2">
+            {Object.entries(SECTION_LABELS).map(([key, label]) => (
+              <Checkbox
+                key={key}
+                data-testid={`settings-section-${key}`}
+                checked={sections.includes(key)}
+                onChange={() => toggleSection(key)}
+                label={label}
+              />
+            ))}
           </div>
-        ) : null}
-        {scheduleStatus?.enabled ? (
-          <div
-            data-testid="settings-schedule-status"
-            className="flex flex-col gap-1 rounded border border-current/20 px-3 py-2 text-sm"
-          >
-            {scheduleStatus.scheduler_available ? null : (
-              <p role="status" data-testid="settings-schedule-unavailable">
-                The scheduler is not currently reachable — scheduled briefs may be delayed until it
-                is back.
-              </p>
-            )}
-            {scheduleStatus.next_run_at ? (
-              <p>
-                Next scheduled brief:{" "}
-                {formatInTimezone(scheduleStatus.next_run_at, scheduleStatus.timezone)}
-              </p>
-            ) : null}
-            {scheduleStatus.latest_run_status ? (
-              <p>
-                Last scheduled run:{" "}
-                {RUN_STATUS_LABELS[scheduleStatus.latest_run_status] ??
-                  scheduleStatus.latest_run_status}
-                {scheduleStatus.latest_run_completed_at
-                  ? ` (${formatInTimezone(scheduleStatus.latest_run_completed_at, scheduleStatus.timezone)})`
-                  : ""}
-                {scheduleStatus.latest_brief_version
-                  ? ` · brief version ${scheduleStatus.latest_brief_version}`
-                  : ""}
-              </p>
-            ) : (
-              <p>No scheduled brief has run yet.</p>
-            )}
+        </FormSection>
+
+        <FormSection legend="Learned preferences (memory)">
+          <div className="flex flex-col gap-1 text-sm text-text-secondary">
+            <p>
+              LifeFlow can learn small preferences from actions you take here — like the sign-off
+              you use when you edit and approve a draft reply. It learns{" "}
+              <strong className="text-foreground">only</strong> from your own deliberate actions
+              inside LifeFlow.
+            </p>
+            <ul className="list-disc pl-5">
+              <li>Content of emails you receive is never treated as your preference.</li>
+              <li>Your explicit settings always take priority over anything learned.</li>
+              <li>
+                Inferred memory never approves or sends anything — you still review every draft.
+              </li>
+              <li>Deleting memory here does not delete anything in Gmail or Calendar.</li>
+              <li>Pausing stops new learning; it does not delete what was already learned.</li>
+            </ul>
           </div>
-        ) : null}
-      </section>
 
-      <section aria-labelledby="settings-sections" className="flex flex-col gap-3">
-        <h2 id="settings-sections" className="text-xl font-medium">
-          Brief sections
-        </h2>
-        <p className="text-sm text-neutral-600 dark:text-neutral-300">
-          Choose which sections your brief shows. <strong>Needs attention</strong> is always shown —
-          high-priority items can never be hidden. Hiding a section only changes the display:
-          signals are still detected and any suggested actions still appear in the approval inbox.
-        </p>
-        {Object.entries(SECTION_LABELS).map(([key, label]) => (
-          <label key={key} className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              data-testid={`settings-section-${key}`}
-              checked={sections.includes(key)}
-              onChange={() => toggleSection(key)}
-            />
-            {label}
-          </label>
-        ))}
-      </section>
-
-      <section aria-labelledby="settings-memory" className="flex flex-col gap-3">
-        <h2 id="settings-memory" className="text-xl font-medium">
-          Learned preferences (memory)
-        </h2>
-        <div className="flex flex-col gap-1 text-sm text-neutral-600 dark:text-neutral-300">
-          <p>
-            LifeFlow can learn small preferences from actions you take here — like the sign-off you
-            use when you edit and approve a draft reply. It learns <strong>only</strong> from your
-            own deliberate actions inside LifeFlow.
-          </p>
-          <ul className="list-disc pl-5">
-            <li>Content of emails you receive is never treated as your preference.</li>
-            <li>Your explicit settings always take priority over anything learned.</li>
-            <li>
-              Inferred memory never approves or sends anything — you still review every draft.
-            </li>
-            <li>Deleting memory here does not delete anything in Gmail or Calendar.</li>
-            <li>Pausing stops new learning; it does not delete what was already learned.</li>
-          </ul>
-        </div>
-
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
+          <Checkbox
             data-testid="settings-memory-enabled"
             checked={memoryEnabled}
             onChange={(event) => void toggleMemoryInference(event.target.checked)}
+            label="Let LifeFlow learn preferences from my actions here"
           />
-          Let LifeFlow learn preferences from my actions here
-        </label>
 
-        {memories.length === 0 ? (
-          <p
-            data-testid="settings-memory-empty"
-            className="text-sm text-neutral-600 dark:text-neutral-300"
-          >
-            Nothing learned yet.
-            {memoryEnabled
-              ? " Edit and approve a few draft replies with the same sign-off and it will appear here for review."
-              : " Turn on learning above to let LifeFlow suggest preferences from your actions."}
-          </p>
-        ) : (
-          <ul className="flex flex-col gap-3">
-            {memories.map((item) => (
-              <li
-                key={item.id}
-                data-testid={`memory-item-${item.id}`}
-                className="flex flex-col gap-2 rounded border border-current/20 px-3 py-2 text-sm"
-              >
-                <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <span className="font-medium" data-testid={`memory-value-${item.id}`}>
-                    Sign-off: “{String((item.value as { value?: string }).value ?? "")}”
-                  </span>
-                  <span
-                    data-testid={`memory-status-${item.id}`}
-                    className="text-neutral-600 dark:text-neutral-300"
-                  >
-                    {memoryStatusLabel(item)}
-                  </span>
-                </div>
-                <p data-testid={`memory-explanation-${item.id}`}>{item.explanation}</p>
-                <p className="text-neutral-600 dark:text-neutral-300">
-                  Confidence: {BAND_LABELS[item.confidence_band] ?? item.confidence_band} (
-                  {item.confidence.toFixed(2)}) · based on {item.evidence_count}{" "}
-                  {item.evidence_count === 1 ? "action" : "actions"} you took
-                  {item.last_observed_at
-                    ? ` · last seen ${formatInTimezone(item.last_observed_at, timezone)}`
-                    : ""}
-                </p>
-
-                {editingId === item.id ? (
-                  <div className="flex flex-wrap items-center gap-2">
-                    <label className="flex items-center gap-2">
-                      <span className="sr-only">New sign-off</span>
-                      <input
-                        data-testid={`memory-edit-input-${item.id}`}
-                        className="w-48 rounded border px-2 py-1"
-                        value={editValue}
-                        onChange={(event) => setEditValue(event.target.value)}
-                      />
-                    </label>
-                    <button
-                      type="button"
-                      data-testid={`memory-save-${item.id}`}
-                      onClick={() => saveEditedMemory(item)}
-                      className="rounded bg-neutral-900 px-3 py-1 text-white dark:bg-white dark:text-neutral-900"
+          {memories.length === 0 ? (
+            <p data-testid="settings-memory-empty" className="text-sm text-text-secondary">
+              Nothing learned yet.
+              {memoryEnabled
+                ? " Edit and approve a few draft replies with the same sign-off and it will appear here for review."
+                : " Turn on learning above to let LifeFlow suggest preferences from your actions."}
+            </p>
+          ) : (
+            <ul className="flex flex-col gap-3">
+              {memories.map((item) => (
+                <li
+                  key={item.id}
+                  data-testid={`memory-item-${item.id}`}
+                  className="flex flex-col gap-2 rounded-md border border-border bg-surface-raised px-3 py-2.5 text-sm"
+                >
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <span
+                      className="font-medium text-foreground"
+                      data-testid={`memory-value-${item.id}`}
                     >
-                      Save &amp; confirm
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditingId(null);
-                        setEditValue("");
-                      }}
-                      className="rounded border px-3 py-1"
-                    >
-                      Cancel
-                    </button>
+                      Sign-off: “{String((item.value as { value?: string }).value ?? "")}”
+                    </span>
+                    <Badge tone="neutral" uppercase={false} testId={`memory-status-${item.id}`}>
+                      {memoryStatusLabel(item)}
+                    </Badge>
                   </div>
-                ) : (
-                  <div className="flex flex-wrap gap-2">
-                    {(item.status === "candidate" || item.status === "superseded") && (
-                      <>
-                        <button
-                          type="button"
-                          data-testid={`memory-confirm-${item.id}`}
-                          onClick={() => confirmMemory(item)}
-                          className="rounded bg-neutral-900 px-3 py-1 text-white dark:bg-white dark:text-neutral-900"
-                        >
-                          Use this sign-off
-                        </button>
-                        <button
-                          type="button"
-                          data-testid={`memory-edit-${item.id}`}
-                          onClick={() => {
-                            setEditingId(item.id);
-                            setEditValue(String((item.value as { value?: string }).value ?? ""));
-                          }}
-                          className="rounded border px-3 py-1"
-                        >
-                          Edit &amp; confirm
-                        </button>
-                        <button
-                          type="button"
-                          data-testid={`memory-dismiss-${item.id}`}
-                          onClick={() => dismissMemory(item)}
-                          className="rounded border px-3 py-1"
-                        >
-                          Dismiss
-                        </button>
-                      </>
-                    )}
-                    <button
-                      type="button"
-                      data-testid={`memory-delete-${item.id}`}
-                      onClick={() => deleteMemory(item)}
-                      className="rounded border border-red-700/40 px-3 py-1 text-red-700 dark:text-red-400"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
+                  <p data-testid={`memory-explanation-${item.id}`} className="text-text-secondary">
+                    {item.explanation}
+                  </p>
+                  <p className="text-text-tertiary">
+                    Confidence: {BAND_LABELS[item.confidence_band] ?? item.confidence_band} (
+                    {item.confidence.toFixed(2)}) · based on {item.evidence_count}{" "}
+                    {item.evidence_count === 1 ? "action" : "actions"} you took
+                    {item.last_observed_at
+                      ? ` · last seen ${formatInTimezone(item.last_observed_at, timezone)}`
+                      : ""}
+                  </p>
 
-        {memories.length > 0 ? (
-          <button
+                  {editingId === item.id ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <label className="flex items-center gap-2">
+                        <span className="sr-only">New sign-off</span>
+                        <TextInput
+                          data-testid={`memory-edit-input-${item.id}`}
+                          className="w-48"
+                          value={editValue}
+                          onChange={(event) => setEditValue(event.target.value)}
+                        />
+                      </label>
+                      <Button
+                        type="button"
+                        variant="primary"
+                        data-testid={`memory-save-${item.id}`}
+                        onClick={() => saveEditedMemory(item)}
+                      >
+                        Save &amp; confirm
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={() => {
+                          setEditingId(null);
+                          setEditValue("");
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {(item.status === "candidate" || item.status === "superseded") && (
+                        <>
+                          <Button
+                            type="button"
+                            variant="primary"
+                            data-testid={`memory-confirm-${item.id}`}
+                            onClick={() => confirmMemory(item)}
+                          >
+                            Use this sign-off
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            data-testid={`memory-edit-${item.id}`}
+                            onClick={() => {
+                              setEditingId(item.id);
+                              setEditValue(String((item.value as { value?: string }).value ?? ""));
+                            }}
+                          >
+                            Edit &amp; confirm
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            data-testid={`memory-dismiss-${item.id}`}
+                            onClick={() => dismissMemory(item)}
+                          >
+                            Dismiss
+                          </Button>
+                        </>
+                      )}
+                      <Button
+                        type="button"
+                        variant="danger"
+                        data-testid={`memory-delete-${item.id}`}
+                        onClick={() => deleteMemory(item)}
+                      >
+                        Delete
+                      </Button>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {memories.length > 0 ? (
+            <Button
+              type="button"
+              variant="danger"
+              className="self-start"
+              data-testid="settings-memory-delete-all"
+              onClick={deleteAllMemories}
+            >
+              Delete all inferred memory
+            </Button>
+          ) : null}
+
+          {memoryMessage ? (
+            <Notice tone="success" role="status" testId="settings-memory-message">
+              {memoryMessage}
+            </Notice>
+          ) : null}
+        </FormSection>
+
+        <div className="flex items-center gap-4">
+          <Button
             type="button"
-            data-testid="settings-memory-delete-all"
-            onClick={deleteAllMemories}
-            className="self-start rounded border border-red-700/40 px-3 py-1 text-sm text-red-700 dark:text-red-400"
+            variant="primary"
+            data-testid="settings-save"
+            onClick={save}
+            disabled={saving}
           >
-            Delete all inferred memory
-          </button>
-        ) : null}
-
-        {memoryMessage ? (
-          <p
-            role="status"
-            data-testid="settings-memory-message"
-            className="text-sm text-green-700 dark:text-green-400"
-          >
-            {memoryMessage}
-          </p>
-        ) : null}
-      </section>
-
-      <div className="flex items-center gap-4">
-        <button
-          type="button"
-          data-testid="settings-save"
-          onClick={save}
-          disabled={saving}
-          className="rounded bg-neutral-900 px-4 py-2 text-sm text-white disabled:opacity-50 dark:bg-white dark:text-neutral-900"
-        >
-          {saving ? "Saving…" : "Save settings"}
-        </button>
-        {message ? (
-          <p role="status" className="text-sm text-green-700 dark:text-green-400">
-            {message}
-          </p>
-        ) : null}
-        {error ? (
-          <p role="alert" className="text-sm text-red-700 dark:text-red-400">
-            {error}
-          </p>
-        ) : null}
+            {saving ? "Saving…" : "Save settings"}
+          </Button>
+          {message ? (
+            <p role="status" className="text-sm text-success-text">
+              {message}
+            </p>
+          ) : null}
+          {error ? (
+            <p role="alert" className="text-sm text-danger-text">
+              {error}
+            </p>
+          ) : null}
+        </div>
       </div>
-    </main>
+    </AppShell>
   );
 }

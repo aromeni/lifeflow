@@ -1,21 +1,28 @@
 #!/usr/bin/env python3
-"""Fail if .github/workflows/ci.yml stops actually running one of the two
+"""Fail if .github/workflows/ci.yml stops actually running one of the three
 Playwright end-to-end suites this repository maintains: the original demo-
-journey suite (`./scripts/e2e.sh`, `apps/web/e2e`) and the Stage 9 Delivery
+journey suite (`./scripts/e2e.sh`, `apps/web/e2e`), the Stage 9 Delivery
 Phase 5 outage-resilience suite (`./scripts/e2e-resilience.sh`, `apps/web/
-e2e-resilience`). Both must run through their wrapper script — a raw `pnpm
-web:e2e`/`playwright test` invocation skips the real ARQ worker and Redis
-these suites depend on (a genuine CI defect found and fixed during Stage 9
-Final Integration: several journeys failed in the very first real CI run
-because the job provisioned neither).
+e2e-resilience`), and the Stage 10 design/accessibility/responsive/visual-
+regression suite (`./scripts/e2e-design.sh`, `apps/web/e2e-design`). All
+three must run through their wrapper script — a raw `pnpm web:e2e`/
+`playwright test` invocation skips the real ARQ worker and Redis the first
+two depend on (a genuine CI defect found and fixed during Stage 9 Final
+Integration: several journeys failed in the very first real CI run because
+the job provisioned neither).
 
 Added during Stage 9 Final Integration after an audit found the resilience
 suite had been built, verified, and documented on `stage-9-resilience-
 telemetry` but was never wired into any CI workflow — nothing would have
-caught it silently disappearing again in a future edit. Deliberately narrow
-and textual, matching the style of scripts/check_uvicorn_launch_safety.py:
-this is not a YAML/job-graph validator, just a guard that both known
-invocation strings appear as an actual `run:` step, not merely in a comment.
+caught it silently disappearing again in a future edit. Extended during
+Stage 10 final closure after the same class of gap recurred in miniature:
+the three new design/accessibility/responsive/visual-regression specs were
+initially placed inside the original `apps/web/e2e` discovery boundary,
+silently inflating that suite's reported journey count rather than being
+independently countable. Deliberately narrow and textual, matching the
+style of scripts/check_uvicorn_launch_safety.py: this is not a YAML/job-
+graph validator, just a guard that all three known invocation strings
+appear as an actual `run:` step, not merely in a comment.
 """
 
 from __future__ import annotations
@@ -30,6 +37,7 @@ CI_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "ci.yml"
 REQUIRED_RUN_STEPS = (
     "./scripts/e2e.sh",
     "./scripts/e2e-resilience.sh",
+    "./scripts/e2e-design.sh",
 )
 
 
@@ -52,7 +60,7 @@ def main() -> int:
         for step in missing:
             print(" -", step)
         return 1
-    print("Both required Playwright E2E suites are wired into ci.yml as real run steps.")
+    print("All three required Playwright E2E suites are wired into ci.yml as real run steps.")
     return 0
 
 

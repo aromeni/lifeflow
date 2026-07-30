@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import { ActionProposalPanel } from "@/components/ActionProposalPanel";
+import { AppShell, PageHeader } from "@/components/ui/AppShell";
 import { api, ApiError } from "@/lib/api";
 import type { ActionProposal, ActionProposalList, Me } from "@/lib/types";
 
@@ -63,45 +64,50 @@ export default function ApprovalsPage() {
     );
   }
 
+  let statusText = "";
+  if (state === "loading") statusText = "Loading action proposals…";
+  else if (state === "error") statusText = "Could not load action proposals. Is the API running?";
+  else if (state === "ready") statusText = executionSummary(proposals);
+
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-4xl flex-col gap-8 px-6 py-12">
-      <header className="flex flex-col gap-3">
-        <Link href="/today" className="text-sm underline">
-          ← Back to Today
-        </Link>
-        <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Approval inbox</h1>
-          <p className="mt-2 max-w-2xl">
-            Review source evidence and every executor input. Nothing—including internal tasks—runs
-            until you approve the exact action type, payload, and proposal version shown here.
-          </p>
-        </div>
-        <p aria-live="polite" className="text-sm opacity-70">
-          {state === "loading" && "Loading action proposals…"}
-          {state === "error" && "Could not load action proposals. Is the API running?"}
-          {state === "ready" && executionSummary(proposals)}
-        </p>
-      </header>
+    <AppShell>
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-8 sm:px-6 sm:py-10">
+        <PageHeader
+          title="Approval inbox"
+          description={
+            <>
+              <span className="block">
+                Review source evidence and every executor input. Nothing—including internal
+                tasks—runs until you approve the exact action type, payload, and proposal version
+                shown here.
+              </span>
+              <span aria-live="polite" className="mt-2 block font-medium text-foreground">
+                {statusText}
+              </span>
+            </>
+          }
+        />
 
-      {state === "ready" && proposals.length === 0 ? (
-        <section className="rounded-lg border border-current/25 p-5">
-          <h2 className="font-semibold">No proposals to review</h2>
-          <p className="mt-1">
-            Generate a brief first. Only grounded, policy-valid actions appear.
-          </p>
-        </section>
-      ) : null}
+        {state === "ready" && proposals.length === 0 ? (
+          <section className="rounded-lg border border-border bg-surface p-5 shadow-xs">
+            <h2 className="font-semibold text-foreground">No proposals to review</h2>
+            <p className="mt-1 text-text-secondary">
+              Generate a brief first. Only grounded, policy-valid actions appear.
+            </p>
+          </section>
+        ) : null}
 
-      {state === "ready"
-        ? proposals.map((proposal) => (
-            <ActionProposalPanel
-              key={proposal.id}
-              proposal={proposal}
-              timezone={timezone}
-              onChanged={replaceProposal}
-            />
-          ))
-        : null}
-    </main>
+        {state === "ready"
+          ? proposals.map((proposal) => (
+              <ActionProposalPanel
+                key={proposal.id}
+                proposal={proposal}
+                timezone={timezone}
+                onChanged={replaceProposal}
+              />
+            ))
+          : null}
+      </div>
+    </AppShell>
   );
 }
