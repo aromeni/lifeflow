@@ -116,6 +116,16 @@ Defined in full in [go-no-go-template.md](../evaluation/stage-11/go-no-go-templa
 | Room/travel (optional, if in-person) | Not budgeted here | Requires explicit user approval |
 | Temporary hosting (only if local proves insufficient) | Not budgeted here | Requires explicit user approval; must be justified in writing first |
 
-## 12. Stage 11 exit criteria
+## 12. Round 1 execution readiness (added 2026-07-30)
+
+Before Round 1 can run, this plan requires an explicit evaluation-context decision and, depending on that decision, an ethics or privacy sign-off — this is not optional paperwork, it is how the "reasons to trust LifeFlow" half of §2's target-user hypothesis is protected on the evaluator's side, not just the product's. See:
+
+- [evaluation-context-decision.md](../evaluation/stage-11/evaluation-context-decision.md) — currently **UNDECIDED**; the project owner must select UNIVERSITY-LINKED, INDEPENDENT PRODUCT EVALUATION, or INFORMAL FEEDBACK before anything below can proceed.
+- [ethics-enquiry-summary.md](../evaluation/stage-11/ethics-enquiry-summary.md) — the pack to send to a supervisor/ethics contact if UNIVERSITY-LINKED.
+- [product-evaluation-privacy-assessment.md](../evaluation/stage-11/product-evaluation-privacy-assessment.md) — the decision pack if INDEPENDENT PRODUCT EVALUATION.
+- [recruitment-authorisation-checklist.md](../evaluation/stage-11/recruitment-authorisation-checklist.md) — currently **RECRUITMENT NOT AUTHORISED**; every applicable item must be satisfied before any participant is contacted.
+- [round-1-runbook.md](../evaluation/stage-11/round-1-runbook.md), [synthetic-scenario-manifest.md](../evaluation/stage-11/synthetic-scenario-manifest.md), [round-1-desk-rehearsal-findings.md](../evaluation/stage-11/round-1-desk-rehearsal-findings.md), [round-1-evidence-register.md](../evaluation/stage-11/round-1-evidence-register.md), and [round-1-readiness-decision.md](../evaluation/stage-11/round-1-readiness-decision.md) — the operational materials and the readiness verdict (**READY TO REQUEST RECRUITMENT AUTHORISATION**, which is a materials-readiness statement, not an authorisation).
+
+## 13. Stage 11 exit criteria
 
 Stage 11 is complete when: both evaluation rounds have run, the findings report and go/no-go decision are recorded, all P0/P1 issues raised during evaluation are resolved and regression-tested, the holdout+adversarial evaluation set (track 2) has been run and recorded in ADR 0002, and the privacy-notice professional review (track 3) is complete. None of this work is performed by this planning document — it defines how that work will be done and is filed for review before any of it begins.
