@@ -16,8 +16,6 @@ const API_URL = "http://localhost:8011";
 const FAKE_GOOGLE_URL = "http://localhost:8098";
 const MUTATION_HEADERS = { "X-LifeFlow-CSRF": "1" };
 const API_DIR = "../api";
-const OUT =
-  "/private/tmp/claude-501/-Users-abdulrashidomeni-Desktop-llm-projects-LifeFlow-Chief-of-Staff-Suite/fec180d4-e5cb-4406-8e22-ac725efb238a/scratchpad/screenshots-final";
 
 const BREAKPOINTS = [
   { width: 1440, height: 900 },
@@ -67,7 +65,7 @@ test.beforeEach(async ({ page }) => {
 
 test("Stage 10 fixture — uncertain execution renders a real, non-retryable, readable warning", async ({
   page,
-}) => {
+}, testInfo) => {
   test.setTimeout(60_000);
   const userId = await signIn(page, "uncertainfixture");
   support("seed-account", userId);
@@ -138,7 +136,10 @@ test("Stage 10 fixture — uncertain execution renders a real, non-retryable, re
   }
 
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.screenshot({ path: `${OUT}/11-approvals-uncertain-execution.png`, fullPage: true });
+  await page.screenshot({
+    path: testInfo.outputPath("11-approvals-uncertain-execution.png"),
+    fullPage: true,
+  });
 
   for (const bp of BREAKPOINTS) {
     await page.setViewportSize(bp);
@@ -149,7 +150,7 @@ test("Stage 10 fixture — uncertain execution renders a real, non-retryable, re
     await expect(warning).toBeVisible();
     if (bp.width === 390) {
       await page.screenshot({
-        path: `${OUT}/11b-approvals-uncertain-execution-mobile-390.png`,
+        path: testInfo.outputPath("11b-approvals-uncertain-execution-mobile-390.png"),
         fullPage: true,
       });
     }

@@ -19,8 +19,6 @@ const API_URL = "http://localhost:8011";
 const FAKE_GOOGLE_URL = "http://localhost:8098";
 const MUTATION_HEADERS = { "X-LifeFlow-CSRF": "1" };
 const API_DIR = "../api";
-const OUT =
-  "/private/tmp/claude-501/-Users-abdulrashidomeni-Desktop-llm-projects-LifeFlow-Chief-of-Staff-Suite/fec180d4-e5cb-4406-8e22-ac725efb238a/scratchpad/screenshots-final";
 
 const BREAKPOINTS = [
   { width: 1440, height: 900 },
@@ -70,7 +68,7 @@ test.beforeEach(async ({ page }) => {
 
 test("Stage 10 fixture — temporary provider outage renders a real, accessible, non-leaking notice", async ({
   page,
-}) => {
+}, testInfo) => {
   test.setTimeout(60_000);
   const userId = await signIn(page, "outagefixture");
   support("seed-account", userId);
@@ -118,7 +116,10 @@ test("Stage 10 fixture — temporary provider outage renders a real, accessible,
   await expect(page.getByTestId("nav-today")).toBeVisible();
 
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.screenshot({ path: `${OUT}/10-connections-temporary-outage.png`, fullPage: true });
+  await page.screenshot({
+    path: testInfo.outputPath("10-connections-temporary-outage.png"),
+    fullPage: true,
+  });
 
   // Responsive: no horizontal overflow at any required breakpoint, controls
   // stay reachable, the notice text stays legible.
@@ -131,7 +132,7 @@ test("Stage 10 fixture — temporary provider outage renders a real, accessible,
     await expect(notice).toBeVisible();
     if (bp.width === 390) {
       await page.screenshot({
-        path: `${OUT}/10b-connections-temporary-outage-mobile-390.png`,
+        path: testInfo.outputPath("10b-connections-temporary-outage-mobile-390.png"),
         fullPage: true,
       });
     }
