@@ -1,0 +1,129 @@
+# Stage 11A Plan — Owner-Only Internal Validation
+
+**Status:** Planning complete, execution not begun · **Date:** 2026-07-30
+
+Companion: [stage-11-plan.md](stage-11-plan.md) · [evaluation-context-decision.md](../evaluation/stage-11/evaluation-context-decision.md) · [owner-validation-success-criteria.md](../evaluation/stage-11/owner-validation-success-criteria.md) · [owner-validation-evidence-register.md](../evaluation/stage-11/owner-validation-evidence-register.md) · [owner-observation-template.md](../evaluation/stage-11/owner-observation-template.md) · [owner-validation-exit-template.md](../evaluation/stage-11/owner-validation-exit-template.md)
+
+## Objective
+
+**Rigorously test, dogfood, and challenge LifeFlow through owner-operated, synthetic, and dedicated-test-account scenarios before any external participant is asked to evaluate it.**
+
+Stage 11A sits before Stage 11's human-participant evaluation track (`docs/evaluation/stage-11/`), not instead of it. It exists because the current operational mode is OWNER-ONLY INTERNAL VALIDATION (see [evaluation-context-decision.md](../evaluation/stage-11/evaluation-context-decision.md)) — participant recruitment remains blocked, but that doesn't mean no evaluation work can happen: it means the evaluation work available right now is the owner's own, not a participant's. Stage 11A's job is to prove the product is stable and safe enough that a future participant isn't the first person to discover a defect.
+
+## Relationship to the rest of Stage 11
+
+- Does not replace, shorten, or substitute for the human-participant evaluation planned in [stage-11-plan.md](stage-11-plan.md) and `docs/evaluation/stage-11/`.
+- Its exit decision ([owner-validation-exit-template.md](../evaluation/stage-11/owner-validation-exit-template.md)) is a precondition for *considering* recruitment, not an authorisation of it — [recruitment-authorisation-checklist.md](../evaluation/stage-11/recruitment-authorisation-checklist.md) governs that separately and is not advanced by anything in Stage 11A.
+- Owner observations recorded here are engineering evidence about the product, never participant research evidence, and must never be merged into or presented alongside participant statistics (see [owner-observation-template.md](../evaluation/stage-11/owner-observation-template.md)).
+
+## A. Synthetic validation
+
+Owner-operated walkthroughs against the existing deterministic demo dataset (`apps/api/src/lifeflow_api/demo/data/v1/`) and application:
+
+- all deterministic demo scenarios in `docs/evaluation/stage-11/synthetic-scenario-manifest.md` (explicit request, near-deadline, overdue follow-up, calendar conflict, newsletter deprioritisation, prompt injection, ambiguous/low-confidence);
+- every Today dashboard category (Needs Attention, Upcoming, Waiting For, Suggested Actions);
+- Gmail draft proposals — review, approve, edit, reject;
+- Calendar event-insertion proposals — review, approve, edit, reject;
+- rejection and editing paths for both proposal types;
+- Audit History — read-only confirmation, filtering, plain-language descriptions;
+- the four disconnect/deletion distinctions (account disconnect, imported-data deletion, inferred-memory deletion, full account deletion);
+- the transient-outage fixture (`apps/web/e2e-resilience/stage10-outage-notice-fixture.spec.ts`);
+- the uncertain-execution fixture (`apps/web/e2e-resilience/stage10-uncertain-execution-fixture.spec.ts`);
+- rate limiting behaviour (Stage 9 Delivery Phase 4);
+- account deletion, exercised in a demo/test context only;
+- reset and repeatability — confirming the demo environment returns to an identical starting state across repeated runs.
+
+This track reuses existing automated suites (`./scripts/e2e.sh`, `./scripts/e2e-resilience.sh`, `./scripts/e2e-design.sh`, `uv run pytest`) plus owner-operated manual walkthroughs for anything not already automated. No new synthetic scenario needs to be invented — the manifest already grounds this in real fixtures.
+
+## B. Dedicated owner-controlled test accounts
+
+**Planning only. No account is connected by this document or this task.** Actual connection of any test account requires a separate, explicit approval — this section defines the requirements that approval would need to confirm, not a green light to proceed.
+
+Requirements for any future test-account connection:
+
+- newly created test-only Google accounts, never the owner's personal account;
+- no personal inbox or Calendar data of any kind imported or referenced;
+- no third-party confidential information (e.g., real correspondence from real people) placed into a test account;
+- only disposable, synthetic messages and events authored specifically for testing;
+- clear, documented separation from any personal account (separate credentials, separate OAuth consent grant, never reused);
+- a documented account-deletion and cleanup procedure, executed and verified after each test-account use, before the credentials are considered "done with."
+
+## C. Long-running dogfooding (soak period)
+
+**Planning only. No soak period is started by this document.**
+
+A future owner-only soak period of **14–30 days**, once test accounts (§B) or continued demo-mode use makes it meaningful, would measure:
+
+- daily brief generation reliability (success rate, latency, degraded-mode fallback correctness);
+- worker and scheduler reliability (arq + Redis, per Stage 8 Phase 2);
+- OAuth refresh behaviour, using approved test accounts only — never a personal account;
+- duplicate-prevention correctness under real elapsed time and real retries;
+- stale-execution recovery;
+- Redis interruption recovery;
+- database restart recovery;
+- accumulated Audit History correctness over many real events, not just a seeded demo set;
+- deletion completion (imported-data, inferred-memory, account) verified after real accumulated use;
+- storage growth over the soak period;
+- error frequency and classification;
+- owner-perceived usefulness (recorded per [owner-observation-template.md](../evaluation/stage-11/owner-observation-template.md), explicitly not participant evidence);
+- owner trust and friction, same caveat.
+
+## D. Failure and recovery exercises
+
+**Planning only. No exercise is run by this document.** Controlled, owner-triggered tests for:
+
+- API process restart;
+- web process restart;
+- worker crash;
+- scheduler interruption;
+- Redis loss (already partially covered by `journey-c-worker-outage-recovery.spec.ts` and `journey-d-dependency-health.spec.ts` — this section extends manual/owner-operated coverage, it doesn't duplicate the automated suite);
+- PostgreSQL interruption;
+- provider timeout before a write is attempted;
+- provider timeout after a write is attempted (the uncertain-execution case, already fixture-covered — extended here to a real test-account context once §B is approved);
+- token expiry;
+- revoked consent;
+- low disk space;
+- failed-deployment rollback, where locally reproducible (no production deployment exists yet — this is a local/demo-environment exercise);
+- backup creation and restore, in a local/test environment only.
+
+## E. Security and privacy review
+
+**Planning only. No review is executed by this document.**
+
+- secret-rotation rehearsal (rotating a local `.env` value and confirming the app picks it up correctly, without ever handling a real production secret);
+- access-token exposure checks (confirming tokens never appear in logs, per the redaction rules in `docs/security/threat-model.md`);
+- log and metric inspection for private-content leakage;
+- Redis key inspection for private-content leakage;
+- database owner-scoping review (every table's `user_id` enforcement, re-confirmed manually against the automated isolation tests);
+- cross-user isolation, re-confirmed manually;
+- account-disconnect cleanup, verified by inspection, not just by the UI reporting success;
+- imported-data deletion, verified by inspection;
+- inferred-memory deletion, verified by inspection;
+- full account deletion, verified by inspection;
+- residual-data inspection after every deletion path above;
+- dependency and container scanning where applicable (existing `gitleaks`/`detect-secrets`/pre-commit tooling, run and reviewed, not merely assumed green).
+
+## F. Owner usability self-review
+
+The owner may record personal observations using [owner-observation-template.md](../evaluation/stage-11/owner-observation-template.md). **Every such entry must be visibly labelled `OWNER OBSERVATION — NOT PARTICIPANT EVIDENCE`** and must never be combined with, averaged into, or presented alongside later participant statistics.
+
+Evaluate:
+
+- onboarding clarity;
+- Today scanability;
+- priority relevance;
+- evidence usefulness;
+- approval comprehension;
+- deletion-choice clarity;
+- outage guidance;
+- uncertain-outcome guidance;
+- navigation and responsive behaviour;
+- recurring friction.
+
+## What Stage 11A does not do
+
+It does not recruit, contact, or collect data from any participant. It does not provision paid infrastructure. It does not connect a personal production Gmail or Calendar account. It does not begin Stage 12. It does not create a Stage 11 completion tag. It does not, by being planned or even executed, advance any row of [recruitment-authorisation-checklist.md](../evaluation/stage-11/recruitment-authorisation-checklist.md).
+
+## Exit
+
+Governed by [owner-validation-exit-template.md](../evaluation/stage-11/owner-validation-exit-template.md): READY FOR INDEPENDENT ETHICS AND RECRUITMENT PREPARATION, CONDITIONAL READINESS, or NOT READY — none of which themselves authorise recruitment.

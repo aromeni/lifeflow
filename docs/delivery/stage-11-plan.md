@@ -116,11 +116,17 @@ Defined in full in [go-no-go-template.md](../evaluation/stage-11/go-no-go-templa
 | Room/travel (optional, if in-person) | Not budgeted here | Requires explicit user approval |
 | Temporary hosting (only if local proves insufficient) | Not budgeted here | Requires explicit user approval; must be justified in writing first |
 
+## 11A. Owner-only internal validation (added 2026-07-30)
+
+The evaluation context is now decided (see [evaluation-context-decision.md](../evaluation/stage-11/evaluation-context-decision.md)): the current operational mode is **OWNER-ONLY INTERNAL VALIDATION** — no participant is involved, and recruitment remains not authorised. The future participant route, if and when activated, is **INDEPENDENT PRODUCT EVALUATION**, potentially supporting a future journal publication; this is a recorded intention, not an activated authorisation.
+
+While recruitment remains blocked, [Stage 11A](stage-11a-owner-validation-plan.md) defines an owner-operated validation programme — synthetic scenario walkthroughs, planned (not yet connected) dedicated test accounts, a planned (not yet started) 14–30 day soak period, failure/recovery exercises, a security/privacy review, and an owner usability self-review explicitly labelled as engineering evidence, never participant evidence. Its purpose is to make sure a future participant is never the first person to find a defect Stage 11A should have already caught. Stage 11A's own exit decision does not authorise recruitment — that remains gated separately by [recruitment-authorisation-checklist.md](../evaluation/stage-11/recruitment-authorisation-checklist.md).
+
 ## 12. Round 1 execution readiness (added 2026-07-30)
 
 Before Round 1 can run, this plan requires an explicit evaluation-context decision and, depending on that decision, an ethics or privacy sign-off — this is not optional paperwork, it is how the "reasons to trust LifeFlow" half of §2's target-user hypothesis is protected on the evaluator's side, not just the product's. See:
 
-- [evaluation-context-decision.md](../evaluation/stage-11/evaluation-context-decision.md) — currently **UNDECIDED**; the project owner must select UNIVERSITY-LINKED, INDEPENDENT PRODUCT EVALUATION, or INFORMAL FEEDBACK before anything below can proceed.
+- [evaluation-context-decision.md](../evaluation/stage-11/evaluation-context-decision.md) — **decided** (see §11A): current mode OWNER-ONLY INTERNAL VALIDATION, future participant route INDEPENDENT PRODUCT EVALUATION. This decision does not itself satisfy anything below — the ethics/privacy/lawful-basis work that route requires remains outstanding.
 - [ethics-enquiry-summary.md](../evaluation/stage-11/ethics-enquiry-summary.md) — the pack to send to a supervisor/ethics contact if UNIVERSITY-LINKED.
 - [product-evaluation-privacy-assessment.md](../evaluation/stage-11/product-evaluation-privacy-assessment.md) — the decision pack if INDEPENDENT PRODUCT EVALUATION.
 - [recruitment-authorisation-checklist.md](../evaluation/stage-11/recruitment-authorisation-checklist.md) — currently **RECRUITMENT NOT AUTHORISED**; every applicable item must be satisfied before any participant is contacted.
