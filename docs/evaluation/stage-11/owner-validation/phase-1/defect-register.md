@@ -1,6 +1,6 @@
 # Stage 11A Phase 1 — Defect Register
 
-**Status:** Complete — 0 P0/P1, 1 P3 informational finding · **Date:** 2026-07-31
+**Status:** Complete — 0 P0/P1, 1 P3 informational finding, 1 P2 pre-existing fragility discovered and mitigated · **Date:** 2026-07-31
 
 Companion: [../../issue-register-template.md](../../issue-register-template.md) (shared P0–P3 definitions) · [manual-walkthrough.md](manual-walkthrough.md) · [acceptance-matrix.md](acceptance-matrix.md)
 
@@ -9,6 +9,7 @@ Companion: [../../issue-register-template.md](../../issue-register-template.md) 
 | ID | Severity | Scenario | Description | Root cause | Fix status | Regression coverage | Re-evaluated? |
 |---|---|---|---|---|---|---|---|
 | F-001 | P3 | S11A-P1-013/018 (Connections) | "Connected accounts" summary card reads "Not connected" while the "Data stored by LifeFlow" panel directly below shows "Connected accounts: 1" / "Imported emails & events: 36" for the same demo-only session — both numbers are correct, but the juxtaposition could read as contradictory to someone unfamiliar with the synthetic-vs-real-provider distinction | The Google-specific card only renders for `provider === "google"` accounts (`connections/page.tsx:90`); the stats panel counts all connected accounts regardless of provider, including the demo/synthetic one | Accepted-as-is for Phase 1 — cosmetic wording only, no safety/correctness impact, out of scope for a synthetic-validation phase to redesign product copy | None added (informational, not a regression risk) | N/A |
+| F-002 | P2 | CI check, not an acceptance-matrix scenario — discovered when this PR's "E2E — design, accessibility, responsive, visual" check failed | Two pre-existing Stage 10 visual-regression baselines ("Today with a generated brief," "Approvals: a single proposal card") failed on a genuine content difference, not rendering noise or flakiness — a different email had become the highest-ranked item since the baseline was originally captured | The demo dataset's signal/priority ranking is computed relative to the real current date (`day_offset` fields resolved against `datetime.now()`); as real time passes after a baseline PNG is captured, which email ranks highest naturally drifts, so the two screens whose baselines happen to render the *content* of the top-ranked item (not just static layout) will periodically diverge from their pinned snapshot — a structural fragility in how those two tests were designed, not a product defect. Reproduced identically on this branch with zero application-code changes, confirming it predates this phase and is unrelated to any change here | Unblocked for this PR by regenerating both the Darwin (local) and Linux (CI, via a temporary branch-scoped workflow) baseline PNGs — the established, precedented maintenance action for this suite. **Not fixed at the root** — the underlying date-relative fragility remains and will resurface again after enough further real time passes. Recommend a future task pin a fixed reference "now" for these two tests specifically (e.g. via a test-only clock override), out of scope for Stage 11A Phase 1 to implement | The other 6 visual-regression baselines in the same suite were unaffected and remained stable, confirming this is isolated to the two date-content-sensitive screens, not a general rendering regression | Re-ran full design suite after regeneration: 26/26 pass |
 
 ## Non-defects explicitly considered and ruled out
 
@@ -18,4 +19,4 @@ Companion: [../../issue-register-template.md](../../issue-register-template.md) 
 
 ## No unresolved P0 or P1
 
-Zero P0 findings. Zero P1 findings. Phase 1 exit is not blocked by anything in this register.
+Zero P0 findings. Zero P1 findings. F-002 (P2) was mitigated (baselines regenerated, full suite re-confirmed green) though not root-caused within this phase's scope; F-001 (P3) is accepted-as-is. Phase 1 exit is not blocked by anything in this register.

@@ -37,4 +37,4 @@ Every row cites a real, re-run automated test or a real, viewed screenshot from 
 
 ## Summary
 
-26 rows, all PASS. Zero P0/P1 findings. One informational note (F-001, not a defect) recorded in [defect-register.md](defect-register.md). Full suite results in [execution-log.md](execution-log.md).
+26 rows, all PASS. Zero P0/P1 findings. One informational note (F-001, not a defect) and one pre-existing P2 fragility discovered and mitigated (F-002 — two visual-regression baselines drifted against date-relative demo content; regenerated, not root-caused) recorded in [defect-register.md](defect-register.md). Full suite results in [execution-log.md](execution-log.md).
