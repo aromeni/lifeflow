@@ -7,10 +7,11 @@ normalisation → idempotent ingestion → audit), with no external credentials.
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
 from lifeflow_api.audit import record_audit_event
+from lifeflow_api.config import Settings
 from lifeflow_api.connectors.synthetic import SyntheticCalendarConnector, SyntheticEmailConnector
 from lifeflow_api.deps import CurrentUser, DbSession
 from lifeflow_api.ingestion import IngestionService
@@ -31,8 +32,22 @@ class DemoStartResponse(BaseModel):
     skipped: int
 
 
+def _resolve_now(settings: Settings, timezone: str) -> datetime:
+    """The instant the synthetic dataset's fixed day-offsets are materialised
+    against. Stage 11A Phase 1 F-002: a Playwright visual-regression run (or
+    any other deterministic demo/test execution) can pin this to a fixed
+    instant via `demo_clock_override`, gated behind the same
+    `e2e_test_controls_enabled` flag `google_api_origin_override` uses, so
+    the demo dataset's content stops drifting as real time passes. Nothing
+    outside this function ever reads `demo_clock_override` — the real wall
+    clock still governs sessions, OAuth, and action-proposal expiry."""
+    if settings.e2e_test_controls_enabled and settings.demo_clock_override:
+        return datetime.fromisoformat(settings.demo_clock_override).astimezone(ZoneInfo(timezone))
+    return datetime.now(ZoneInfo(timezone))
+
+
 @router.post("/start", response_model=DemoStartResponse, dependencies=[RateLimited("demo_start")])
-async def start_demo(user: CurrentUser, session: DbSession) -> DemoStartResponse:
+async def start_demo(request: Request, user: CurrentUser, session: DbSession) -> DemoStartResponse:
     accounts = ConnectedAccountRepository(session, user.id)
     account = await accounts.get_by_provider(SYNTHETIC_PROVIDER)
     if account is None:
@@ -50,7 +65,7 @@ async def start_demo(user: CurrentUser, session: DbSession) -> DemoStartResponse
             entity_id=str(account.id),
         )
 
-    now_local = datetime.now(ZoneInfo(user.timezone))
+    now_local = _resolve_now(request.app.state.settings, user.timezone)
     anchor = now_local.date()
     summary = await IngestionService(session, user.id).import_sources(
         email_connector=SyntheticEmailConnector(anchor),

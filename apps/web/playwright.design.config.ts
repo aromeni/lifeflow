@@ -12,6 +12,16 @@ import { defineConfig } from "@playwright/test";
 // journey/test counts stay independently countable and none of the three
 // is silently inflated by another's tests (a real gap in this stage's first
 // self-review — see docs/delivery/reports/stage-10.md).
+//
+// Stage 11A Phase 1 F-002: this suite's visual-regression baselines pin
+// exact demo email/event content, which `demo_mode.py` otherwise
+// materialises relative to the real host clock — as real time passed, which
+// fictional item ranked highest drifted and periodically broke the
+// baselines. E2E_TEST_CONTROLS_ENABLED + DEMO_CLOCK_OVERRIDE (the same
+// test-only gate `playwright.resilience.config.ts` uses for its fake-Google
+// origin override) pin the demo anchor to a fixed instant here, so this
+// suite's content — and therefore its baselines — stay stable regardless of
+// the real date, real time, or host timezone the suite happens to run in.
 
 export default defineConfig({
   testDir: "./e2e-design",
@@ -31,6 +41,10 @@ export default defineConfig({
       url: "http://localhost:8010/health",
       reuseExistingServer: !process.env.CI,
       timeout: 60_000,
+      env: {
+        E2E_TEST_CONTROLS_ENABLED: "true",
+        DEMO_CLOCK_OVERRIDE: "2026-03-15T09:00:00+00:00",
+      },
     },
     {
       command: "pnpm dev",

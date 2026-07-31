@@ -104,6 +104,14 @@ test("keyboard-only: landing page primary action is reachable and activatable by
   page,
 }) => {
   await page.goto("/");
+  // Under load (running after many prior tests in the same suite), the
+  // server-rendered button text is paintable before React finishes
+  // hydrating its onClick handler — tabbing to it and pressing Enter too
+  // early activates nothing, so `waitForURL` below hangs to its full
+  // timeout. Waiting for the network to settle first reliably closes that
+  // hydration race (reproduced twice running the full suite; never in
+  // isolation, which is what mistakenly hid it before).
+  await page.waitForLoadState("networkidle");
   // Tab from the top of the document until the demo button is focused —
   // proves it sits in a sane, reachable tab order, not just that it exists.
   let reached = false;

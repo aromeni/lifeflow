@@ -82,3 +82,36 @@ def test_test_controls_enabled_without_an_origin_override_keeps_real_google() ->
     app = create_app(settings)
     gmail_client: GmailDraftClient = app.state.gmail_client
     assert gmail_client._base_url == "https://gmail.googleapis.com/gmail/v1/users/me"
+
+
+def test_e2e_test_controls_enabled_refuses_to_start_in_production_with_demo_clock_override() -> (
+    None
+):
+    """Stage 11A Phase 1 F-002: `demo_clock_override` rides the same
+    production guard as `google_api_origin_override` — it is the flag being
+    on in production that is rejected, regardless of which override field
+    happens to be set."""
+    settings = _test_settings("production").model_copy(
+        update={
+            **GOOGLE_SETTINGS_OVERRIDES,
+            "e2e_test_controls_enabled": True,
+            "demo_clock_override": "2026-01-01T09:00:00+00:00",
+        }
+    )
+    with pytest.raises(RuntimeError, match="E2E_TEST_CONTROLS_ENABLED"):
+        create_app(settings)
+
+
+def test_demo_clock_override_alone_is_safe_in_production() -> None:
+    """The accidental-leftover-env-var case: a stray DEMO_CLOCK_OVERRIDE
+    value with the gating flag left off (the only combination a real
+    deployment could ever have) must not stop production from starting."""
+    settings = _test_settings("production").model_copy(
+        update={
+            **GOOGLE_SETTINGS_OVERRIDES,
+            "session_secret": "a-production-session-secret-value",  # pragma: allowlist secret
+            "token_key_id": "prod-1",
+            "demo_clock_override": "2026-01-01T09:00:00+00:00",
+        }
+    )
+    create_app(settings)  # must not raise
