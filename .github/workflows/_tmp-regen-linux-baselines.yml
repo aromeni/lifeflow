@@ -43,9 +43,14 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: cd apps/api && uv sync
       - run: cd apps/web && pnpm exec playwright install --with-deps chromium
-      - run: ./scripts/e2e-design.sh visual-regression.spec.ts --update-snapshots
+      - run: ./scripts/e2e-design.sh visual-regression.spec.ts
         continue-on-error: true
       - uses: actions/upload-artifact@v4
         with:
           name: linux-baselines
           path: apps/web/e2e-design/visual-regression.spec.ts-snapshots/*-linux.png
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-actual-diff
+          path: apps/web/test-results/**/*.png
+          if-no-files-found: ignore
