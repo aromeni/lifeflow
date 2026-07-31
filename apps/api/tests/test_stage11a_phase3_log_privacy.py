@@ -32,6 +32,7 @@ from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
 
 import pytest
+import redis.asyncio as aioredis
 from asgi_lifespan import LifespanManager
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -131,6 +132,19 @@ def _sentinel(name: str) -> str:
 async def test_no_sentinel_leaks_across_a_full_workflow(
     session: AsyncSession, cipher: AesGcmTokenCipher, cycle: int
 ) -> None:
+    # This workflow's rate-limit-exhaustion stage needs a real Redis to
+    # prove exhaustion at all (RateLimiter.check() fails open without one,
+    # which would make the exhaustion assertion meaningless, not merely
+    # unreachable) — skip cleanly rather than crash, matching the
+    # established pattern in test_rate_limiter.py's redis_client fixture.
+    probe = aioredis.from_url(REDIS_URL)
+    try:
+        await probe.ping()
+    except Exception:
+        pytest.skip("Redis is not running (docker compose up -d redis)")
+    finally:
+        await probe.aclose()
+
     _SENTINELS.clear()
     sentinel_email = _sentinel("email")  # pragma: allowlist secret
     sentinel_subject = _sentinel("subject")
@@ -331,8 +345,6 @@ async def test_no_sentinel_leaks_across_a_full_workflow(
             await revoked_service.get_valid_access_token("google")
 
         # --- Rate-limit exhaustion (real Redis, tiny synthetic policy).
-        import redis.asyncio as aioredis
-
         redis_client = aioredis.from_url(REDIS_URL)
         try:
             limiter = RateLimiter(redis_client, socket_timeout_seconds=1.0)

@@ -97,6 +97,11 @@ async def _assert_sentinel_absent_from_database(session: AsyncSession, sentinel:
 async def _assert_sentinel_absent_from_redis(sentinel: str) -> None:
     client = aioredis.from_url(REDIS_URL, decode_responses=True)
     try:
+        await client.ping()
+    except Exception:
+        await client.aclose()
+        pytest.skip("Redis is not running (docker compose up -d redis)")
+    try:
         async for key in client.scan_iter(match="*", count=200):
             key_type = await client.type(key)
             if key_type == "string":
