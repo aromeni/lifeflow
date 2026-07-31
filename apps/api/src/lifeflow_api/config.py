@@ -161,6 +161,16 @@ class Settings(BaseSettings):
     # alone can never accidentally redirect real Google traffic.
     e2e_test_controls_enabled: bool = False
     google_api_origin_override: str = ""
+    # Stage 11A Phase 1 F-002 closure: same gate, same shape as
+    # `google_api_origin_override` above. When non-empty AND
+    # `e2e_test_controls_enabled=true`, this ISO-8601 instant replaces the
+    # real host clock as the "now" the demo/synthetic connectors materialise
+    # their fixed day-offset dataset against (`demo_mode.py`) — nothing else
+    # in the app ever reads it, so OAuth, session, and action-proposal expiry
+    # timestamps always keep using the real wall clock regardless of this
+    # setting. Exists so demo content (and therefore visual-regression
+    # baselines captured against it) stops drifting as real time passes.
+    demo_clock_override: str = ""
 
 
 @lru_cache
