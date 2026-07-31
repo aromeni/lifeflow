@@ -17,3 +17,7 @@ No rotation tooling or test existed anywhere in this project before this phase �
 ## Result
 
 Two of three real secrets have a safe, verified rotation path. The third (`TOKEN_KEY`) does not — recorded as **P2** (weak/absent secret-rotation process for one secret, no current exploitable exposure since nothing prompts a rotation today, but production readiness will require building this migration before `TOKEN_KEY` can ever actually be rotated). Thresholds were not lowered to accommodate this: the gap is documented honestly rather than a false capability being claimed.
+
+## Phase 4 connection blocker
+
+This gap is not merely recorded for future closure — it is a direct **Phase 4 connection blocker**: no Google test account may be connected until the project owner approves a `TOKEN_KEY` rotation path (key-versioned migration, or disposable-account destructive rotation for pre-production testing only) or a formally reviewed replacement. See the "TOKEN_KEY rotation — Phase 4 connection blocker" section of [phase-3-decision.md](phase-3-decision.md) for the full path definitions and what this record does and does not authorise. This finding is also the reason Phase 3's decision is recorded as CONDITIONAL PASS rather than an unqualified PASS.
