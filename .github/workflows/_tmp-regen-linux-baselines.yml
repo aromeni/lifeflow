@@ -45,6 +45,7 @@ jobs:
       - run: cd apps/web && pnpm exec playwright install --with-deps chromium
       - run: ./scripts/e2e-design.sh visual-regression.spec.ts
         continue-on-error: true
+      - run: find apps/web/test-results -type f 2>&1 || echo "no test-results dir"
       - uses: actions/upload-artifact@v4
         with:
           name: linux-baselines
@@ -52,5 +53,5 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: linux-actual-diff
-          path: apps/web/test-results/**/*.png
-          if-no-files-found: ignore
+          path: apps/web/test-results
+          if-no-files-found: warn
