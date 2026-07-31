@@ -23,6 +23,12 @@ Each invariant below is the specific, checkable claim Stage 11A's success criter
 | Stable daily brief generation | Deterministic | "Deterministic under repeat composition: True" | `./scripts/run-evals.sh brief`, `brief+mock` |
 | All participant-facing P0/P1 risks resolved before recruitment consideration | 0 unresolved | 0 — no P0/P1 exists in this phase's own defect register, and no new participant-facing risk was found beyond the pre-existing, already-resolved Round-1 desk-rehearsal findings | [defect-register.md](defect-register.md) |
 
+## Addendum: new invariant from the F-002 closure (2026-07-31)
+
+| Invariant | Threshold | Result | Evidence |
+|---|---|---|---|
+| The test-only demo-clock override never affects any security- or expiry-relevant clock | 0 leakage | **0** — action-proposal expiry keeps anchoring to the real wall clock even with a far-past override active; the override is inert unless the pre-existing production-guarded `e2e_test_controls_enabled` flag is also on | `test_stage11a_demo_clock_determinism.py::test_demo_clock_override_does_not_affect_action_proposal_expiry`; `test_e2e_test_controls.py::test_e2e_test_controls_enabled_refuses_to_start_in_production_with_demo_clock_override`, `::test_demo_clock_override_alone_is_safe_in_production` |
+
 ## Verdict
 
-Every safety invariant Stage 11A Phase 1 exists to check holds, confirmed by re-running the actual tests rather than citing memory of a prior stage's results.
+Every safety invariant Stage 11A Phase 1 exists to check holds, confirmed by re-running the actual tests rather than citing memory of a prior stage's results. All 14 original invariants were reconfirmed fresh during the F-002 root-cause closure (2026-07-31), and the invariant above is newly established by that closure.

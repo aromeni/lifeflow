@@ -47,3 +47,47 @@ Both changes are attributable to the one new test file added in this phase (`tes
 ## Defect found and fixed during execution (evidence-script, not product)
 
 The first walkthrough run screenshotted `/audit-history` before its data finished loading (a race in the new walkthrough script itself, not a product defect — `e2e/audit-history.spec.ts` already correctly waits for real content and was unaffected). Fixed by waiting for a real entry heading (`"Action rejected"`) before screenshotting, matching the existing spec's own pattern; re-ran and confirmed the corrected screenshot shows the full plain-language lifecycle. See [manual-walkthrough.md](manual-walkthrough.md).
+
+## Addendum: F-002 root-cause closure reverification (2026-07-31)
+
+A follow-up task fixed F-002 at the root (see [defect-register.md](defect-register.md)) and reran the complete gate list above fresh, plus additional determinism stress-testing not performed originally:
+
+| # | Suite | Command | Result |
+|---|---|---|---|
+| 1 | Backend tests + coverage | `uv run pytest --cov=lifeflow_api --cov-report=term-missing -q` | **817 passed**, 90% coverage |
+| 2 | New: demo-clock determinism tests | `uv run pytest tests/test_stage11a_demo_clock_determinism.py tests/test_e2e_test_controls.py -v` | **20 passed** |
+| 3 | Reset-repeatability harness (rerun) | `uv run pytest tests/test_stage11a_phase1_reset_repeatability.py -v` | **1 passed** (10 internal cycles), 9.9s |
+| 4 | Frontend unit tests | `pnpm web:test` | **90 passed** across 10 files |
+| 5 | ESLint / TypeScript / Prettier | `pnpm web:lint && pnpm web:typecheck && prettier --check .` | Clean |
+| 6 | Production build | `pnpm web:build` | Compiled successfully; 12/12 pages generated |
+| 7 | Ruff format / lint / mypy | `uv run ruff format --check . && uv run ruff check . && uv run mypy` | Clean; 90 source files |
+| 8 | Functional E2E | `./scripts/e2e.sh` | **10 passed**, 2.0m |
+| 9 | Resilience E2E | `./scripts/e2e-resilience.sh` | **6 passed**, 46.5s |
+| 10 | Design/a11y/responsive/visual E2E — 5 consecutive full-suite passes | `pnpm exec playwright test --config=playwright.design.config.ts` × 5 | **26/26 passed every run** (one hydration-race flake found and fixed between run 1 and run 2 of this stress test — see defect register) |
+| 11 | Visual-regression-only — 3 consecutive passes | `pnpm exec playwright test --config=playwright.design.config.ts visual-regression.spec.ts` × 3 | **8/8 passed every run**, no regeneration between runs |
+| 12 | Alternate-host-timezone pass | API launched with `TZ=Pacific/Kiritimati` (UTC+14) | **8/8 visual-regression tests passed**, byte-identical baselines |
+| 13 | Real Linux CI regeneration + comparison | Temporary branch-scoped workflow (removed after use) | Only the same 2 of 8 Linux baselines changed; visually confirmed and SHA256-diffed against the previous committed files before copying in |
+| 14 | 5 golden evals | `./scripts/run-evals.sh {det,det+mock,brief,brief+mock,actions}` | All green; same figures as the original run (no regression) |
+| 15 | Contract regeneration | `./scripts/generate-contracts.sh` | Regenerated; no diff |
+| 16 | Metrics regeneration | `python3 scripts/metrics.py` | Regenerated; see updated change table below |
+| 17 | Alembic single-head check | `uv run alembic heads` | `0011 (head)` — unchanged |
+| 18 | Contrast-token validation | `python3 scripts/check_design_token_contrast.py` | All 28 token pairs meet their WCAG threshold |
+| 19 | CI E2E-suite-coverage validator | `python3 scripts/check_ci_e2e_coverage.py` | All three required suites wired into `ci.yml` |
+| 20 | Uvicorn launch-safety validator | `python3 scripts/check_uvicorn_launch_safety.py` | All 11 known launch sites set a safe proxy posture |
+| 21 | `.env.example` secret-shape validator | `python3 scripts/check_env_example_secrets.py` | Clean |
+| 22 | Full pre-commit | `uvx pre-commit run --all-files` | 12/12 hooks passed |
+| 23 | `detect-secrets` full scan | `uvx detect-secrets scan --baseline .secrets.baseline` | Clean, exit 0 |
+| 24 | Gitleaks (staged) | `gitleaks protect --staged --no-banner` | 0 commits scanned (nothing staged at check time), no leaks |
+| 25 | Gitleaks (full history) | `gitleaks detect --no-banner` | 91 commits scanned, no leaks |
+| 26 | `git diff --check` | `git diff --check && git diff --cached --check` | Clean |
+
+### Metrics change (real, expected)
+
+| Metric | Before this closure | After |
+|---|---|---|
+| Python files | 187 | 188 |
+| Backend tests | 807 passing | 817 passing |
+
+Both changes are attributable to the one new test file this closure added (`test_stage11a_demo_clock_determinism.py`, 7 test functions) plus the 2 extended `google_api_origin_override`-pattern tests added to the existing `test_e2e_test_controls.py` file (10 net new test functions total, matching 807 + 10 = 817). No other value changed.
+
+`det+anthropic` was not run and is not claimed (no real Anthropic API key configured), consistent with the original execution.

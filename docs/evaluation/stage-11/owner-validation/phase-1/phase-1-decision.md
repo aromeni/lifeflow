@@ -31,3 +31,7 @@ This task's execution (Stage 11A Phase 1 synthetic acceptance validation). Autho
 ## Date
 
 2026-07-31
+
+## Addendum: F-002 closed at root cause (2026-07-31)
+
+The decision above was recorded while F-002 (P2) was mitigated (baselines regenerated) but explicitly not root-caused — its own text warned drift "will resurface again after enough further real time passes." A follow-up closure task fixed the root cause before PR #10 merged: see [defect-register.md](defect-register.md)'s closure addendum and [f-002-closure-acceptance-matrix.md](f-002-closure-acceptance-matrix.md). The full automated-suite figures are now 817 backend tests (90% coverage) and 90 frontend tests, up from 807/90 at the time of the original decision, reflecting the 10 new regression tests this closure added; every other figure in "Criteria checked" above is unchanged and was re-verified fresh (not merely re-cited) as part of this closure. The **PASS — READY FOR PHASE 2** decision stands and is strengthened, not superseded, by this addendum.
