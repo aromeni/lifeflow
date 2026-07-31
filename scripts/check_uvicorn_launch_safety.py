@@ -59,6 +59,8 @@ KNOWN_LAUNCH_SITES = (
     "apps/web/playwright.owner-validation.config.ts",
     "apps/api/tests/test_rate_limit_uvicorn_regression.py",
     "scripts/e2e-resilience.sh",
+    "scripts/stage11a-phase2-owner-walkthrough.sh",
+    "scripts/stage11a-phase2-rollback-rehearsal.sh",
     "apps/web/e2e-resilience/journey-b-uncertain-write.spec.ts",
     "docs/delivery/reports/stage-09.md",
 )
