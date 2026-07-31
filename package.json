@@ -11,5 +11,12 @@
     "web:e2e": "pnpm --filter @lifeflow/web test:e2e",
     "web:format": "pnpm --filter @lifeflow/web format",
     "web:format:check": "pnpm --filter @lifeflow/web format:check"
+  },
+  "pnpm": {
+    "overrides": {
+      "postcss": ">=8.5.18",
+      "sharp": ">=0.35.0",
+      "js-yaml": ">=4.3.0"
+    }
   }
 }

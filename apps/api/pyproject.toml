@@ -64,8 +64,11 @@ select = [
 # allowlist pragmas) legitimately exceed the line limit. S105/S106/S107:
 # fixtures use obviously-fictional credentials for the dev database and
 # cipher tests, including as default parameter values (e.g. a seed helper's
-# `refresh_token="refresh-1"`).
-"tests/**" = ["S101", "E501", "S105", "S106", "S107"]
+# `refresh_token="refresh-1"`). S608: Stage 11A Phase 3's sentinel-search
+# helper interpolates a table name into raw SQL, but only ever from a fixed,
+# hardcoded tuple of table names defined in the same file — never from any
+# request, argument, or external input.
+"tests/**" = ["S101", "E501", "S105", "S106", "S107", "S608"]
 # Exact-file, non-secret only: the smoke script shells out to Alembic via a
 # fixed argv (`uv run alembic …`); S603/S607's line attribution varies by ruff
 # version so an inline noqa is not portable. No secret rule is exempted here and
@@ -81,6 +84,9 @@ select = [
 # rehearsal is a shell script (scripts/stage11a-phase2-rollback-rehearsal.sh
 # at the repository root), so it is outside this Python linter's scope.
 "scripts/stage11a_phase2_backup_restore_rehearsal.py" = ["S603", "S607"]
+# Exact-file, non-secret only: Stage 11A Phase 3's backup-vs-deletion
+# rehearsal, the same fixed-argv docker-compose pg_dump/pg_restore pattern.
+"scripts/stage11a_phase3_backup_deletion_rehearsal.py" = ["S603", "S607"]
 
 [tool.mypy]
 python_version = "3.12"
