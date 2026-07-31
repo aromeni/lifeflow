@@ -7,7 +7,11 @@ services:
       POSTGRES_DB: lifeflow
     ports:
       # 5433 by default: many machines already run a Postgres on 5432.
-      - "${POSTGRES_PORT:-5433}:5432"
+      # Bound to loopback only (Stage 11A Phase 3 hardening finding): the
+      # short "host:container" form binds every host interface by default,
+      # so without this, any other device on the same network could reach
+      # this dev database's known, intentionally-weak credentials.
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
     volumes:
       - lifeflow-db-data:/var/lib/postgresql/data
     healthcheck:
@@ -27,7 +31,9 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "${REDIS_PORT:-6380}:6379"
+      # Bound to loopback only, same Stage 11A Phase 3 hardening finding as
+      # the db service above — this Redis has no authentication configured.
+      - "127.0.0.1:${REDIS_PORT:-6380}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
