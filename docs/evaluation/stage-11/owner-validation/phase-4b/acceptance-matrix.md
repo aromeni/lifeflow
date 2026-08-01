@@ -68,3 +68,20 @@ Built before implementation began, per the governing task instruction. This phas
 | S11A-P4B-060 | Exact-boundary security proof finds nothing prohibited staged for commit | automated |
 
 All 60 rows must PASS for this phase's decision to be PASS or CONDITIONAL PASS; any FAIL on a P0-class row (021–024, 026–029, 040, 046, 052–054, 060 — the rows matching the P0 examples in §27: send/update-delete capability, OAuth state/account-binding correctness, provider-write budget, and production test-bypass guards) forces **FAIL — GOOGLE CONNECTION REMAINS BLOCKED**. Rows 030–033 (denied-consent labelling, callback replay, post-logout callback, malformed-parameter handling) are P1/P2-class hygiene and observability rows — real gaps worth closing, but not on their own P0 stop conditions, since none of them permits cross-owner binding, token exposure, or an unauthorised write.
+
+## Phase 4B boundary correction (this task)
+
+Built before editing began, per this correction task's own governing instruction. Rows 061–070 gate the correction and its merge; none creates or requires a real Google account, project, OAuth client, or provider call.
+
+| ID | Readiness area | Method |
+|---|---|---|
+| S11A-P4B-061 | Real-provider-call evidence corrected: the exact-boundary classification (hostname/URL, HTTP operation, TCP/TLS establishment, request/response, credential/data presence, authentication result, provider-side-effect possibility, fixing code change) is recorded in `dry-run-results.md` and `defect-register.md`, reconciling the earlier unqualified "no real Google API call" claims | inspection |
+| S11A-P4B-062 | Durable no-live-network guard (`lifeflow_api.testing.no_live_network`) blocks `accounts.google.com`, `oauth2.googleapis.com`, `gmail.googleapis.com`, `www.googleapis.com`, `calendar.googleapis.com`, and an arbitrary unnamed non-loopback host, via a loopback allowlist rather than a Google-specific blocklist | automated |
+| S11A-P4B-063 | Guard is installed as a safety net on the rehearsal's shared `google_http_client` before per-cycle mocks are applied, so a forgotten mock override is refused, not silently real; no environment variable can select a live origin; a followed redirect to a non-loopback host is also refused | automated |
+| S11A-P4B-064 | No-live-network guard regression suite passes (`test_stage11a_phase4b_no_live_network_guard.py`, 12/12) | automated |
+| S11A-P4B-065 | All three dry-run rehearsal cycles re-pass with the guard active, zero attempted external connection | automated (dry run) |
+| S11A-P4B-066 | PKCE P2 condition revalidated: confirmed non-mandatory in Google's current web-server-flow documentation, confirmed as genuine defence-in-depth (not zero-benefit), confirmed required before any public/native/non-confidential-client deployment, kept open and non-blocking | inspection |
+| S11A-P4B-067 | Seven-day Testing-status refresh-token / 100-test-user constraint revalidated; an explicit Option A (Testing re-authorisation cadence) / Option B (reviewed publishing-status change) future decision is recorded without either being chosen | inspection |
+| S11A-P4B-068 | Scope and capability boundaries reconfirmed unchanged: `GmailDraftClient` has no send method, `CalendarEventClient` has no update/delete method, the action-proposal model contains no Gmail-send action type, no generic/user-controlled provider-method executor exists | automated |
+| S11A-P4B-069 | Full Phase 4B evidence pack re-read for internal consistency after all corrections; 0 P0, 0 P1 retained; both pre-existing P2s (PKCE, 7-day constraint) still recorded with explicit closure conditions | inspection |
+| S11A-P4B-070 | Correction commit(s) pushed to `stage-11a-phase-4b-test-account-readiness`; all required CI checks green on the final SHA; PR #14 merged via a true two-parent merge; post-merge verification confirms tree equivalence and an unchanged Google/tag/soak/recruitment/Stage-12 boundary | automated + inspection |

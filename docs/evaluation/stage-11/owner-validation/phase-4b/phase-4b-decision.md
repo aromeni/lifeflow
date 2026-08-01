@@ -26,6 +26,9 @@ Companion: [acceptance-matrix.md](acceptance-matrix.md) · [defect-register.md](
 - [x] **Preconnection readiness command passes** — [preconnection-readiness-results.md](preconnection-readiness-results.md), all 11 checks pass against current local state.
 - [x] **No unresolved P0/P1** — [defect-register.md](defect-register.md): 0 P0, 0 P1; 3 P2 findings found and fixed this phase; 2 P2 findings recorded with explicit non-blocking closure conditions.
 - [x] **All required CI checks green** — see the final report's required-check results.
+- [x] **No-live-network guard in place** — [dry-run-results.md](dry-run-results.md)'s "No-live-network guard" section, `test_stage11a_phase4b_no_live_network_guard.py` (12/12), added during this phase's boundary correction after the exact-boundary classification below was recorded.
+- [x] **Exact-boundary classification of the accidental outbound attempt recorded** — [dry-run-results.md](dry-run-results.md), reconciling this document's own accurate defect entry with the unqualified "no real Google API call" phrasing that previously appeared elsewhere in the evidence pack and cross-cutting docs.
+- [x] **Soak-period decision framed, not made** — [soak-period-decision.md](soak-period-decision.md), Option A (Testing re-authorisation cadence) vs. Option B (reviewed publishing-status change), neither chosen.
 
 ## What this decision does not do
 
