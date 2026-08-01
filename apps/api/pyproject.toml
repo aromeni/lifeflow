@@ -87,6 +87,11 @@ select = [
 # Exact-file, non-secret only: Stage 11A Phase 3's backup-vs-deletion
 # rehearsal, the same fixed-argv docker-compose pg_dump/pg_restore pattern.
 "scripts/stage11a_phase3_backup_deletion_rehearsal.py" = ["S603", "S607"]
+# Exact-file, non-secret only: Stage 11A Phase 4A's backup/key-ring
+# rehearsal, the same fixed-argv pg_dump/pg_restore pattern (direct, not via
+# docker compose exec, since it targets the host-mapped port like Phase 3's
+# script above).
+"scripts/stage11a_phase4a_backup_key_ring_rehearsal.py" = ["S603", "S607"]
 
 [tool.mypy]
 python_version = "3.12"

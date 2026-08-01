@@ -228,6 +228,8 @@ async def run_account_deletion_step(
                     revoke_failed = True
             account.encrypted_access_token = None
             account.encrypted_refresh_token = None
+            account.access_token_key_id = None
+            account.refresh_token_key_id = None
             account.sync_cursors = {}
         await session.execute(delete(ConnectedAccount).where(ConnectedAccount.user_id == user.id))
         deleted.add(CAT_CONNECTED_ACCOUNTS, len(accounts))

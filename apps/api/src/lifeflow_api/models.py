@@ -352,6 +352,14 @@ class ConnectedAccount(Base):
     # valid across routine refreshes but goes stale the moment the
     # underlying authorisation actually changes.
     authorisation_revision: Mapped[int] = mapped_column(default=1)
+    # Non-secret key-version identifiers (Stage 11A Phase 4A, F-P3-03): the
+    # `key_id` recorded inside the matching envelope's own `v1:<key_id>:...`
+    # prefix, kept as a queryable column so the rotation service can select
+    # "rows not yet on the active key" without decrypting anything. NULL
+    # means the corresponding ciphertext column is also NULL (no credential
+    # stored). Never key material, never a token — safe to log or index.
+    access_token_key_id: Mapped[str | None] = mapped_column(String(40))
+    refresh_token_key_id: Mapped[str | None] = mapped_column(String(40))
 
 
 class SourceItem(Base):

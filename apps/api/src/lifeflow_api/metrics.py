@@ -105,6 +105,16 @@ http_responses_total = Counter(
     ["status_class"],
     registry=REGISTRY,
 )
+# Stage 11A Phase 4A (F-P3-03): credential key-rotation outcomes, one label
+# from a fixed four-value vocabulary — never a key id, account id, or user
+# id, none of which belong in a metrics backend (threat model T6).
+credential_key_rotation_total = Counter(
+    "lifeflow_credential_key_rotation_total",
+    "Connected-account credential rows processed by the key-rotation "
+    "service, by outcome (migrated/skipped_current/blocked/failed).",
+    ["outcome"],
+    registry=REGISTRY,
+)
 
 
 def status_class(status_code: int) -> str:
@@ -203,6 +213,7 @@ def render_latest() -> tuple[bytes, str]:
 
 __all__ = [
     "REGISTRY",
+    "credential_key_rotation_total",
     "database_readiness_failures_total",
     "http_responses_total",
     "observe_provider_call",

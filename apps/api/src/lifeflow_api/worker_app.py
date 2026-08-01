@@ -83,12 +83,16 @@ async def on_startup(ctx: dict[str, Any]) -> None:
 
         from lifeflow_api.google.oauth import GoogleOAuthClient
         from lifeflow_api.google_wiring import build_account_revoker
-        from lifeflow_api.security.token_cipher import AesGcmTokenCipher
+        from lifeflow_api.security.token_cipher import build_key_ring
 
         http = httpx.AsyncClient(timeout=google_httpx_timeout(settings))
         ctx["google_http_client"] = http
-        cipher = AesGcmTokenCipher(settings.token_key, settings.token_key_id)
-        ctx["revoker"] = build_account_revoker(cipher, GoogleOAuthClient(http))
+        # Stage 11A Phase 4A: a `TokenKeyRing`, not a bare cipher — see the
+        # matching comment in `main.py`'s `create_app`.
+        key_ring = build_key_ring(
+            settings.token_key, settings.token_key_id, settings.token_key_legacy_json
+        )
+        ctx["revoker"] = build_account_revoker(key_ring, GoogleOAuthClient(http))
     logger.info("scheduled_briefs.worker_started")
 
 
