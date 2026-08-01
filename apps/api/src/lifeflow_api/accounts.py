@@ -21,7 +21,12 @@ from lifeflow_api.google.oauth import GoogleOAuthClient, GoogleTokenResponse
 from lifeflow_api.models import AccountStatus, ConnectedAccount
 from lifeflow_api.repositories import ConnectedAccountRepository
 from lifeflow_api.retry import retry_read
-from lifeflow_api.security.token_cipher import TokenCipher
+from lifeflow_api.security.credential_context import (
+    ACCESS_TOKEN_FIELD,
+    REFRESH_TOKEN_FIELD,
+    credential_context,
+)
+from lifeflow_api.security.token_cipher import TokenCipher, peek_key_id
 
 REFRESH_SAFETY_MARGIN = timedelta(minutes=2)
 NowFactory = Callable[[], datetime]
@@ -32,6 +37,37 @@ class ReauthorisationRequiredError(Exception):
     token). The account has already been marked AccountStatus.revoked;
     callers must surface a clear re-authorisation state, never a bare 500
     (AC-J2.3)."""
+
+
+def _field_context(account: ConnectedAccount, field: str) -> str:
+    return credential_context(
+        connected_account_id=account.id,
+        user_id=account.user_id,
+        provider=account.provider,
+        field=field,
+    )
+
+
+def _encrypt_field(
+    cipher: TokenCipher, account: ConnectedAccount, field: str, plaintext: str
+) -> None:
+    """Encrypt `plaintext` for `field` on `account` and write both the
+    ciphertext and its key-id column together, so the two can never drift
+    apart (Stage 11A Phase 4A)."""
+    envelope = cipher.encrypt(plaintext, context=_field_context(account, field))
+    key_id = peek_key_id(envelope)
+    if field == ACCESS_TOKEN_FIELD:
+        account.encrypted_access_token = envelope
+        account.access_token_key_id = key_id
+    else:
+        account.encrypted_refresh_token = envelope
+        account.refresh_token_key_id = key_id
+
+
+def _decrypt_field(
+    cipher: TokenCipher, account: ConnectedAccount, field: str, envelope: str
+) -> str:
+    return cipher.decrypt(envelope, context=_field_context(account, field))
 
 
 class ConnectedAccountService:
@@ -63,6 +99,13 @@ class ConnectedAccountService:
                 user_id=self._user_id, provider=provider, authorisation_revision=1
             )
             self._accounts.add(account)
+            # `account.id`'s `default=uuid.uuid4` is applied at flush, not at
+            # construction — flushing here (Stage 11A Phase 4A) guarantees
+            # `account.id` is real before `_encrypt_field` derives the
+            # encryption context from it, so the context used to encrypt
+            # below always matches the context a later decrypt will derive
+            # from this same, now-persisted, row.
+            await self._session.flush()
             event_type = "account.connected"
         else:
             # Every call here represents a fresh consent grant — new
@@ -75,9 +118,9 @@ class ConnectedAccountService:
             account.authorisation_revision += 1
             event_type = "account.tokens_refreshed"
 
-        account.encrypted_access_token = self._cipher.encrypt(access_token)
+        _encrypt_field(self._cipher, account, ACCESS_TOKEN_FIELD, access_token)
         if refresh_token is not None:
-            account.encrypted_refresh_token = self._cipher.encrypt(refresh_token)
+            _encrypt_field(self._cipher, account, REFRESH_TOKEN_FIELD, refresh_token)
         account.granted_scopes = granted_scopes
         account.expires_at = expires_at
         account.status = AccountStatus.active
@@ -104,7 +147,9 @@ class ConnectedAccountService:
         account = await self._accounts.get_by_provider(provider)
         if account is None or account.encrypted_access_token is None:
             return None
-        return self._cipher.decrypt(account.encrypted_access_token)
+        return _decrypt_field(
+            self._cipher, account, ACCESS_TOKEN_FIELD, account.encrypted_access_token
+        )
 
     async def disconnect(
         self, provider: str, *, oauth_client: GoogleOAuthClient | None = None
@@ -117,11 +162,15 @@ class ConnectedAccountService:
             return False
         if oauth_client is not None and account.encrypted_refresh_token is not None:
             await oauth_client.revoke_token(
-                token=self._cipher.decrypt(account.encrypted_refresh_token)
+                token=_decrypt_field(
+                    self._cipher, account, REFRESH_TOKEN_FIELD, account.encrypted_refresh_token
+                )
             )
         account.status = AccountStatus.disconnected
         account.encrypted_access_token = None
         account.encrypted_refresh_token = None
+        account.access_token_key_id = None
+        account.refresh_token_key_id = None
         await self._session.flush()
         record_audit_event(
             self._session,
@@ -246,10 +295,14 @@ class GoogleTokenService:
             and account.expires_at is not None
             and account.expires_at - now > REFRESH_SAFETY_MARGIN
         ):
-            return self._cipher.decrypt(account.encrypted_access_token)
+            return _decrypt_field(
+                self._cipher, account, ACCESS_TOKEN_FIELD, account.encrypted_access_token
+            )
         if account.encrypted_refresh_token is None:
             raise ReauthorisationRequiredError(f"No refresh token stored for {provider}.")
-        refresh_token = self._cipher.decrypt(account.encrypted_refresh_token)
+        refresh_token = _decrypt_field(
+            self._cipher, account, REFRESH_TOKEN_FIELD, account.encrypted_refresh_token
+        )
         try:
 
             async def _refresh() -> GoogleTokenResponse:
@@ -288,11 +341,11 @@ class GoogleTokenService:
             raise ReauthorisationRequiredError(
                 f"Google rejected the refresh token for {provider}; reconnect required."
             ) from exc
-        account.encrypted_access_token = self._cipher.encrypt(token_response.access_token)
+        _encrypt_field(self._cipher, account, ACCESS_TOKEN_FIELD, token_response.access_token)
         # A refresh response commonly omits refresh_token — never clear the
         # stored one just because this call didn't receive a new one (D18).
         if token_response.refresh_token is not None:
-            account.encrypted_refresh_token = self._cipher.encrypt(token_response.refresh_token)
+            _encrypt_field(self._cipher, account, REFRESH_TOKEN_FIELD, token_response.refresh_token)
         account.expires_at = now + timedelta(seconds=token_response.expires_in)
         await self._session.flush()
         record_audit_event(

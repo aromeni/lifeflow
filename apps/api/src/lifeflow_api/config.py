@@ -34,8 +34,18 @@ class Settings(BaseSettings):
     session_secret: str = ""
     # Base64-encoded 32-byte key for encrypting OAuth tokens at rest
     # (see security/token_cipher.py). Only required once tokens are stored.
+    # This is always the *active* key — every new encryption uses it.
     token_key: str = ""
     token_key_id: str = "dev-1"  # noqa: S105 — key *identifier*, not a secret
+    # Stage 11A Phase 4A (F-P3-03): a JSON array of {"key": "<base64>",
+    # "key_id": "<id>"} objects — zero or more *legacy* keys retained only to
+    # decrypt rows the rotation service (credential_rotation.py) has not yet
+    # re-encrypted under the active key above. Empty string means no legacy
+    # keys (the ordinary, pre-rotation state). A key id repeated between this
+    # list and `token_key_id`, or malformed/wrong-length key material
+    # anywhere in the list, fails configuration validation at startup, never
+    # silently (same idiom as `rate_limit_policy_overrides_json`).
+    token_key_legacy_json: str = ""
     # Browser origin allowed to call this API with credentials (CORS).
     web_origin: str = "http://localhost:3000"
     # LLM-assisted extraction (optional — mock/deterministic paths never need it).

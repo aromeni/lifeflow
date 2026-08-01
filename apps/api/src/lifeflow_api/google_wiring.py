@@ -27,6 +27,7 @@ from lifeflow_api.action_executors import (
 from lifeflow_api.google.oauth import GoogleOAuthClient
 from lifeflow_api.google_sync import GoogleSyncService
 from lifeflow_api.models import ActionType, ConnectedAccount
+from lifeflow_api.security.credential_context import REFRESH_TOKEN_FIELD, credential_context
 from lifeflow_api.security.token_cipher import TokenCipher
 
 
@@ -107,7 +108,15 @@ def build_account_revoker(cipher: TokenCipher, oauth_client: GoogleOAuthClient) 
     async def revoke(account: ConnectedAccount) -> None:
         if account.encrypted_refresh_token is None:
             return
-        await oauth_client.revoke_token(token=cipher.decrypt(account.encrypted_refresh_token))
+        context = credential_context(
+            connected_account_id=account.id,
+            user_id=account.user_id,
+            provider=account.provider,
+            field=REFRESH_TOKEN_FIELD,
+        )
+        await oauth_client.revoke_token(
+            token=cipher.decrypt(account.encrypted_refresh_token, context=context)
+        )
 
     return revoke
 

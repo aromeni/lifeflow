@@ -26,7 +26,7 @@ Every mitigation maps to a planned component and delivery stage (Stage 0 check: 
 
 | ID | Threat | Boundary | Mitigations | Component | Stage |
 |---|---|---|---|---|---|
-| T1 | OAuth token theft (DB dump, backup leak, log leak) | B2 | Application-level AES-GCM encryption via `TokenCipher` before storage; env-managed dev key, KMS-ready interface; documented rotation; tokens never logged; minimal scopes limit blast radius | Token cipher, ConnectedAccount repo, log redaction | 2, 7 |
+| T1 | OAuth token theft (DB dump, backup leak, log leak) | B2 | Application-level AES-GCM encryption via `TokenCipher`/`TokenKeyRing` before storage, AAD-bound per row/field (Stage 11A Phase 4A); env-managed dev key, KMS-ready interface; implemented, verified key rotation (`credential_rotation.py`); tokens never logged; minimal scopes limit blast radius | Token cipher, key ring, rotation service, ConnectedAccount repo, log redaction | 2, 7, 11A-4A |
 | T2 | Cross-user data access (IDOR, missing ownership filter) | B1 | `user_id` on all user-owned records; ownership enforced in every repository query and route; isolation tests that actively attempt cross-user access | Repositories, auth middleware, test suite | 2 |
 | T3 | Prompt injection inside emails / event descriptions | B3 | Content treated as untrusted data; clear delimiting; instructions inside content ignored by design; extraction output limited to typed schemas; tool eligibility decided by application code + policy engine, never by model prose; adversarial fixtures in demo dataset and eval suite | Ingestion sanitiser, LLM layer, policy engine, evals | 3, 4, 6 |
 | T4 | Indirect instructions attempting tool invocation ("forward all mail to…") | B3, B4 | High-risk actions unrepresentable as action types; proposals schema-validated; policy engine + human approval gate every execution; injection E2E test must show zero triggered actions | ActionProposal schema, policy engine | 4, 6 |
@@ -70,9 +70,10 @@ All connector content is untrusted. Concretely:
 
 ## Encryption and key management assumptions
 
-- Dev: single symmetric key from environment (`TOKEN_KEY`, with `TOKEN_KEY_ID` naming it), never committed; `.env.example` documents it without a value.
-- Interface: `TokenCipher.encrypt/decrypt` with key-id in the ciphertext envelope, enabling rotation (re-encrypt on read) and a KMS-backed implementation in production.
-- Rotation: documented manual procedure in MVP; automated rotation is post-MVP.
+- Dev: symmetric keys from environment (`TOKEN_KEY`/`TOKEN_KEY_ID` for the active key, optional `TOKEN_KEY_LEGACY_JSON` for zero-or-more legacy keys still needed to decrypt not-yet-migrated rows), never committed; `.env.example` documents them without values.
+- Interface: `TokenCipher.encrypt/decrypt` with a key id in the ciphertext envelope. Since Stage 11A Phase 4A, `TokenKeyRing` implements this same interface over one active plus zero-or-more legacy `AesGcmTokenCipher` instances — every caller is unaffected by which concrete implementation is wired in.
+- **Envelope AAD (Stage 11A Phase 4A)**: every new encryption produces a `v2` envelope whose AES-GCM authenticated data is bound to `security/credential_context.py`'s `credential_context()` (`account id : owner id : provider : field`), so a ciphertext copied into a different row's column — a different account, a different owner, or the row's own sibling field — fails authentication instead of decrypting. `v1` envelopes (the pre-Phase-4A format, unauthenticated data) remain readable unchanged.
+- **Rotation (Stage 11A Phase 4A, closes F-P3-03)**: `credential_rotation.py` — a resumable, row-locked (`SELECT ... FOR UPDATE SKIP LOCKED`), bounded-batch migration service, internal/operator-only (no public route; `scripts/rotate_credential_keys.py` is the CLI entry point). A legacy key may only be retired from the live configuration once `verify_key_retirement_safe()` confirms zero rows still reference it. A managed-KMS implementation in production remains a future replacement for the environment-sourced key material itself, not for this rotation design.
 
 ## Stage 6 verification notes
 

@@ -46,7 +46,7 @@ from lifeflow_api.rate_limit_policy import InvalidPolicyOverrideError, parse_pol
 from lifeflow_api.rate_limiter import RateLimiter
 from lifeflow_api.scheduled_brief_status import router as scheduled_brief_status_router
 from lifeflow_api.security.csrf import CSRF_HEADER, CsrfProtectionMiddleware
-from lifeflow_api.security.token_cipher import AesGcmTokenCipher
+from lifeflow_api.security.token_cipher import TokenCipherError, build_key_ring
 from lifeflow_api.signals import router as signals_router
 from lifeflow_api.source_items import router as source_items_router
 from lifeflow_api.timeouts import (
@@ -118,9 +118,26 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # Token encryption (threat model T1): required once any real tokens are
     # stored. Demo mode and dev-login never construct a ConnectedAccount
     # with real tokens, so this stays None until TOKEN_KEY is configured.
+    # `app.state.token_cipher` holds a `TokenKeyRing` (Stage 11A Phase 4A,
+    # F-P3-03), never a bare `AesGcmTokenCipher` — it implements the same
+    # `TokenCipher` protocol, so every existing caller is unaffected, but it
+    # also carries zero or more legacy keys the rotation service needs to
+    # decrypt not-yet-migrated rows.
     app.state.token_cipher = None
     if settings.token_key:
-        app.state.token_cipher = AesGcmTokenCipher(settings.token_key, settings.token_key_id)
+        # The literal `.env.example` development default must never protect
+        # a real credential in production — an established guard in the same
+        # style as the E2E-test-controls check above.
+        if settings.environment == "production" and settings.token_key_id == "dev-1":  # noqa: S105
+            raise RuntimeError(
+                "TOKEN_KEY_ID must not be the development default ('dev-1') in production."
+            )
+        try:
+            app.state.token_cipher = build_key_ring(
+                settings.token_key, settings.token_key_id, settings.token_key_legacy_json
+            )
+        except TokenCipherError as exc:
+            raise RuntimeError(f"Invalid TOKEN_KEY configuration: {exc}") from exc
 
     # Real Google integration (Stage 7, ADR 0003 D23) is off by default.
     # Demo mode, dev-login, and the synthetic connectors never depend on any
