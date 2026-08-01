@@ -56,6 +56,14 @@ def begin_oauth_flow(
     return state, pkce, nonce
 
 
+def clear_pending_oauth_flow(request: Request) -> None:
+    """Best-effort clear of any pending flow, regardless of purpose/state —
+    used when Google reports an error (e.g. denied consent) before ever
+    issuing a code, so a callback that never reaches `consume_oauth_flow`
+    does not leave stale pending state in the session until its TTL lapses."""
+    request.session.pop(_SESSION_KEY, None)
+
+
 def consume_oauth_flow(request: Request, *, purpose: str, state: str) -> ConsumedOAuthFlow:
     """Validate the callback's `state` against the pending flow and clear it
     — single-use regardless of outcome."""
@@ -80,4 +88,10 @@ def consume_oauth_flow(request: Request, *, purpose: str, state: str) -> Consume
     )
 
 
-__all__ = ["ConsumedOAuthFlow", "OAuthStateError", "begin_oauth_flow", "consume_oauth_flow"]
+__all__ = [
+    "ConsumedOAuthFlow",
+    "OAuthStateError",
+    "begin_oauth_flow",
+    "clear_pending_oauth_flow",
+    "consume_oauth_flow",
+]

@@ -26,7 +26,12 @@ from lifeflow_api.google.oauth import build_authorization_url
 from lifeflow_api.google_scopes import CONNECTOR_SCOPE_STRING
 from lifeflow_api.google_sync import GoogleReadScopeMissingError
 from lifeflow_api.google_wiring import build_google_sync_service
-from lifeflow_api.oauth_state import OAuthStateError, begin_oauth_flow, consume_oauth_flow
+from lifeflow_api.oauth_state import (
+    OAuthStateError,
+    begin_oauth_flow,
+    clear_pending_oauth_flow,
+    consume_oauth_flow,
+)
 from lifeflow_api.rate_limit_deps import RateLimited
 from lifeflow_api.repositories import ConnectedAccountRepository
 from lifeflow_api.security.token_cipher import TokenCipher
@@ -104,11 +109,18 @@ async def google_connector_callback(
     session: DbSession,
     code: str | None = None,
     state: str | None = None,
+    error: str | None = None,
 ) -> RedirectResponse:
     if _google_connector_disabled(request):
         raise HTTPException(status_code=404, detail="Not Found")
     settings = request.app.state.settings
     web_origin = settings.web_origin
+    if error is not None:
+        # See auth.py's google_callback for the identical rationale: clear
+        # the now-moot pending flow rather than leaving it until its TTL
+        # expires, and never reflect the raw `error` value into the redirect.
+        clear_pending_oauth_flow(request)
+        return RedirectResponse(url=f"{web_origin}/?connect_error=access_denied", status_code=302)
     if code is None or state is None:
         return RedirectResponse(url=f"{web_origin}/?connect_error=missing_code", status_code=302)
     try:

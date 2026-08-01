@@ -20,7 +20,12 @@ from lifeflow_api.deps import CurrentUser, DbSession
 from lifeflow_api.google.errors import IdTokenVerificationError
 from lifeflow_api.google.oauth import build_authorization_url, verify_id_token
 from lifeflow_api.models import User
-from lifeflow_api.oauth_state import OAuthStateError, begin_oauth_flow, consume_oauth_flow
+from lifeflow_api.oauth_state import (
+    OAuthStateError,
+    begin_oauth_flow,
+    clear_pending_oauth_flow,
+    consume_oauth_flow,
+)
 from lifeflow_api.rate_limit_deps import RateLimited
 from lifeflow_api.repositories import UserRepository
 
@@ -119,12 +124,25 @@ async def google_login(request: Request) -> RedirectResponse:
 
 @router.get("/google/callback", dependencies=[RateLimited("anonymous_auth")])
 async def google_callback(
-    request: Request, session: DbSession, code: str | None = None, state: str | None = None
+    request: Request,
+    session: DbSession,
+    code: str | None = None,
+    state: str | None = None,
+    error: str | None = None,
 ) -> RedirectResponse:
     if _google_oidc_disabled(request):
         raise HTTPException(status_code=404, detail="Not Found")
     settings = request.app.state.settings
     web_origin = settings.web_origin
+    if error is not None:
+        # The user declined consent (or Google reported some other error)
+        # before ever issuing a code — clear the now-moot pending flow so it
+        # cannot linger in the session until its TTL expires, and label this
+        # distinctly from a genuinely malformed callback (Stage 11A Phase
+        # 4B readiness finding). The raw `error` value is never reflected
+        # into the redirect — only this fixed, closed-vocabulary code is.
+        clear_pending_oauth_flow(request)
+        return RedirectResponse(url=f"{web_origin}/?auth_error=access_denied", status_code=302)
     if code is None or state is None:
         return RedirectResponse(url=f"{web_origin}/?auth_error=missing_code", status_code=302)
     try:
