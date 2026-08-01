@@ -2046,6 +2046,7 @@ export interface operations {
             query?: {
                 code?: string | null;
                 state?: string | null;
+                error?: string | null;
             };
             header?: never;
             path?: never;
@@ -2258,6 +2259,7 @@ export interface operations {
             query?: {
                 code?: string | null;
                 state?: string | null;
+                error?: string | null;
             };
             header?: never;
             path?: never;

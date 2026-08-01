@@ -92,6 +92,10 @@ select = [
 # docker compose exec, since it targets the host-mapped port like Phase 3's
 # script above).
 "scripts/stage11a_phase4a_backup_key_ring_rehearsal.py" = ["S603", "S607"]
+# Exact-file, non-secret only: Stage 11A Phase 4B's preconnection readiness
+# command, a fixed-argv `python -m alembic heads` subprocess call — no user
+# input, no shell.
+"scripts/preconnection_readiness_check.py" = ["S603"]
 
 [tool.mypy]
 python_version = "3.12"
