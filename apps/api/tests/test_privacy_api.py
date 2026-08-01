@@ -85,16 +85,28 @@ async def _seed_full_dataset(user_id: uuid.UUID, *, last_sync: datetime | None) 
     try:
         maker = async_sessionmaker(engine, expire_on_commit=False)
         async with maker() as s:
+            # Stage 11A Phase 4A: the account id is generated up front (not
+            # left to the ORM's flush-time default) so the encryption
+            # context below can reference the real id this row will be
+            # persisted under.
+            account_id = uuid.uuid4()
             account = ConnectedAccount(
+                id=account_id,
                 user_id=user_id,
                 provider="google",
                 status=AccountStatus.active,
-                encrypted_access_token=cipher.encrypt(SECRET_ACCESS),
-                encrypted_refresh_token=cipher.encrypt(SECRET_REFRESH),
+                encrypted_access_token=cipher.encrypt(
+                    SECRET_ACCESS, context=f"{account_id}:{user_id}:google:access_token"
+                ),
+                encrypted_refresh_token=cipher.encrypt(
+                    SECRET_REFRESH, context=f"{account_id}:{user_id}:google:refresh_token"
+                ),
                 granted_scopes=[GMAIL_RO, GMAIL_COMPOSE, CAL_RO],
                 last_sync_at=last_sync,
                 sync_cursors={"gmail": {"history_id": SECRET_CURSOR}},
                 authorisation_revision=3,
+                access_token_key_id="test-1",
+                refresh_token_key_id="test-1",
             )
             s.add(account)
             source = SourceItem(

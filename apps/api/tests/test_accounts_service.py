@@ -61,7 +61,7 @@ async def test_no_plaintext_token_reaches_the_database(
     row_dump = str(dict(row))
     assert ACCESS_TOKEN not in row_dump
     assert REFRESH_TOKEN not in row_dump
-    assert row["encrypted_access_token"].startswith("v1:test-1:")
+    assert row["encrypted_access_token"].startswith("v2:test-1:")
 
 
 async def test_tokens_round_trip_through_the_cipher(service: ConnectedAccountService) -> None:

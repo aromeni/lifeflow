@@ -130,8 +130,18 @@ async def _seed(db_name: str) -> dict[str, object]:
         )
         session.add(account)
         await session.flush()
-        account.encrypted_access_token = cipher.encrypt("synthetic-access-token")
-        account.encrypted_refresh_token = cipher.encrypt("synthetic-refresh-token")
+        # Stage 11A Phase 4A: encryption context binds the envelope to this
+        # exact account/user/provider/field (security/credential_context.py).
+        access_context = f"{account.id}:{user.id}:google:access_token"
+        refresh_context = f"{account.id}:{user.id}:google:refresh_token"
+        account.encrypted_access_token = cipher.encrypt(
+            "synthetic-access-token", context=access_context
+        )
+        account.encrypted_refresh_token = cipher.encrypt(
+            "synthetic-refresh-token", context=refresh_context
+        )
+        account.access_token_key_id = "phase3-backup-key"  # noqa: S105 — a key *identifier*
+        account.refresh_token_key_id = "phase3-backup-key"  # noqa: S105 — a key *identifier*
 
         source = SourceItem(
             user_id=user.id,
@@ -250,7 +260,7 @@ async def _verify_restored_backup_retains_pre_deletion_state(
         # Restored credentials are synthetic ciphertext with no real provider
         # host or live key anywhere in this rehearsal — inert by
         # construction, never capable of an outbound call.
-        if not str(restored_account.encrypted_access_token).startswith("v1:"):
+        if not str(restored_account.encrypted_access_token).startswith("v2:"):
             raise AssertionError("restored token envelope is not the expected synthetic format")
     await engine.dispose()
 

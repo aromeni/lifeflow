@@ -79,21 +79,27 @@ async def _connect() -> asyncpg.Connection:
 
 async def seed_account(user_id: uuid.UUID) -> uuid.UUID:
     cipher = AesGcmTokenCipher(_FAKE_TOKEN_KEY, _FAKE_TOKEN_KEY_ID)
-    encrypted_access_token = cipher.encrypt(_FAKE_ACCESS_TOKEN)
     account_id = uuid.uuid4()
+    # Stage 11A Phase 4A: encryption context binds this envelope to this
+    # exact account/user/provider/field — must match what the app itself
+    # would derive (security/credential_context.py) or a real decrypt of
+    # this fixture through the application would fail authentication.
+    context = f"{account_id}:{user_id}:google:access_token"
+    encrypted_access_token = cipher.encrypt(_FAKE_ACCESS_TOKEN, context=context)
     conn = await _connect()
     try:
         await conn.execute(
             "INSERT INTO connected_accounts "
             "(id, user_id, provider, encrypted_access_token, encrypted_refresh_token, "
             "granted_scopes, expires_at, status, authorisation_revision, sync_cursors, "
-            "last_sync_at) "
-            "VALUES ($1, $2, 'google', $3, NULL, $4, $5, 'active', 1, '{}', NULL)",
+            "last_sync_at, access_token_key_id, refresh_token_key_id) "
+            "VALUES ($1, $2, 'google', $3, NULL, $4, $5, 'active', 1, '{}', NULL, $6, NULL)",
             account_id,
             user_id,
             encrypted_access_token,
             json.dumps(list(CONNECTOR_SCOPES)),
             datetime.now(UTC) + timedelta(days=365),
+            _FAKE_TOKEN_KEY_ID,
         )
     finally:
         await conn.close()

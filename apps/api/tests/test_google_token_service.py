@@ -25,7 +25,22 @@ from lifeflow_api.google.errors import InvalidGrantError
 from lifeflow_api.google.oauth import GoogleTokenResponse
 from lifeflow_api.models import AccountStatus, ConnectedAccount, User
 from lifeflow_api.repositories import AuditEventRepository, ConnectedAccountRepository
+from lifeflow_api.security.credential_context import (
+    ACCESS_TOKEN_FIELD,
+    REFRESH_TOKEN_FIELD,
+    credential_context,
+)
 from lifeflow_api.security.token_cipher import AesGcmTokenCipher
+
+
+def _ctx(account: ConnectedAccount, field: str) -> str:
+    return credential_context(
+        connected_account_id=account.id,
+        user_id=account.user_id,
+        provider=account.provider,
+        field=field,
+    )
+
 
 pytestmark = pytest.mark.integration
 
@@ -129,7 +144,10 @@ async def test_expiring_token_is_refreshed(
 
     account = await ConnectedAccountRepository(session, user.id).get_by_provider("google")
     assert account is not None
-    assert cipher.decrypt(account.encrypted_refresh_token) == "refresh-1"  # preserved (D18)
+    assert (
+        cipher.decrypt(account.encrypted_refresh_token, context=_ctx(account, REFRESH_TOKEN_FIELD))
+        == "refresh-1"  # preserved (D18)
+    )
 
 
 async def test_refresh_response_with_new_refresh_token_replaces_it(
@@ -157,7 +175,10 @@ async def test_refresh_response_with_new_refresh_token_replaces_it(
     await service.get_valid_access_token("google")
     account = await ConnectedAccountRepository(session, user.id).get_by_provider("google")
     assert account is not None
-    assert cipher.decrypt(account.encrypted_refresh_token) == "refresh-2"
+    assert (
+        cipher.decrypt(account.encrypted_refresh_token, context=_ctx(account, REFRESH_TOKEN_FIELD))
+        == "refresh-2"
+    )
 
 
 async def test_invalid_grant_marks_account_revoked_and_raises(
@@ -486,7 +507,13 @@ async def test_execution_routine_refresh_preserves_revision_and_returns_fresh_to
     refreshed_account = await ConnectedAccountRepository(session, user.id).get(account.id)
     assert refreshed_account is not None
     assert refreshed_account.authorisation_revision == original_revision
-    assert cipher.decrypt(refreshed_account.encrypted_access_token) == "access-refreshed"
+    assert (
+        cipher.decrypt(
+            refreshed_account.encrypted_access_token,
+            context=_ctx(refreshed_account, ACCESS_TOKEN_FIELD),
+        )
+        == "access-refreshed"
+    )
 
 
 async def test_execution_invalid_grant_marks_revoked_not_context_changed(

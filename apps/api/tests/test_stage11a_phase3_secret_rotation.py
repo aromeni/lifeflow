@@ -13,14 +13,17 @@ never a live provider) and its rotation capability is classified honestly:
   correctly under the new one. No dual-key grace period exists or is
   needed — sessions are short-lived and re-issued by simply logging in
   again.
-- `TOKEN_KEY`/`TOKEN_KEY_ID` — **no rotation capability exists today.**
-  `AesGcmTokenCipher` holds exactly one active key; `decrypt()` raises
-  `TokenCipherError` for any envelope whose `key_id` does not match the
-  instance's own. Application wiring (`main.py`, `worker_app.py`)
-  constructs exactly one cipher instance from settings — there is no
-  dual-key registry that would let a caller decrypt-under-old,
-  re-encrypt-under-new. This test proves that gap directly rather than
-  asserting a capability that does not exist; see defect-register.md.
+- `TOKEN_KEY`/`TOKEN_KEY_ID` — at the time this file was first written,
+  **no rotation capability existed.** `AesGcmTokenCipher` holds exactly one
+  active key; `decrypt()` raises `TokenCipherError` for any envelope whose
+  `key_id` does not match the instance's own, and application wiring
+  constructed exactly one cipher instance from settings. **Stage 11A Phase
+  4A closed this gap** (F-P3-03, Path A) by adding `TokenKeyRing` — see
+  `test_token_cipher.py` and `apps/api/src/lifeflow_api/credential_rotation.py`
+  for the rotation/migration tests. The single-`AesGcmTokenCipher` limitation
+  this file's remaining test proves is retained deliberately: it is exactly
+  why `TokenKeyRing` exists as a separate wrapper, not a sign the gap is
+  still open at the application level.
 - `RATE_LIMIT_KEY_SECRET` — rotation is safe by construction: a new secret
   simply produces a new HMAC digest for the same raw subject, which is
   indistinguishable from a normal bucket expiring. No stored state becomes
@@ -97,13 +100,17 @@ async def test_session_secret_rotation_invalidates_old_sessions_and_issues_new_o
         break
 
 
-def test_token_cipher_key_rotation_has_no_dual_key_migration_path() -> None:
-    """Honest gap, not a silent acceptance: encrypting under an old key and
-    attempting to decrypt with a cipher configured only with the new key
-    fails outright. There is no dual-key read path anywhere in the
-    codebase for a caller to fall back to. A real rotation today would
-    require a dedicated, currently-unbuilt re-encryption migration that
-    decrypts every row under the old key before the old key is discarded."""
+def test_a_single_cipher_still_has_no_dual_key_read_path() -> None:
+    """F-P3-03's original finding, still true at this exact layer: a single
+    `AesGcmTokenCipher` instance holds exactly one key, and a cipher
+    constructed with a new key cannot decrypt an envelope encrypted under an
+    old one — this is precisely why `TokenKeyRing` exists (Stage 11A Phase
+    4A, see `test_token_cipher.py`'s `TokenKeyRing` tests and
+    `credential_rotation.py`), rather than teaching `AesGcmTokenCipher`
+    itself to hold two keys. Retained here as a regression guard: if this
+    single-cipher limitation ever silently disappeared, it would mean the
+    envelope format stopped actually binding to a specific key, which would
+    be a correctness regression in the opposite direction."""
     old_key = base64.b64encode(os.urandom(32)).decode()
     new_key = base64.b64encode(os.urandom(32)).decode()
 
@@ -111,17 +118,20 @@ def test_token_cipher_key_rotation_has_no_dual_key_migration_path() -> None:
     new_cipher = AesGcmTokenCipher(new_key, "key-v2")
 
     sentinel = f"SENTINEL-ROTATION-TOKEN-{uuid.uuid4()}"  # pragma: allowlist secret
-    envelope = old_cipher.encrypt(sentinel)
+    envelope = old_cipher.encrypt(sentinel, context="test-context")
 
     with pytest.raises(TokenCipherError, match="No key available"):
-        new_cipher.decrypt(envelope)
+        new_cipher.decrypt(envelope, context="test-context")
 
-    # The only currently-correct rotation procedure: keep the old cipher
-    # instance alive until every row has been re-encrypted under the new
-    # one. This must be a deliberate migration step, never implicit.
-    assert old_cipher.decrypt(envelope) == sentinel
-    reencrypted = new_cipher.encrypt(old_cipher.decrypt(envelope))
-    assert new_cipher.decrypt(reencrypted) == sentinel
+    # The now-built, deliberate rotation procedure (Stage 11A Phase 4A):
+    # a `TokenKeyRing` holding both keys decrypts under whichever key the
+    # envelope names, and `credential_rotation.rotate_batch` re-encrypts
+    # under the active key as a controlled, resumable migration step.
+    assert old_cipher.decrypt(envelope, context="test-context") == sentinel
+    reencrypted = new_cipher.encrypt(
+        old_cipher.decrypt(envelope, context="test-context"), context="test-context"
+    )
+    assert new_cipher.decrypt(reencrypted, context="test-context") == sentinel
 
 
 def test_rate_limit_secret_rotation_only_changes_the_bucket_key_deterministically() -> None:
