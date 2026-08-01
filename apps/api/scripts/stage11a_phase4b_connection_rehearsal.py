@@ -44,6 +44,7 @@ from lifeflow_api.models import ConnectedAccount, User, UserAccountState
 from lifeflow_api.retention import RetentionHorizons
 from lifeflow_api.security.csrf import CSRF_HEADER
 from lifeflow_api.security.token_cipher import build_key_ring
+from lifeflow_api.testing.no_live_network import block_live_google_network
 
 ADMIN_DSN = "postgresql://lifeflow:lifeflow@localhost:5433/lifeflow"  # pragma: allowlist secret
 _ENGINE_DSN_PREFIX = (
@@ -160,6 +161,28 @@ async def _run_cycle(cycle: int) -> None:
         raise RehearsalError("fake-provider test controls must be inert for this rehearsal")
 
     app = create_app(settings)
+
+    # Safety net: `create_app()` wires `google_oauth_client`/`gmail_client`/
+    # `calendar_client` to a single shared `google_http_client`, a real,
+    # network-capable `httpx.AsyncClient`. Replace it with one whose
+    # transport refuses any non-loopback host *before* installing the
+    # explicit per-cycle mocks below. If a future edit forgets to override
+    # one of the three clients with `mock_http` — the exact mistake that
+    # let an early draft of this script reach `gmail.googleapis.com` for
+    # real (see dry-run-results.md) — that client keeps using this guarded
+    # client instead of silently falling back to a real one.
+    await app.state.google_http_client.aclose()
+    app.state.google_http_client = httpx.AsyncClient(
+        transport=block_live_google_network(httpx.AsyncHTTPTransport())
+    )
+    app.state.google_oauth_client = GoogleOAuthClient(app.state.google_http_client)
+    app.state.gmail_client = GmailDraftClient(app.state.google_http_client)
+    app.state.calendar_client = CalendarEventClient(app.state.google_http_client)
+
+    # The actual per-cycle simulation: every Google-facing client is
+    # explicitly assigned a local mock transport that never touches a
+    # socket for any host, matching `test_google_route_integration.py`'s
+    # `_app_client` pattern.
     mock_http = httpx.AsyncClient(transport=_full_transport())
     app.state.google_oauth_client = GoogleOAuthClient(mock_http)
     app.state.gmail_client = GmailDraftClient(mock_http)
