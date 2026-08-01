@@ -1,6 +1,6 @@
 # Stage 11A Phase 4A — Acceptance Matrix
 
-**Status:** In execution · **Date:** 2026-07-31
+**Status:** In execution · **Date:** 2026-07-31 · row 047 added 2026-08-01 during the PR #13 merge-integrity check (see [phase-4b-connection-gate.md](phase-4b-connection-gate.md))
 
 Built before implementation began, per the governing task instruction. Each row is verified by an automated test unless marked "manual"/"script".
 
@@ -52,5 +52,6 @@ Built before implementation began, per the governing task instruction. Each row 
 | S11A-P4A-044 | Three complete rotation rehearsals (18-step lifecycle each) pass | script (3 cycles) |
 | S11A-P4A-045 | No rotation endpoint is exposed publicly; only an internal/operator command exists | manual + automated |
 | S11A-P4A-046 | A user-controlled identifier cannot direct rotation to migrate another owner's account | automated |
+| S11A-P4A-047 | An explicit, non-decrypting Phase 4B pre-connection gate exists and fails closed unless every stored credential field is on the active key (zero unversioned, zero legacy-known, zero legacy-unknown rows) | automated |
 
-All 46 rows must PASS for this phase's decision to be PASS or CONDITIONAL PASS; any FAIL on a P0-class row (001–016, 026–038, 043, 045–046) forces FAIL — TEST-ACCOUNT CONNECTION REMAINS BLOCKED.
+All 47 rows must PASS for this phase's decision to be PASS or CONDITIONAL PASS; any FAIL on a P0-class row (001–016, 026–038, 043, 045–047) forces FAIL — TEST-ACCOUNT CONNECTION REMAINS BLOCKED.

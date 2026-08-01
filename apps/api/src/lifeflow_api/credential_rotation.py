@@ -159,8 +159,74 @@ async def verify_key_retirement_safe(session: AsyncSession, key_id: str) -> bool
     return result.first() is None
 
 
+@dataclass
+class ConnectionGateReport:
+    """Bounded, content-free counts for the Phase 4B pre-connection gate
+    (governing-instruction §3): no Google account may be connected while any
+    stored credential field remains outside the active v2 key. Every count
+    here comes from the non-secret key-version columns only — nothing is
+    decrypted or displayed to produce this report."""
+
+    unversioned: int = 0
+    """Rows with a stored envelope but no key-version id recorded at all —
+    would indicate a write path that bypassed key-id bookkeeping; expected
+    to always be zero given the migration backfill and the encrypt helpers."""
+    legacy_known: int = 0
+    """Field-references on a legacy key this ring can still read and
+    migrate — the ordinary, expected pre-rotation state."""
+    legacy_unknown: int = 0
+    """Field-references on a key id this ring does not hold (already
+    retired, or never configured) — would block migration and must be
+    resolved before any key can be retired or any new account connected."""
+
+    @property
+    def clear_to_connect(self) -> bool:
+        return self.unversioned == 0 and self.legacy_known == 0 and self.legacy_unknown == 0
+
+
+async def credential_connection_gate(
+    session: AsyncSession, key_ring: TokenKeyRing
+) -> ConnectionGateReport:
+    """The authoritative Phase 4B pre-connection check: every stored
+    credential field must already be on the active v2 key before a Google
+    account may be connected, so the legacy v1 format (which lacks
+    owner/account/field AAD binding) never has to coexist with a live
+    connection. Callers must fail closed when `clear_to_connect` is False."""
+    report = ConnectionGateReport()
+    rows = (
+        await session.execute(
+            select(
+                ConnectedAccount.encrypted_access_token,
+                ConnectedAccount.access_token_key_id,
+                ConnectedAccount.encrypted_refresh_token,
+                ConnectedAccount.refresh_token_key_id,
+            )
+        )
+    ).all()
+    active_id = key_ring.active_key_id
+    legacy_ids = key_ring.legacy_key_ids
+    for access_envelope, access_key_id, refresh_envelope, refresh_key_id in rows:
+        for envelope, key_id in (
+            (access_envelope, access_key_id),
+            (refresh_envelope, refresh_key_id),
+        ):
+            if envelope is None:
+                continue
+            if key_id is None:
+                report.unversioned += 1
+            elif key_id == active_id:
+                continue
+            elif key_id in legacy_ids:
+                report.legacy_known += 1
+            else:
+                report.legacy_unknown += 1
+    return report
+
+
 __all__ = [
+    "ConnectionGateReport",
     "RotationBatchResult",
+    "credential_connection_gate",
     "dry_run_inventory",
     "rotate_batch",
     "verify_key_retirement_safe",

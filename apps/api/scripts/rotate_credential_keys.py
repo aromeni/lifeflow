@@ -15,6 +15,13 @@ Usage (from apps/api):
     uv run python3 scripts/rotate_credential_keys.py --dry-run
     uv run python3 scripts/rotate_credential_keys.py --batch-size 100
     uv run python3 scripts/rotate_credential_keys.py --verify-retirement <key_id>
+    uv run python3 scripts/rotate_credential_keys.py --connection-gate
+
+`--connection-gate` is the Phase 4B pre-connection check: it exits 0 only if
+every stored credential field is already on the active v2 key (zero
+unversioned rows, zero legacy-known references, zero legacy-unknown/blocked
+references), and exits 1 otherwise. Run it before connecting any Google
+account. It never decrypts or displays credential content.
 """
 
 from __future__ import annotations
@@ -30,6 +37,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from lifeflow_api.config import get_settings
 from lifeflow_api.credential_rotation import (
+    credential_connection_gate,
     dry_run_inventory,
     rotate_batch,
     verify_key_retirement_safe,
@@ -46,6 +54,12 @@ async def main() -> int:
         "--verify-retirement",
         metavar="KEY_ID",
         help="exit 0 if zero rows reference KEY_ID (safe to retire), else exit 1",
+    )
+    parser.add_argument(
+        "--connection-gate",
+        action="store_true",
+        help="Phase 4B pre-connection check: exit 0 only if every credential "
+        "field is on the active v2 key, else exit 1",
     )
     args = parser.parse_args()
 
@@ -64,6 +78,17 @@ async def main() -> int:
     engine = create_engine(settings.database_url)
     maker = async_sessionmaker(engine, expire_on_commit=False)
     try:
+        if args.connection_gate:
+            async with maker() as session:
+                report = await credential_connection_gate(session, key_ring)
+            print(
+                "connection-gate: unversioned="
+                f"{report.unversioned} legacy_known={report.legacy_known} "
+                f"legacy_unknown={report.legacy_unknown} "
+                f"clear_to_connect={report.clear_to_connect}"
+            )
+            return 0 if report.clear_to_connect else 1
+
         if args.verify_retirement:
             async with maker() as session:
                 safe = await verify_key_retirement_safe(session, args.verify_retirement)

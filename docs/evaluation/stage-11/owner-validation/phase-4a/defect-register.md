@@ -24,4 +24,4 @@ None.
 
 ## Automated-suite regressions
 
-None. The full pre-existing backend suite (932 tests, unrelated to this phase's own 15 new tests) was re-run in full after every substantive change and passed 100% on the final run.
+None. The full pre-existing backend suite (915 tests on the prior `main` boundary) was re-run in full after every substantive change and passed 100% on the final run, alongside this phase's 32 new tests — 15 in `test_stage11a_phase4a_credential_rotation.py` and 17 added to `test_token_cipher.py` (context/envelope-v2 and `TokenKeyRing`/`build_key_ring` coverage), for a total of 947 at the point PR #13 was opened. An earlier reported breakdown ("932 pre-existing + 15 new") undercounted the `test_token_cipher.py` additions by attributing them to the pre-existing baseline instead of this phase; corrected after a direct `pytest --collect-only` diff against `main` during the PR #13 merge-integrity check, which also added 6 further tests (the Phase 4B connection-gate and a previously-untested production key-id guard — see [phase-4b-connection-gate.md](phase-4b-connection-gate.md)), for a final total of **953**, all passing.

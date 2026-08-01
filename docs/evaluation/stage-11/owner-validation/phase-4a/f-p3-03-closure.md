@@ -10,7 +10,7 @@ Phase 3 recorded F-P3-03: `AesGcmTokenCipher` held exactly one active key; appli
 
 ## Closure criteria, checked against this phase's actual evidence
 
-- [x] **All mandatory tests pass** — 15/15 new Phase 4A tests, 41/41 in the combined cipher+rotation suite, 932/932 pre-existing backend tests unaffected.
+- [x] **All mandatory tests pass** — 21/21 tests in `test_stage11a_phase4a_credential_rotation.py` (15 from initial implementation plus 6 added during the PR #13 merge-integrity check: the Phase 4B connection gate and a previously-untested production key-id guard), 48/48 in the combined `test_token_cipher.py` + rotation suite, 915/915 pre-existing backend tests (the prior `main` boundary) unaffected — **953 total**, corrected from an earlier "932 pre-existing + 15 new / 41-in-combined-suite" figure that undercounted the `test_token_cipher.py` additions (see [defect-register.md](defect-register.md) and [phase-4b-connection-gate.md](phase-4b-connection-gate.md)).
 - [x] **All three rehearsals pass** — the key-rotation rehearsal (18-step lifecycle) and the backup/key-ring rehearsal, 3/3 cycles each, both runs repeated twice during this phase with identical results.
 - [x] **Migration is resumable** — proven directly via a simulated interruption (rollback before commit) followed by a resume-to-completion run; no row was left half-migrated or double-processed.
 - [x] **Concurrent refresh is safe** — a real token refresh and a real rotation batch racing the same row, against real PostgreSQL, never corrupted the row or produced an inconsistent result.

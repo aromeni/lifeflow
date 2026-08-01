@@ -27,6 +27,7 @@ from tests.test_google_token_service import NOW, _seed_google_account, _StubOAut
 
 from lifeflow_api.accounts import ConnectedAccountService, GoogleTokenService
 from lifeflow_api.credential_rotation import (
+    credential_connection_gate,
     dry_run_inventory,
     rotate_batch,
     verify_key_retirement_safe,
@@ -151,6 +152,101 @@ async def test_dry_run_inventory_counts_legacy_rows(session: AsyncSession) -> No
 
     inventory = await dry_run_inventory(session, ring)
     assert inventory.get("legacy-x", 0) >= 2
+
+
+async def test_connection_gate_clears_when_every_row_is_on_the_active_key(
+    session: AsyncSession,
+) -> None:
+    """The Phase 4B pre-connection gate must pass when nothing needs
+    migration — the normal, expected pre-connection state."""
+    active = AesGcmTokenCipher(_random_key(), "active-gate-1")
+    ring = TokenKeyRing(active)
+    await _seed_account_on_key(session, active)
+    await session.commit()
+
+    report = await credential_connection_gate(session, ring)
+
+    assert report.clear_to_connect is True
+    assert report.unversioned == 0
+    assert report.legacy_known == 0
+    assert report.legacy_unknown == 0
+
+
+async def test_connection_gate_blocks_on_a_known_legacy_reference(
+    session: AsyncSession,
+) -> None:
+    """A row still on a key the ring recognises as legacy (needs migration,
+    not yet blocked) must still fail the gate — Phase 4B requires zero
+    legacy references, not merely zero *unrecoverable* ones."""
+    legacy = AesGcmTokenCipher(_random_key(), "legacy-gate-1")
+    active = AesGcmTokenCipher(_random_key(), "active-gate-2")
+    ring = TokenKeyRing(active, [legacy])
+    await _seed_account_on_key(session, legacy)
+    await session.commit()
+
+    report = await credential_connection_gate(session, ring)
+
+    assert report.clear_to_connect is False
+    assert report.legacy_known >= 2
+    assert report.legacy_unknown == 0
+
+
+async def test_connection_gate_blocks_on_an_unknown_key_id(session: AsyncSession) -> None:
+    """A row on a key id the current ring holds neither as active nor as
+    legacy (retired, or never configured) must block the gate as
+    legacy_unknown, distinct from an ordinary migratable reference."""
+    orphaned = AesGcmTokenCipher(_random_key(), "orphaned-gate-1")
+    active = AesGcmTokenCipher(_random_key(), "active-gate-3")
+    ring = TokenKeyRing(active)
+    await _seed_account_on_key(session, orphaned)
+    await session.commit()
+
+    report = await credential_connection_gate(session, ring)
+
+    assert report.clear_to_connect is False
+    assert report.legacy_unknown >= 2
+    assert report.legacy_known == 0
+
+
+async def test_connection_gate_flags_an_envelope_with_no_recorded_key_id(
+    session: AsyncSession,
+) -> None:
+    """A stored envelope with no key-version id at all would mean a write
+    path bypassed key-id bookkeeping — the gate must flag it as
+    `unversioned` rather than silently ignoring it."""
+    active = AesGcmTokenCipher(_random_key(), "active-gate-4")
+    ring = TokenKeyRing(active)
+    account = await _seed_account_on_key(session, active)
+    account.access_token_key_id = None
+    await session.commit()
+
+    report = await credential_connection_gate(session, ring)
+
+    assert report.clear_to_connect is False
+    assert report.unversioned == 1
+
+
+async def test_connection_gate_ignores_rows_with_no_stored_credential(
+    session: AsyncSession,
+) -> None:
+    """A row with no encrypted envelope at all (disconnected/never-connected)
+    must not be counted in any gate bucket — nothing there needs migrating
+    or blocks a connection."""
+    active = AesGcmTokenCipher(_random_key(), "active-gate-5")
+    ring = TokenKeyRing(active)
+    user = User(email=f"rot-{uuid.uuid4()}@example.com", display_name="Rot")
+    session.add(user)
+    await session.flush()
+    session.add(
+        ConnectedAccount(
+            user_id=user.id, provider="google", status=AccountStatus.active, granted_scopes=[]
+        )
+    )
+    await session.commit()
+
+    report = await credential_connection_gate(session, ring)
+
+    assert report.clear_to_connect is True
 
 
 async def test_rotate_batch_migrates_a_legacy_row_to_the_active_key(
@@ -421,6 +517,33 @@ async def test_full_account_deletion_removes_key_id_columns_with_the_row(
         .all()
     )
     assert remaining == []
+
+
+# --- production startup guard against the development key-id default -------
+
+
+def test_production_startup_refuses_the_development_key_id_default() -> None:
+    """S11A-P4A-020: TOKEN_KEY_ID must never be the literal `.env.example`
+    development default ('dev-1') when ENVIRONMENT=production — the literal
+    default must never silently protect a real credential. Found untested
+    during the PR #13 merge-integrity check (the guard raises synchronously
+    inside `create_app`, before the ASGI lifespan ever starts); added here to
+    back the acceptance matrix's existing "automated" claim for this row with
+    a real assertion rather than an aspirational one."""
+    from lifeflow_api.config import Settings
+    from lifeflow_api.main import create_app
+
+    settings = Settings(
+        _env_file=None,
+        environment="production",
+        log_level="WARNING",
+        database_url=TEST_DB_URL,
+        session_secret="x" * 32,
+        token_key=_random_key(),
+        token_key_id="dev-1",
+    )
+    with pytest.raises(RuntimeError, match="development default"):
+        create_app(settings)
 
 
 # --- structural proof: no public rotation route exists ----------------------
