@@ -73,6 +73,12 @@ Formatter · linter · type checker · unit tests · relevant integration tests 
 | Timezone/DST defects (Europe/London) | Wrong deadlines/schedules | UTC storage + tz-aware rendering; DST boundary tests from Stage 3 |
 | Solo-developer bus factor / stall | Delivery risk | Stage gates keep the repo always in a documented, runnable state |
 
+## Stage 11A Phase 4C live status (2026-08-01)
+
+Disposable environment creation has executed and is in repository/CI review. Two isolated accounts, one dedicated test-only Cloud project, the Gmail and Calendar APIs, an External/Testing OAuth app, one approved test user, the exact four connector scopes, and one web client now exist. The client configuration is installed only in the ignored local `.env`; OAuth initiation and callbacks remain default-denied. OAuth consent is not completed, no Google account is connected, and stored credentials/tokens, Phase 4C Google imports/interactions, and provider writes are zero.
+
+The 7-day Testing-status constraint remains an undecided future soak choice: **SOAK PERIOD REMAINS BLOCKED**. Recruitment remains not authorised; Stage 11A is incomplete; Stage 12 remains pending and unstarted. See [stage-11a-phase-4c-plan.md](stage-11a-phase-4c-plan.md) and the [Phase 4C evidence pack](../evaluation/stage-11/owner-validation/phase-4c/).
+
 ## Decision log and documentation index
 
 North Star (long-term vision, permanent principles, guard rails): [../project/project-foundation.md](../project/project-foundation.md). Architecture decisions: [../architecture/adr/0001-architecture.md](../architecture/adr/0001-architecture.md). Assumptions and open decisions: [assumptions-and-decisions.md](assumptions-and-decisions.md). Product scope: [../product/mvp-scope.md](../product/mvp-scope.md). Threats: [../security/threat-model.md](../security/threat-model.md). Engineering delivery process: [engineering-acceptance-contract.md](engineering-acceptance-contract.md). Operational runbooks (Stage 9 Delivery Phase 5): [runbooks/outage-response.md](runbooks/outage-response.md), [runbooks/provider-failure.md](runbooks/provider-failure.md), [runbooks/worker-recovery.md](runbooks/worker-recovery.md), [runbooks/health-readiness.md](runbooks/health-readiness.md). When scope or design questions arise, the Project Foundation document is the single source of truth.

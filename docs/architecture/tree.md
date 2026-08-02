@@ -21,6 +21,9 @@ lifeflow-ai/
 │   │                        # scripts/e2e.sh — never run the two concurrently).
 │   └── api/                 # FastAPI backend: domain models, services, policy engine, executors, audit.
 │                            # ALL business logic lives here, behind connector/LLM interfaces.
+│                            # oauth_initiation.py is the independent default-deny gate
+│                            # for configured Google initiation/callback routes; enabling
+│                            # it requires a separate owner-authorised connection phase.
 │                            # src/lifeflow_api/testing/ is test-only fault-injection
 │                            # infrastructure (the fake Google server) — never imported
 │                            # by the production app, refuses to start without an
@@ -50,7 +53,9 @@ lifeflow-ai/
 │   └── evaluation/          # Human-evaluation materials, per stage (e.g.
 │                            # stage-11/: hypotheses, thresholds, participant
 │                            # protocol, consent/governance templates — no
-│                            # participant data is ever committed here).
+│                            # participant data is ever committed here). Stage 11A
+│                            # owner-validation/phase-4c/ contains only content-free
+│                            # disposable-environment and zero-activity evidence.
 ├── .github/workflows/       # CI pipelines — mirror the local commands exactly, never diverge.
 ├── docker-compose.yml       # Local development stack (PostgreSQL now; Redis when Stage 8 needs it).
 ├── CLAUDE.md                # Repository operating instructions for AI sessions: commands, boundaries, rules.

@@ -313,6 +313,14 @@ The one-active-proposal-per-action-type policy itself is deliberately unchanged:
 
 Fixing D42's regression run surfaced a latent test-rot defect: the route-level integration suites (`test_google_route_integration`, `test_execution_context_binding` scenario 1) seeded proposals with the frozen `tests/helpers.REFERENCE` (2026-07-15) but approve/execute through the **real app**, whose policy engine checks expiry and event start against `datetime.now(UTC)` — giving every seeded proposal a fixed absolute expiry (2026-07-22) after which the whole suite would silently start failing, regardless of code correctness. Fixed by anchoring exactly those suites to the wall clock (`demo_source_items(anchor=...)`, `scheduling_email_source(reference=...)` — whose event date is now written dynamically, eight days after its reference, weekday matched); every suite that validates with a frozen `now_factory` keeps the frozen reference and its deterministic absolute-date assertions. Documented in `tests/helpers.py`'s module docstring as the two-clock rule.
 
+### D43 — Configured credentials do not authorise OAuth initiation (Stage 11A Phase 4C)
+
+The disposable owner-test environment uses one physical web client for the existing two logical flows. The OIDC and connector routes, state purposes, redirect fields, and requested scope sets remain distinct; only the physical client ID/secret mapping is shared. This Phase 4C mapping supersedes Phase 4B's earlier two-client operational proposal without weakening flow separation.
+
+`GOOGLE_OAUTH_ENABLED=true` now means only that the integration is completely configured. A separate default-false `GOOGLE_OAUTH_INITIATION_ENABLED` gate covers both initiation and both callback routes before state creation/consumption, redirect construction, code exchange, token storage, or account binding. Enabling initiation while the integration itself is disabled fails startup. This is a connection-authorisation boundary, not a production bypass: existing OAuth logic is unchanged behind it, tests explicitly enable it only where they exercise the flow, and demo/synthetic mode remains available while it is false.
+
+Phase 4C installs the client but leaves the gate false. OAuth consent, connection, tokens, provider reads/writes, and soak remain separately authorised future actions.
+
 ## Consequences
 
 - Two extra environment-variable groups to configure in production (OIDC client, connector client) — documented in `.env.example`, both empty/false by default, never blocking demo mode or CI.

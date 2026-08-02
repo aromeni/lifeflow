@@ -385,6 +385,14 @@ report).
   operation-name set (422 on anything else), and expose only synthetic
   object/call counts, never content.
 
+## Stage 11A Phase 4C — configured-but-disconnected Google boundary
+
+The disposable Google test environment is configured locally, but configuration is not authority. An independent, default-false initiation flag is checked by both sign-in/connector initiation routes and both callbacks before any redirect, state consumption, code exchange, token storage, or binding. A configured-but-blocked route returns fixed operator guidance with no `Location` header and no provider value. Enabling the flag while Google OAuth itself is disabled fails startup.
+
+The owner created one web client carrying the two exact localhost server callbacks; the OIDC and connector flows retain separate routes, state purposes, redirect fields, and scope sets. The client identifier/secret exists only in the Git-ignored owner-only `.env`; presence/mapping/callback checks never print a value, length, prefix, or suffix. The current connection gate reports zero unversioned, legacy-known, and legacy-unknown credential fields; current Google identity bindings and credential-bearing rows are zero.
+
+Regression proof covers blocked initiation, blocked callbacks before transport/storage, normal demo operation while blocked, production/configuration guards, live-network denial, secret-sentinel storage/log/Redis checks, and browser-storage minimisation. Phase 4C authorises no consent or provider traffic. The Testing-status seven-day authorisation constraint remains a separately gated soak decision.
+
 ## Out-of-scope threats (recorded, revisit at Stage 12)
 
 Multi-region availability, DDoS at scale, malicious insiders with database access, and formal GDPR DPIA sign-off (draft privacy notice arrives in Stage 11 for professional review). (Renumbered 2026-07-30 — originally Stage 11/Stage 10 respectively; see `docs/delivery/stage-plan.md`.)

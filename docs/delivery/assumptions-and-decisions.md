@@ -483,6 +483,14 @@ Verified: 953 pre-existing backend tests (the prior `main` boundary) plus 11 new
 
 Decision: **PASS — READY FOR OWNER CONNECTION AUTHORISATION**, which does not itself create or connect a Google account, a Google Cloud project, or any OAuth credential, and does not authorise the connection or provider-write decisions in `provider-write-authorisation-gate.md`. See [docs/delivery/stage-11a-phase-4b-plan.md](stage-11a-phase-4b-plan.md) and [docs/evaluation/stage-11/owner-validation/phase-4b/](../evaluation/stage-11/owner-validation/phase-4b/) for the full evidence pack.
 
+## Stage 11A Phase 4C — Disposable Google Test Environment Creation (recorded 2026-08-01)
+
+The owner created the isolated environment Phase 4B designed: `ACCOUNT_A`, `ACCOUNT_B`, one dedicated test-only Cloud project, exactly Gmail and Calendar API enablement, an External/Testing OAuth app, `ACCOUNT_A` as the sole test user, exactly the four approved connector scopes, and one web client carrying the two approved localhost server callbacks. No identifier, account address, client value, recovery/MFA detail, or provider content entered Git or chat. The one physical client's values are installed in both logical local configuration pairs inside the ignored `.env`, which is owner-only (`0600`).
+
+Because configuration alone would otherwise expose initiation routes, Phase 4C adds an independent default-false `GOOGLE_OAUTH_INITIATION_ENABLED` gate shared by both initiation and both callback routes. It runs before state creation/consumption, redirect, code exchange, token storage, or binding; ordinary demo/synthetic behaviour remains available. Presence-only readiness now verifies one-client mapping, exact callbacks, zero Google identity bindings, zero credential-bearing rows, and the blocked initiation state. A first over-broad check incorrectly required the long-lived synthetic/demo connected-account table itself to be empty; this verification-only P2 was narrowed and closed before any final decision.
+
+Current state: OAuth consent NOT COMPLETED; no Google account connected; zero stored credentials/tokens; zero Phase 4C Google data imports, successful API interactions, or provider writes; soak period not started; recruitment not authorised; Stage 11A incomplete; Stage 12 unstarted. Phase 4C's final verdict remains subject to full local and required-PR checks and cannot itself initiate OAuth. See [stage-11a-phase-4c-plan.md](stage-11a-phase-4c-plan.md) and the [content-free evidence pack](../evaluation/stage-11/owner-validation/phase-4c/).
+
 ## Open questions deliberately deferred (with owner stage)
 
 - ~~Evaluation acceptance targets~~ — **ratified 2026-07-16 in [ADR 0002](../architecture/adr/0002-evaluation-targets.md)** after the deterministic baseline; real-model metrics still pending an Anthropic key (before the Stage 11 gate, renumbered 2026-07-30 — originally Stage 10).
