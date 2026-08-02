@@ -31,15 +31,26 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from lifeflow_api.config import get_settings
 from lifeflow_api.credential_rotation import credential_connection_gate
 from lifeflow_api.db import check_database, create_engine
 from lifeflow_api.health import check_redis
+from lifeflow_api.models import ConnectedAccount, User
 from lifeflow_api.security.token_cipher import TokenCipherError, build_key_ring
 
 _DEV_KEY_ID = "dev-1"
+_EXPECTED_OIDC_REDIRECT_URI = "http://localhost:8010/auth/google/callback"
+_EXPECTED_CONNECTOR_REDIRECT_URI = "http://localhost:8010/connected-accounts/google/callback"
+
+
+def _is_placeholder(value: str) -> bool:
+    """Classify known-safe placeholder shapes without exposing the value."""
+
+    lowered = value.casefold()
+    return not value or "your-" in lowered or "placeholder" in lowered
 
 
 @dataclass
@@ -152,12 +163,47 @@ async def _run_checks() -> list[ReadinessCheck]:
                 maker = async_sessionmaker(engine, expire_on_commit=False)
                 async with maker() as session:
                     report = await credential_connection_gate(session, key_ring)
+                    google_identity_bindings = int(
+                        await session.scalar(
+                            select(func.count())
+                            .select_from(User)
+                            .where(User.google_subject.is_not(None))
+                        )
+                        or 0
+                    )
+                    stored_credential_rows = int(
+                        await session.scalar(
+                            select(func.count())
+                            .select_from(ConnectedAccount)
+                            .where(
+                                or_(
+                                    ConnectedAccount.encrypted_access_token.is_not(None),
+                                    ConnectedAccount.encrypted_refresh_token.is_not(None),
+                                )
+                            )
+                        )
+                        or 0
+                    )
                 checks.append(
                     ReadinessCheck(
                         "connection_gate_clear",
                         report.clear_to_connect,
                         f"unversioned={report.unversioned} legacy_known={report.legacy_known} "
                         f"legacy_unknown={report.legacy_unknown}",
+                    )
+                )
+                checks.append(
+                    ReadinessCheck(
+                        "google_identity_bindings_zero",
+                        google_identity_bindings == 0,
+                        f"google_identity_bindings={google_identity_bindings}",
+                    )
+                )
+                checks.append(
+                    ReadinessCheck(
+                        "stored_credential_rows_zero",
+                        stored_credential_rows == 0,
+                        f"stored_credential_rows={stored_credential_rows}",
                     )
                 )
     finally:
@@ -168,25 +214,63 @@ async def _run_checks() -> list[ReadinessCheck]:
         ReadinessCheck("redis_reachable", redis_ok, "reachable" if redis_ok else "unreachable")
     )
 
-    if settings.google_oauth_enabled:
-        callback_ok = bool(settings.google_connector_redirect_uri) and bool(
-            settings.google_oidc_redirect_uri
+    client_values = (
+        settings.google_oidc_client_id,
+        settings.google_oidc_client_secret,
+        settings.google_connector_client_id,
+        settings.google_connector_client_secret,
+    )
+    clients_configured = settings.google_oauth_enabled and all(
+        not _is_placeholder(value) for value in client_values
+    )
+    checks.append(
+        ReadinessCheck(
+            "oauth_client_configuration_present",
+            clients_configured,
+            "configured (values not displayed)"
+            if clients_configured
+            else "unset or placeholder configuration",
         )
-        checks.append(
-            ReadinessCheck(
-                "callback_configuration_present",
-                callback_ok,
-                settings.google_connector_redirect_uri if callback_ok else "redirect URI(s) unset",
-            )
+    )
+
+    single_client_mapping = clients_configured and (
+        settings.google_oidc_client_id == settings.google_connector_client_id
+        and settings.google_oidc_client_secret == settings.google_connector_client_secret
+    )
+    checks.append(
+        ReadinessCheck(
+            "single_web_client_mapping",
+            single_client_mapping,
+            "one physical client mapped to both logical flows"
+            if single_client_mapping
+            else "single physical client mapping not confirmed",
         )
-    else:
-        checks.append(
-            ReadinessCheck(
-                "callback_configuration_present",
-                True,
-                "not applicable — GOOGLE_OAUTH_ENABLED=false",
-            )
+    )
+
+    callbacks_approved = (
+        settings.google_oidc_redirect_uri == _EXPECTED_OIDC_REDIRECT_URI
+        and settings.google_connector_redirect_uri == _EXPECTED_CONNECTOR_REDIRECT_URI
+    )
+    checks.append(
+        ReadinessCheck(
+            "callback_configuration_approved",
+            callbacks_approved,
+            "exact Phase 4C localhost callbacks configured"
+            if callbacks_approved
+            else "callback configuration differs from the approved values",
         )
+    )
+
+    initiation_blocked = not settings.google_oauth_initiation_enabled
+    checks.append(
+        ReadinessCheck(
+            "oauth_initiation_blocked",
+            initiation_blocked,
+            "blocked pending explicit owner authorisation"
+            if initiation_blocked
+            else "enabled — Phase 4C requires this to be blocked",
+        )
+    )
 
     return checks
 

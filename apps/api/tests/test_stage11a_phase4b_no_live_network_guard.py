@@ -113,6 +113,7 @@ async def test_safety_net_catches_a_client_that_was_never_mocked() -> None:
         token_key_id="guard-test-1",
         session_secret="g" * 32,
         google_oauth_enabled=True,
+        google_oauth_initiation_enabled=True,
         google_oidc_client_id="oidc-id",
         google_oidc_client_secret="oidc-secret",  # pragma: allowlist secret
         google_oidc_redirect_uri="http://localhost:8010/auth/google/callback",

@@ -61,8 +61,20 @@ class Settings(BaseSettings):
     # these being set. When enabled, BOTH client configs below are required
     # or the app refuses to start (ADR 0003 D23).
     google_oauth_enabled: bool = False
-    # App sign-in (OIDC): openid+email+profile only, never mailbox access
-    # (ADR 0003 D10). Deliberately a separate client from the one below.
+    # Stage 11A Phase 4C: client configuration and OAuth initiation are two
+    # separate operator decisions. A deployment may load and validate its
+    # client configuration while every route capable of starting or
+    # completing an OAuth flow remains blocked. This flag must stay false
+    # until the project owner explicitly authorises the next phase. It does
+    # not disable disconnect/sync/execution for an account that was already
+    # connected under a later authorisation; it gates initiation/callbacks
+    # only.
+    google_oauth_initiation_enabled: bool = False
+    # App sign-in (OIDC): openid+email+profile only, never mailbox access.
+    # This remains a separate logical configuration from connector consent;
+    # Phase 4C maps both logical configurations to one physical web client
+    # while preserving separate callbacks, state purposes, and scopes (ADR
+    # 0003 D10 and D43).
     google_oidc_client_id: str = ""
     google_oidc_client_secret: str = ""
     google_oidc_redirect_uri: str = ""

@@ -26,6 +26,7 @@ pytestmark = pytest.mark.integration
 
 GOOGLE_SETTINGS_OVERRIDES = {
     "google_oauth_enabled": True,
+    "google_oauth_initiation_enabled": True,
     "google_oidc_client_id": "oidc-id",
     "google_oidc_client_secret": "oidc-secret",
     "google_oidc_redirect_uri": "http://localhost:8010/auth/google/callback",
