@@ -73,9 +73,9 @@ Formatter · linter · type checker · unit tests · relevant integration tests 
 | Timezone/DST defects (Europe/London) | Wrong deadlines/schedules | UTC storage + tz-aware rendering; DST boundary tests from Stage 3 |
 | Solo-developer bus factor / stall | Delivery risk | Stage gates keep the repo always in a documented, runnable state |
 
-## Stage 11A Phase 4C live status (2026-08-01)
+## Stage 11A Phase 4C live status (2026-08-02)
 
-Disposable environment creation has executed and is in repository/CI review. Two isolated accounts, one dedicated test-only Cloud project, the Gmail and Calendar APIs, an External/Testing OAuth app, one approved test user, the exact four connector scopes, and one web client now exist. The client configuration is installed only in the ignored local `.env`; OAuth initiation and callbacks remain default-denied. OAuth consent is not completed, no Google account is connected, and stored credentials/tokens, Phase 4C Google imports/interactions, and provider writes are zero.
+Disposable environment creation is complete: **PASS — READY FOR FIRST OAUTH CONNECTION AUTHORISATION**. Two isolated accounts, one dedicated test-only Cloud project, the Gmail and Calendar APIs, an External/Testing OAuth app, one approved test user, the exact four connector scopes, and one web client now exist. The client configuration is installed only in the ignored local `.env`; OAuth initiation and callbacks remain default-denied. OAuth consent is not completed, no Google account is connected, and stored credentials/tokens, Phase 4C Google imports/interactions, and provider writes are zero. This verdict does not authorise connection.
 
 The 7-day Testing-status constraint remains an undecided future soak choice: **SOAK PERIOD REMAINS BLOCKED**. Recruitment remains not authorised; Stage 11A is incomplete; Stage 12 remains pending and unstarted. See [stage-11a-phase-4c-plan.md](stage-11a-phase-4c-plan.md) and the [Phase 4C evidence pack](../evaluation/stage-11/owner-validation/phase-4c/).
 

@@ -1,12 +1,12 @@
 # Stage 11A Phase 4C — Decision
 
-**Status:** PENDING EXACT-BOUNDARY AND REQUIRED REMOTE CHECKS · **Date:** 2026-08-02
+**Status:** Decision recorded · **Date:** 2026-08-02
 
 Companion: [acceptance-matrix.md](acceptance-matrix.md) · [defect-register.md](defect-register.md) · [connection-block-results.md](connection-block-results.md) · [no-provider-activity-results.md](no-provider-activity-results.md)
 
 ## Decision
 
-A terminal Phase 4C verdict is intentionally withheld until the exact-boundary proof, coherent commits, branch-only push, pull request, and all required remote checks complete. All owner-operated actions and local automated prerequisites have passed.
+**PASS — READY FOR FIRST OAUTH CONNECTION AUTHORISATION**
 
 ## Current evidence
 
@@ -19,7 +19,12 @@ A terminal Phase 4C verdict is intentionally withheld until the exact-boundary p
 - Local automated tests, evaluations, quality gates, migrations, contracts, and metrics pass on the current boundary.
 - No unresolved P0, P1, or P2 finding exists. Four implementation-time P2 findings are closed.
 - The complete intended boundary passed pre-commit, explicit detect-secrets, staged and 108-commit Gitleaks scans, private-key and prohibited-identifier scans, sentinel tests, environment/ignore checks, validators, and Git diff checks.
+- Coherent commits were pushed only to the Phase 4C branch; PR #15 targets `main`; all nine required checks passed.
 
-## Boundary while pending
+## What this decision does not do
 
-This pending record authorises nothing. Do not initiate OAuth, connect `ACCOUNT_A`, call Google, begin soak, recruit participants, deploy production, merge, tag, or begin Stage 12.
+This PASS does not authorise OAuth connection. Do not initiate OAuth, connect `ACCOUNT_A`, call Google, begin soak, recruit participants, deploy production, merge, tag, or begin Stage 12.
+
+## Next owner decision
+
+`AUTHORISE FIRST OAUTH CONNECTION OF ACCOUNT A — READ-ONLY SMOKE TESTS ONLY`
