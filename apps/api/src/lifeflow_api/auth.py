@@ -20,6 +20,7 @@ from lifeflow_api.deps import CurrentUser, DbSession
 from lifeflow_api.google.errors import IdTokenVerificationError
 from lifeflow_api.google.oauth import build_authorization_url, verify_id_token
 from lifeflow_api.models import User
+from lifeflow_api.oauth_initiation import require_google_oauth_initiation
 from lifeflow_api.oauth_state import (
     OAuthStateError,
     begin_oauth_flow,
@@ -98,17 +99,9 @@ async def logout(request: Request, user: CurrentUser, session: DbSession) -> Non
     )
 
 
-def _google_oidc_disabled(request: Request) -> bool:
-    settings = request.app.state.settings
-    return not settings.google_oauth_enabled or request.app.state.google_oauth_client is None
-
-
 @router.get("/google/login", dependencies=[RateLimited("anonymous_auth")])
 async def google_login(request: Request) -> RedirectResponse:
-    if _google_oidc_disabled(request):
-        # Indistinguishable from a route that does not exist, matching the
-        # dev-login convention: real integrations stay invisible when unset.
-        raise HTTPException(status_code=404, detail="Not Found")
+    require_google_oauth_initiation(request)
     settings = request.app.state.settings
     state, pkce, nonce = begin_oauth_flow(request, purpose=OIDC_PURPOSE, include_nonce=True)
     url = build_authorization_url(
@@ -130,8 +123,7 @@ async def google_callback(
     state: str | None = None,
     error: str | None = None,
 ) -> RedirectResponse:
-    if _google_oidc_disabled(request):
-        raise HTTPException(status_code=404, detail="Not Found")
+    require_google_oauth_initiation(request)
     settings = request.app.state.settings
     web_origin = settings.web_origin
     if error is not None:

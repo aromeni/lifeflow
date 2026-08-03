@@ -24,6 +24,7 @@ type (`detectors.py::detect_requests`, `proposal_composition.py::_draft_candidat
 Usage:
     uv run python scripts/e2e_google_support.py seed-account <user_id>
     uv run python scripts/e2e_google_support.py seed-draft-source <user_id>
+    uv run python scripts/e2e_google_support.py cleanup-accounts
 """
 
 import asyncio
@@ -34,9 +35,12 @@ import os
 import sys
 import uuid
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from urllib.parse import urlparse
 
 import asyncpg
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from lifeflow_api.google_scopes import CONNECTOR_SCOPES
 from lifeflow_api.security.token_cipher import AesGcmTokenCipher
@@ -146,9 +150,39 @@ async def seed_draft_source(user_id: uuid.UUID) -> None:
         await conn.close()
 
 
+async def cleanup_accounts() -> int:
+    """Delete only credential rows created with the fixed resilience-test key.
+
+    The resilience suite uses the shared local development database so its
+    browser journeys can exercise real process restarts and dependency
+    outages. Leaving its encrypted fixture rows behind makes the real
+    preconnection gate correctly fail on an unknown key after the suite.
+    Selecting by the dedicated, non-secret fixture key id keeps cleanup
+    closed to rows this helper created; foreign keys minimise or cascade
+    test references according to the application's existing schema.
+    """
+
+    conn = await _connect()
+    try:
+        result = await conn.execute(
+            "DELETE FROM connected_accounts "
+            "WHERE access_token_key_id = $1 OR refresh_token_key_id = $1",
+            _FAKE_TOKEN_KEY_ID,
+        )
+    finally:
+        await conn.close()
+    return int(result.rsplit(" ", 1)[-1])
+
+
 async def _main() -> None:
-    command, raw_user_id = sys.argv[1], sys.argv[2]
-    user_id = uuid.UUID(raw_user_id)
+    command = sys.argv[1]
+    if command == "cleanup-accounts" and len(sys.argv) == 2:
+        cleaned = await cleanup_accounts()
+        print(f"cleaned synthetic resilience accounts: {cleaned}")
+        return
+    if len(sys.argv) != 3:
+        raise SystemExit("seed commands require exactly one user id")
+    user_id = uuid.UUID(sys.argv[2])
     if command == "seed-account":
         await seed_account(user_id)
     elif command == "seed-draft-source":

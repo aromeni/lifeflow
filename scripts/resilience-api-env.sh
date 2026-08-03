@@ -20,6 +20,9 @@ export WEB_ORIGIN=http://localhost:3001
 # what Journey B's API-restart step needs to NOT happen.
 export SESSION_SECRET=e2e-resilience-fixed-session-secret-not-a-real-secret-32c  # pragma: allowlist secret
 export GOOGLE_OAUTH_ENABLED=true
+# These journeys seed fake credentials directly and never exercise browser
+# OAuth consent. Keep the independent Phase 4C initiation/callback gate shut.
+export GOOGLE_OAUTH_INITIATION_ENABLED=false
 export GOOGLE_OIDC_CLIENT_ID=resilience-e2e-oidc-id
 export GOOGLE_OIDC_CLIENT_SECRET=resilience-e2e-oidc-secret  # pragma: allowlist secret
 export GOOGLE_OIDC_REDIRECT_URI=http://localhost:8011/auth/google/callback

@@ -15,7 +15,7 @@ Companion: [redirect-uri-and-origin-plan.md](redirect-uri-and-origin-plan.md) ·
 | Tamper rejection | `pending.get("state") != state` (`oauth_state.py:67-68`) | `test_oauth_state_rejects_wrong_state_value`, `test_callback_with_invalid_state_redirects_safely` |
 | Purpose mismatch rejection | `pending.get("purpose") != purpose` (`oauth_state.py:65-66`) | `test_oauth_state_rejects_purpose_mismatch` |
 | Cross-owner account binding rejection | `bound_user_id != request.session.get("user_id")` (`oauth_state.py:71-73`) | `test_oauth_state_connect_flow_binds_to_current_session_user` |
-| PKCE (sign-in flow) | `generate_pkce_pair()` / verified at exchange (`google/oauth.py:46-64,161-180`) | `test_login_redirect_requests_openid_scope_only` (asserts `code_challenge_method=S256`) |
+| PKCE (both flows) | `generate_pkce_pair()` in the shared `begin_oauth_flow` / verified at exchange (`google/oauth.py:46-64,161-180`) | `test_login_redirect_requests_openid_scope_only` (sign-in); `test_connector_connect_redirect_also_carries_pkce` (connector — added Stage 11A Phase 4C, correcting a documentation error, see below) |
 
 ## Gaps found this phase and closed
 
@@ -28,9 +28,9 @@ All six were found by inspecting the actual callback code against the governing 
 5. **Empty-string `state` parameter was untested.** `code is None or state is None` does not catch an empty string (`"" is not None`), so this exercises the real `consume_oauth_flow` state-mismatch path rather than a hypothetical one. Proven by `test_signin_callback_with_empty_state_is_rejected_not_crashed` — no crash, safe `invalid_state` redirect.
 6. **Repeated/duplicated `state` query parameter was untested.** FastAPI/Starlette resolves this to a single value without raising; proven by `test_signin_callback_with_repeated_state_param_is_rejected_not_crashed` to redirect safely either way (`invalid_state` or `missing_code`, never a 500).
 
-## Not fixed — recorded as a non-blocking P2 (see defect-register.md)
+## Corrected during Stage 11A Phase 4C (see defect-register.md)
 
-- **No PKCE on the connector-consent flow.** The flow's state is already session-bound and single-use, which is what actually prevents authorization-code interception/replay in this server-side confidential-client shape; PKCE's marginal benefit here is defence-in-depth, not a closed gap. Recorded with an explicit closure condition (add PKCE to the connector flow before any future non-local/public-client deployment), consistent with the severity rules in the governing instruction §27 — it does not affect scope correctness, account binding, token security, or first-connection safety today.
+- **"No PKCE on the connector-consent flow" was never true.** This phase originally recorded PKCE as sign-in-only and treated the connector flow's absence of it as a non-blocking P2. Direct inspection during the Phase 4C integrity check showed `begin_oauth_flow` — shared by both flows — unconditionally generates and stores a PKCE pair regardless of `purpose`, and the connector flow's authorization URL and token exchange both use it exactly like sign-in. Closed with a new regression test, `test_connector_connect_redirect_also_carries_pkce`; no code change was needed.
 
 ## Concurrent-callback handling
 

@@ -143,6 +143,7 @@ async def _run_cycle(cycle: int) -> None:
         token_key_id="rehearsal-active-1",  # noqa: S106 -- a key *identifier*, not a secret
         session_secret="r" * 32,
         google_oauth_enabled=True,
+        google_oauth_initiation_enabled=True,
         google_oidc_client_id="oidc-id",
         google_oidc_client_secret="oidc-secret",  # noqa: S106 # pragma: allowlist secret
         google_oidc_redirect_uri="http://localhost:8010/auth/google/callback",

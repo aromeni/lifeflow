@@ -44,6 +44,12 @@ API_LOG="$(mktemp -t lifeflow-e2e-resilience-api.XXXXXX)"
 API_PID=$!
 
 cleanup() {
+  # The suite seeds encrypted fake-provider credentials under a dedicated
+  # fixed test key. Remove only those fixture accounts so a later real
+  # preconnection gate cannot be contaminated by this test run.
+  if ! (cd apps/api && uv run python scripts/e2e_google_support.py cleanup-accounts); then
+    echo "e2e-resilience: WARNING — synthetic credential cleanup failed" >&2
+  fi
   # Port-based, not PID-based: Journey B intentionally replaces this process
   # mid-suite, so the PID we started is not necessarily the one still
   # running by the time this script exits. `-sTCP:LISTEN` is essential, not

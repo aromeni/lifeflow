@@ -26,6 +26,7 @@ from lifeflow_api.google.oauth import build_authorization_url
 from lifeflow_api.google_scopes import CONNECTOR_SCOPE_STRING
 from lifeflow_api.google_sync import GoogleReadScopeMissingError
 from lifeflow_api.google_wiring import build_google_sync_service
+from lifeflow_api.oauth_initiation import require_google_oauth_initiation
 from lifeflow_api.oauth_state import (
     OAuthStateError,
     begin_oauth_flow,
@@ -84,8 +85,7 @@ def _google_connector_disabled(request: Request) -> bool:
 
 @router.get("/google/connect", dependencies=[RateLimited("oauth_connect_callback")])
 async def connect_google(request: Request, user: CurrentUser) -> RedirectResponse:
-    if _google_connector_disabled(request):
-        raise HTTPException(status_code=404, detail="Not Found")
+    require_google_oauth_initiation(request)
     settings = request.app.state.settings
     state, pkce, _nonce = begin_oauth_flow(
         request, purpose=CONNECTOR_PURPOSE, bind_user_id=str(user.id)
@@ -111,8 +111,7 @@ async def google_connector_callback(
     state: str | None = None,
     error: str | None = None,
 ) -> RedirectResponse:
-    if _google_connector_disabled(request):
-        raise HTTPException(status_code=404, detail="Not Found")
+    require_google_oauth_initiation(request)
     settings = request.app.state.settings
     web_origin = settings.web_origin
     if error is not None:
