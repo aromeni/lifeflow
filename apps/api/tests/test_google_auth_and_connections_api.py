@@ -315,6 +315,34 @@ async def test_connector_connect_requests_exact_four_data_scopes(
     assert params["prompt"][0] == "consent"
 
 
+async def test_connector_connect_redirect_also_carries_pkce(
+    google_client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The connector-consent flow shares `begin_oauth_flow`/
+    `build_authorization_url` with OIDC sign-in and therefore always sends
+    PKCE too — closing a documentation gap (Stage 11A Phase 4B recorded this
+    flow as lacking PKCE, which was never true of the code; corrected during
+    the Phase 4C integrity check)."""
+
+    async def fake_verify(
+        token: str, *, client_id: str, expected_nonce: str | None = None
+    ) -> GoogleIdentity:
+        return GoogleIdentity(subject="sub-pkce", email="pkce@example.com", email_verified=True)
+
+    monkeypatch.setattr(auth_module, "verify_id_token", fake_verify)
+    login = await google_client.get("/auth/google/login", follow_redirects=False)
+    state = _extract_state(login.headers["location"])
+    await google_client.get(
+        "/auth/google/callback", params={"code": "c", "state": state}, follow_redirects=False
+    )
+
+    connect = await google_client.get("/connected-accounts/google/connect", follow_redirects=False)
+    assert connect.status_code == 302
+    params = parse_qs(urlparse(connect.headers["location"]).query)
+    assert params["code_challenge_method"][0] == "S256"
+    assert len(params["code_challenge"][0]) > 0
+
+
 async def test_connector_callback_stores_only_actually_granted_scopes(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

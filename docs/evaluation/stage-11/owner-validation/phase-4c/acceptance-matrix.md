@@ -96,3 +96,22 @@ Status vocabulary follows the [Engineering Acceptance Contract](../../../../../d
 ## Completion boundary
 
 All 84 requirements are verified. The earned PASS permits only consideration of the exact next owner decision; OAuth initiation, connection, provider activity, soak, recruitment, merge, tag, deployment, and Stage 12 remain blocked.
+
+## Phase 4C integrity check and merge (this task)
+
+Built before editing began. This task performs final integrity verification and merge only — it does not redo Phase 4C, create or touch any Google account/project/credential, or initiate OAuth.
+
+| ID | Readiness area | Method |
+|---|---|---|
+| S11A-P4C-085 | PR #15 boundary matches exactly: base `main`, head `stage-11a-phase-4c-google-test-environment`, final head `3de5aabcbf81ba13dfcb62835b58d2d7ff6cc0db`, all four commits present and unrewritten, `main`/`origin/main` at `1451d06f...`, mergeable/CLEAN, all 9 checks green | inspection |
+| S11A-P4C-086 | Stored-credential, identity-binding, OAuth-consent, real-provider-read, and provider-write counts are independently re-derived from the live database/gate and recorded explicitly as 0/0/0/0/0 in the final report | automated (direct query + gate command) |
+| S11A-P4C-087 | Zero committed machine-specific absolute paths (`/Users/`, `/home/`, `Desktop/`, `file://`) exist anywhere in the full PR diff or current tree | automated (grep across diff and tree) |
+| S11A-P4C-088 | Environment state (accounts, project, APIs, OAuth app/audience/test-user, scopes, redirects, client, local secret) reconfirmed from committed evidence and local presence-only checks, without displaying any identifier or secret | inspection + automated (redacted) |
+| S11A-P4C-089 | OAuth initiation and callback block reconfirmed: both routes return 409 with no transport call; negative control still proves detection; production/test-control guards intact | automated |
+| S11A-P4C-090 | Credential/secret boundary reconfirmed: connection gate 0/0/0 `clear_to_connect=true`; preconnection readiness `READY`; Phase 4A key-ring, Phase 4C secret-installation, sentinel, OAuth state/callback, no-live-network, and provider-production-guard tests pass | automated |
+| S11A-P4C-091 | Scope/capability boundary reconfirmed: exactly the four approved scope strings configured; `GmailDraftClient`/`CalendarEventClient` structural absence of send/update/delete; no generic provider executor; Calendar guest notifications off | automated + inspection |
+| S11A-P4C-092 | PKCE finding reconfirmed against LifeFlow's actual code (not merely against Google's docs) — see defect-register.md correction below if the prior claim does not hold | inspection + automated (new regression test) |
+| S11A-P4C-093 | Seven-day Testing-status constraint and the undecided Option A/B soak-period choice remain documented and unresolved; Phase 4C readiness does not imply production readiness | inspection |
+| S11A-P4C-094 | Full verification pyramid re-run on the final boundary: backend + coverage, frontend, three E2E suites, five eval modes, contracts, metrics ×2, Alembic, Ruff, mypy, ESLint/TypeScript/Prettier, production build, pre-commit, detect-secrets, staged + full-history Gitleaks, private-key/absolute-path/credential-sentinel scans, `git diff --check` | automated |
+| S11A-P4C-095 | Any committed problem found (blank/ambiguous count, absolute path, factual documentation error) is corrected via a minimal, clearly-labelled documentation-only commit; the four existing Phase 4C commits are not amended, squashed, or rebased | inspection |
+| S11A-P4C-096 | PR #15 merged via a true two-parent merge commit; post-merge tree is byte-identical to the final PR head; no tag created; OAuth remains disabled after merge | automated + inspection |
