@@ -23,6 +23,12 @@ export GOOGLE_OAUTH_ENABLED=true
 # These journeys seed fake credentials directly and never exercise browser
 # OAuth consent. Keep the independent Phase 4C initiation/callback gate shut.
 export GOOGLE_OAUTH_INITIATION_ENABLED=false
+# These journeys exist specifically to prove real Gmail/Calendar execution
+# behaviour (including an uncertain outcome across an API restart) — Stage
+# 11A Phase 4D's write kill switch defaults false, which would otherwise
+# intercept every write attempt before it reaches the fake Google server
+# and turn the intended "uncertain" outcome into an unconditional "failed".
+export GOOGLE_PROVIDER_WRITES_ENABLED=true
 export GOOGLE_OIDC_CLIENT_ID=resilience-e2e-oidc-id
 export GOOGLE_OIDC_CLIENT_SECRET=resilience-e2e-oidc-secret  # pragma: allowlist secret
 export GOOGLE_OIDC_REDIRECT_URI=http://localhost:8011/auth/google/callback
