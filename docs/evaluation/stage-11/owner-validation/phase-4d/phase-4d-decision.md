@@ -58,10 +58,36 @@ this phase: a targeted `logging.Filter`
 two OAuth callback paths specifically, verified by 9 new tests. This is
 the only defect found across the entire phase.
 
+## Addendum — PR #16 merge-integrity review (2026-08-04, same day)
+
+Before merge, a separate integrity-check task re-verified this phase's
+evidence against Git and CI rather than trusting the reports above, and
+found two further genuine issues — both fixed, neither changing this
+decision:
+
+- **D-4D-01 (strengthened):** the original access-log fix matched by
+  exact, case-sensitive path only; replaced with a closed sensitive-key
+  vocabulary applied to every route's query string, for the reasons in
+  `defect-register.md`. 10 further tests (19 total).
+- **D-4D-02 (new):** PR #16's required "E2E — outage resilience journeys"
+  check failed deterministically (reproduced on a clean rerun) —
+  `scripts/resilience-api-env.sh` never set the new
+  `GOOGLE_PROVIDER_WRITES_ENABLED`, so the write kill switch intercepted
+  the two journeys that specifically need a real write to reach the fake
+  server to prove an uncertain outcome is never retried. Fixed by setting
+  the flag `true` for that dedicated, disposable test API instance only.
+
+Both fixes are additional commits on the same branch (`49e0d42`,
+`463964f`); no existing Phase 4D commit was amended, squashed, or rebased.
+The full backend suite was re-run and now totals **1032 passed** (up from
+1022, reflecting the 10 new logging tests). See the merge-integrity task's
+own final report for the complete re-verification record.
+
 ## Verification pyramid
 
-- Full backend suite: **1022 passed**, 91% coverage (`logging_setup.py`
-  itself at 100%).
+- Full backend suite: **1022 passed** at original evidence time, **1032
+  passed** after the merge-integrity corrections above; 91% coverage
+  (`logging_setup.py` itself at 100%).
 - Ruff format + lint: clean. Mypy: clean.
 - Frontend lint + typecheck: clean (no frontend code changed this phase;
   full E2E/build re-run was not required, matching this phase's own
