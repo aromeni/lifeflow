@@ -1,6 +1,8 @@
 # Stage 11A Phase 5 — Synthetic Dataset Population
 
-**Status:** Approved by the project owner 2026-08-04; population checklist issued, execution (manual, owner-performed) in progress · **Date:** 2026-08-04
+**Status:** Complete — **PASS — DATASET POPULATED, READY FOR OWNER DECISION ON NEXT STEP** · **Date:** 2026-08-04
+
+See [phase-5-decision.md](../evaluation/stage-11/owner-validation/phase-5/phase-5-decision.md) and [population-confirmation.md](../evaluation/stage-11/owner-validation/phase-5/population-confirmation.md) for the full evidence pack.
 
 Governed by [engineering-acceptance-contract.md](engineering-acceptance-contract.md). Follows Phase 4D (`PASS — READY FOR OWNER DECISION ON SYNTHETIC DATASET POPULATION`, merged to `main` at `5266c4dd04c2c67ab416d34bd134c3811f5bd8cb`) and the project owner's authorisation: **AUTHORISE POPULATION OF ACCOUNTS A AND B WITH THE APPROVED SYNTHETIC GMAIL AND CALENDAR DATASET**.
 
@@ -67,8 +69,8 @@ A PASS here does **not** itself authorise Decision 2, reconnecting Account A, re
 - **AUTHORISE DECISION 2 — FIRST REAL PROVIDER-WRITE (GM-18 GMAIL DRAFT, CAL-12 CALENDAR EVENT)**
 - **AUTHORISE RECONNECTION OF ACCOUNT A FOR REAL-INGESTION VALIDATION AGAINST THE POPULATED DATASET**
 
-## Next steps
+## Completion
 
 1. ~~Produce the 28-row population checklist as a companion evidence document.~~ Done — [population-checklist.md](../evaluation/stage-11/owner-validation/phase-5/population-checklist.md).
-2. No branch or code work is needed for this phase — confirmed: it touches nothing in `apps/api` or `apps/web`.
-3. Awaiting the owner's `POPULATION COMPLETE` confirmation (or `POPULATION PARTIAL`/`EMERGENCY STOP`), after which the Phase 5 evidence pack and decision record will be written.
+2. No branch or code work was needed for this phase — confirmed: nothing in `apps/api` or `apps/web` changed.
+3. Owner confirmation received: `POPULATION COMPLETE — 17/17 MESSAGES — 11/11 EVENTS`. See [phase-5-decision.md](../evaluation/stage-11/owner-validation/phase-5/phase-5-decision.md).
