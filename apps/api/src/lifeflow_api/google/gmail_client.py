@@ -1,12 +1,14 @@
 """Narrow Gmail transport client (ADR 0003 D13).
 
-Exactly five methods exist: four reads used by ingestion, and exactly one
-write — `create_draft`, which POSTs to exactly one fixed path. There is no
-generic `request()` method. `gmail.compose` is a broad scope that *permits*
-sending (threat model T22) — this client is the enforcement point that
-never constructs a request to `/messages/send` or `/drafts/send`, checked
-directly by the allow-list assertion below and proven by transport-level
-tests that inspect every HTTP call actually made.
+Exactly seven methods exist: six reads (five used by ingestion/execution
+verification, one — `get_profile_email`, Stage 11A Phase 4D — used only for
+one-time live identity verification) and exactly one write — `create_draft`,
+which POSTs to exactly one fixed path. There is no generic `request()`
+method. `gmail.compose` is a broad scope that *permits* sending (threat
+model T22) — this client is the enforcement point that never constructs a
+request to `/messages/send` or `/drafts/send`, checked directly by the
+allow-list assertion below and proven by transport-level tests that inspect
+every HTTP call actually made.
 """
 
 import base64
@@ -249,6 +251,22 @@ class GmailDraftClient:
             )
             _raise_for_error(response)
         return str(response.json()["historyId"])
+
+    async def get_profile_email(self, *, access_token: str) -> str:
+        """Stage 11A Phase 4D: the same `users.getProfile` endpoint
+        `get_current_history_id` already calls, reading `emailAddress`
+        instead of `historyId` — used only to verify the connected
+        account's identity during the one-time live read-only smoke
+        sequence. Callers must never print or persist the returned value
+        (see `docs/evaluation/stage-11/owner-validation/phase-4d/
+        official-requirements-recheck.md`)."""
+        assert "profile" in _ALLOWED_READ_PATHS  # noqa: S101
+        async with observe_provider_call("gmail", "get_profile_email"):
+            response = await _get(
+                self._http, f"{self._base_url}/profile", headers=_headers(access_token)
+            )
+            _raise_for_error(response)
+        return str(response.json()["emailAddress"])
 
     async def create_draft(
         self,

@@ -1,14 +1,16 @@
 """Narrow Calendar transport client (ADR 0003 D13, D40).
 
-Exactly three methods exist: `list_events` (read, cursor-aware),
-`insert_event` (the one write), and `get_event` (a single-event read used
-only to independently verify what Calendar actually stored after a create —
-the Calendar analogue of Gmail's `get_draft` verification, D17/D40).
-`insert_event` always sends `sendUpdates=none` — hard-coded, not a
-caller-supplied parameter — so no attendee is ever notified and no other
-calendar is modified (threat model T23). There is no
-`update`/`patch`/`delete` method and no generic `request()` passthrough;
-only `events.insert` can ever write.
+Exactly four methods exist: `list_events` (read, cursor-aware),
+`insert_event` (the one write), `get_event` (a single-event read used only
+to independently verify what Calendar actually stored after a create — the
+Calendar analogue of Gmail's `get_draft` verification, D17/D40), and
+`get_primary_calendar_metadata` (Stage 11A Phase 4D — the primary
+calendar's own `calendars.get` resource, not its events; used only for
+one-time live connectivity verification). `insert_event` always sends
+`sendUpdates=none` — hard-coded, not a caller-supplied parameter — so no
+attendee is ever notified and no other calendar is modified (threat model
+T23). There is no `update`/`patch`/`delete` method and no generic
+`request()` passthrough; only `events.insert` can ever write.
 """
 
 from dataclasses import dataclass
@@ -244,6 +246,20 @@ class CalendarEventClient:
             status=body.get("status", "confirmed"),
             organiser_email=organiser.get("email"),
         )
+
+    async def get_primary_calendar_metadata(self, *, access_token: str) -> str:
+        """Stage 11A Phase 4D: `calendars.get` on the primary calendar
+        itself, not its events — proves the connected account's Calendar is
+        reachable during the one-time live read-only smoke sequence. The
+        response's `id` field, for the primary calendar, equals the
+        account's email address; callers must never print or persist the
+        returned value."""
+        assert self._base_url.endswith("/events")  # noqa: S101 -- see the derivation below
+        metadata_url = self._base_url.removesuffix("/events")
+        async with observe_provider_call("calendar", "get_primary_calendar_metadata"):
+            response = await _get(self._http, metadata_url, headers=_headers(access_token))
+            _raise_for_error(response)
+        return str(response.json()["id"])
 
 
 def _event_time(value: dict[str, Any]) -> str:

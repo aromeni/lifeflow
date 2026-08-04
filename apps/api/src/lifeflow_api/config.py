@@ -70,6 +70,16 @@ class Settings(BaseSettings):
     # connected under a later authorisation; it gates initiation/callbacks
     # only.
     google_oauth_initiation_enabled: bool = False
+    # Stage 11A Phase 4D: a third, independent operator decision from the two
+    # above. A deployment may have OAuth initiation enabled and a real
+    # connected account, yet still be forbidden from writing to that
+    # account's Gmail/Calendar — e.g. during read-only provider-connection
+    # validation. This flag must stay false until the project owner
+    # explicitly authorises provider writes. It gates `create_gmail_draft`/
+    # `create_calendar_event` execution only — reads (sync) and disconnect
+    # are unaffected, matching `google_oauth_initiation_enabled`'s own
+    # narrow scope above.
+    google_provider_writes_enabled: bool = False
     # App sign-in (OIDC): openid+email+profile only, never mailbox access.
     # This remains a separate logical configuration from connector consent;
     # Phase 4C maps both logical configurations to one physical web client

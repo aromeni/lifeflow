@@ -458,6 +458,30 @@ class UnavailableGoogleExecutorRegistry:
         raise FinalExecutionError("google_execution_unavailable")
 
 
+class ProviderWritesDisabledExecutorRegistry:
+    """Stage 11A Phase 4D's hard write kill switch. `google_wiring.py`'s
+    `build_google_executor_registry` returns this — instead of a real
+    `GoogleExecutorRegistry` — whenever `Settings.google_provider_writes_enabled`
+    is false, even when a real Google integration is otherwise fully wired
+    and a real account is connected. Distinct from
+    `UnavailableGoogleExecutorRegistry` (a wiring bug) so the two causes are
+    never confused in an error code or audit trail: this one means writes
+    are deliberately, administratively disabled, not that Google isn't
+    configured. Raises before any Gmail/Calendar client method is called —
+    no provider HTTP request is ever attempted."""
+
+    async def execute(
+        self,
+        action_type: ActionType,
+        *,
+        proposal_id: uuid.UUID,
+        payload: TypedActionPayload,
+        approved_authorization: ApprovedExecutionAuthorization | None,
+    ) -> ExecutorOutcome:
+        del action_type, proposal_id, payload, approved_authorization
+        raise FinalExecutionError("provider_writes_disabled")
+
+
 __all__ = [
     "ActionExecutor",
     "ExecutorOutcome",
@@ -466,6 +490,7 @@ __all__ = [
     "GoogleCalendarEventExecutor",
     "GoogleExecutorRegistry",
     "GoogleGmailDraftExecutor",
+    "ProviderWritesDisabledExecutorRegistry",
     "SimulatedCalendarEventExecutor",
     "SimulatedExecutorRegistry",
     "SimulatedGmailDraftExecutor",
