@@ -1,48 +1,60 @@
 # Stage 11A Phase 6 — Real Ingestion, Extraction, and First Provider-Write Validation
 
-**Status:** Approved by the project owner 2026-08-04, subject to five amendments (all incorporated below) · **Date:** 2026-08-04
+**Status:** Approved by the project owner 2026-08-04, amended twice (five initial amendments, then a further amendment replacing the write triggers) — all incorporated below · **Date:** 2026-08-04
 
-Governed by [engineering-acceptance-contract.md](engineering-acceptance-contract.md). Follows Phase 5 (`PASS — DATASET POPULATED, READY FOR OWNER DECISION ON NEXT STEP`) and the project owner's authorisation: **AUTHORISE DECISION 2 — FIRST REAL PROVIDER-WRITE (GM-18 GMAIL DRAFT, CAL-12 CALENDAR EVENT)**.
+Governed by [engineering-acceptance-contract.md](engineering-acceptance-contract.md). Follows Phase 5 (`PASS — DATASET POPULATED, READY FOR OWNER DECISION ON NEXT STEP`) and the project owner's authorisation: **AUTHORISE DECISION 2 — FIRST REAL PROVIDER-WRITE**.
 
 Nothing has been executed yet. No branch has been created, no `.env` flag has been changed, and Account A remains disconnected. Checkpoint 1 (below) is entirely owner-performed and must complete before I do anything else.
 
-## Why this is bundled with real-ingestion validation, not narrowly scoped
+## Supersession note — dedicated write-validation triggers replace GM-18/CAL-12
 
-`provider-write-authorisation-gate.md`'s Decision 2 describes GM-18/CAL-12 as coming from LifeFlow's *real* pipeline (a real email arrives, LifeFlow syncs it, extraction proposes the draft, the owner approves in the UI) — not a synthetic shortcut. Checked directly against the code: `POST /connected-accounts/google/sync` uses a **fixed, non-configurable 14-day-past / 30-day-future window** (`SYNC_WINDOW_PAST_DAYS`/`SYNC_WINDOW_FUTURE_DAYS`, `connected_accounts.py`), not a caller-controlled range. Since Phase 5's population happened well inside that window, any real sync run for this phase will import the *entire* populated dataset, not just GM-18. There is no product-code path to sync "only GM-18" without adding new code for a one-off test, which this plan deliberately avoids.
+The original plan relied on GM-18 (a dataset-plan scenario) to trigger the Gmail draft, and on whichever of GM-01/05/10/17 happened to trigger a Calendar proposal organically — a genuine ambiguity for the Calendar side, and a dependency on GM-12 reaching five days old before the phase could start at all. The owner has now replaced both triggers with two dedicated, purpose-built messages:
 
-**A second, genuine uncertainty, stated honestly rather than assumed away:** `proposal_composition.py` derives `create_calendar_event` proposals from an *email* signal expressing scheduling intent, not directly from calendar content. The dataset plan does not name which specific message is expected to produce the CAL-12-shaped proposal. **This plan does not assume in advance which proposal(s) the real extraction pipeline will generate.** Amendment 3 below (the controlled acceptance envelope) governs which one, if any, may be approved.
+- **P6-GM-TEST-01** — an unambiguous B→A request, worded as a single, explicit, standalone ask (e.g. "could you send over the latest version of the document") with no scheduling language mixed in, so it should produce exactly one clean `create_gmail_draft` candidate and nothing else.
+- **P6-CAL-TEST-01** — an unambiguous B→A scheduling request, worded as a single, explicit meeting/call request with a time reference (e.g. "could we grab a call sometime in the next few days to go over X") and no document-request language mixed in, so it should produce exactly one clean `create_calendar_event` candidate and nothing else.
+
+**GM-18 and CAL-12 (the original Phase 4B dataset-plan scenario IDs) stay permanently uncreated, superseded by these two.** This also decouples the write test from GM-12's five-day timer entirely — **the write test may proceed today.**
+
+## Why this is still bundled with GM-01–17/CAL-01–11 ingestion
+
+`POST /connected-accounts/google/sync` uses a fixed, non-configurable 14-day-past / 30-day-future window (`SYNC_WINDOW_PAST_DAYS`/`SYNC_WINDOW_FUTURE_DAYS`, `connected_accounts.py`) — there is no way to sync only the two P6 trigger messages without adding new code for a one-off test, which this plan avoids. Any real sync still imports the entire previously-populated dataset alongside the two new triggers. The extraction-accuracy comparison against that dataset therefore still happens as part of this phase (see below) — but it is now explicitly a *separate* piece of evidence from the write-trigger validation, per the owner's requirement 3.
 
 ## Objective
 
-1. Once GM-12 is genuinely 5+ days old, refresh the time-relative Calendar fixtures and send GM-18, so both the "stale follow-up" and the "current" scenarios are genuinely fresh at ingestion time.
-2. Reconnect Account A and run exactly one real sync, importing the full previously-populated dataset as real `SourceItem`s.
-3. Let the real extraction/priority pipeline process this real content unmodified, and record how its output compares to Phase 4B's pre-specified expected outcomes for GM-01–17/CAL-01–11 (content-free: category/priority/signal-type match or mismatch only), before approving anything.
-4. Approve and execute **exactly one** `create_gmail_draft` proposal.
-5. Approve and execute a `create_calendar_event` proposal **only if one meets the controlled acceptance envelope** (Amendment 3) — otherwise the Calendar write is not performed this pass.
-6. Manually verify the resulting draft in Gmail (and the event in Calendar, if one was created).
-7. Delete LifeFlow's own imported copies (`SourceItem`s, signals, brief) — but leave the actual messages/events in Account A and Account B untouched, so a later phase can re-sync against the same fictional source dataset without repopulating it.
-8. Revoke and disconnect Account A, and restore every flag to its safe default.
+1. Immediately before reconnecting: refresh the eight time-relative Calendar fixtures (table below, unchanged from the prior amendment) and send both P6-GM-TEST-01 and P6-CAL-TEST-01, for real, between Account A and Account B.
+2. Reconnect Account A and run exactly one real sync, importing the full previously-populated dataset plus the two new trigger messages as real `SourceItem`s.
+3. Before approving anything: record content-free extraction-accuracy evidence for GM-01–17 (excluding GM-12, deferred — see below) and CAL-01–11 against Phase 4B's expected-outcome table. This is a separate evidence set from write-trigger validation and does not include P6-GM-TEST-01/P6-CAL-TEST-01 in its denominator.
+4. Separately, confirm each P6 trigger message produced the intended proposal shape (exactly one `create_gmail_draft` candidate traceable to P6-GM-TEST-01; at most one `create_calendar_event` candidate traceable to P6-CAL-TEST-01).
+5. Approve and execute **at most one** `create_gmail_draft` proposal, and only if it is derived from P6-GM-TEST-01.
+6. Approve and execute **at most one** `create_calendar_event` proposal, and only if it is derived from P6-CAL-TEST-01 *and* meets the controlled acceptance envelope (unchanged from the prior amendment) — otherwise the Calendar write is not performed this pass.
+7. Manually verify the resulting draft in Gmail (and the event in Calendar, if one was created).
+8. Delete LifeFlow's own imported copies (`SourceItem`s, signals, brief) — but leave every message/event in Account A and Account B untouched, including GM-12 and both P6 triggers, so a later phase can re-sync without repopulating.
+9. Revoke and disconnect Account A, and restore every flag to its safe default.
+
+## GM-12's deferred evaluation
+
+GM-12 (the "5+ days old, no reply" stale-follow-up scenario) is real-content-populated already but will not yet be old enough at the time this phase runs. It is **excluded from this phase's extraction-accuracy denominator** rather than evaluated prematurely and marked a false mismatch. Its accuracy check happens as a separate, later, lightweight follow-up (a fresh reconnect+sync once it is genuinely 5+ days old, since this phase deletes LifeFlow's local copies at the end) — it does not gate this phase's PASS/FAIL.
 
 ## Authorised boundary
 
-- Waiting for GM-12 to be objectively 5+ days old before starting anything else in this phase (Amendment 1).
-- Immediately before reconnecting: refreshing CAL-01, CAL-02, CAL-03, CAL-04, CAL-05, CAL-06, CAL-07, and CAL-10 to fresh relative dates (Amendment 2, exact mapping below), and sending the GM-18 email for real, between Account A and Account B, via Gmail's own interface.
+- Immediately before reconnecting: refreshing CAL-01, CAL-02, CAL-03, CAL-04, CAL-05, CAL-06, CAL-07, and CAL-10 to fresh relative dates (table below), and sending P6-GM-TEST-01 and P6-CAL-TEST-01 for real, via Gmail's own interface.
 - Reconnecting Account A via the connector-consent flow (same mechanics as Phase 4D).
 - Temporarily setting `GOOGLE_PROVIDER_WRITES_ENABLED=true` (in addition to the initiation flag), for this window only.
-- One real, on-demand sync (`POST /connected-accounts/google/sync`), accepting that it imports the entire populated dataset as `SourceItem`s.
+- One real, on-demand sync (`POST /connected-accounts/google/sync`), accepting that it imports the entire populated dataset plus both new triggers as `SourceItem`s.
 - Normal, unmodified operation of the extraction pipeline and brief generation against this real content.
-- Reviewing the extraction/evaluation comparison (Objective 3) before touching any approval.
-- Approving **exactly one** `create_gmail_draft` proposal.
-- Approving **at most one** `create_calendar_event` proposal, and only one that satisfies every condition in the controlled acceptance envelope (Amendment 3).
-- Explicitly rejecting or leaving untouched every other proposal the pipeline generates.
-- Exactly one real Gmail draft creation, and (if the envelope is met) exactly one real Calendar event insertion, through the existing, already-tested real executors — no new application code is expected for this phase.
+- Recording extraction-accuracy evidence for GM-01–17 (excluding GM-12) and CAL-01–11 — a dataset-accuracy record, separate from write-trigger validation.
+- Recording, separately, whether each P6 trigger produced its intended proposal shape.
+- Approving **at most one** `create_gmail_draft` proposal, only if traceable to P6-GM-TEST-01.
+- Approving **at most one** `create_calendar_event` proposal, only if traceable to P6-CAL-TEST-01 *and* it satisfies every condition in the controlled acceptance envelope.
+- Explicitly rejecting or leaving untouched every other proposal the pipeline generates, including any candidate derived from GM-01–17 rather than the P6 triggers.
+- At most one real Gmail draft creation, and (only if both the trigger-linkage and envelope conditions hold) at most one real Calendar event insertion, through the existing, already-tested real executors — no new application code is expected for this phase.
 - Owner verification of both results directly in Gmail/Calendar (not merely LifeFlow's own confirmation).
 - Manual deletion of the draft (Gmail) and, if created, the event (Calendar or the approved cleanup procedure).
-- Preserving content-free extraction-accuracy evidence, then running the existing imported-data and inferred-preference deletion operations against everything this sync created.
+- Preserving content-free extraction-accuracy and trigger-validation evidence, then running the existing imported-data and inferred-preference deletion operations against everything this sync created.
 - Revoking access and disconnecting Account A afterward; restoring `GOOGLE_OAUTH_INITIATION_ENABLED=false` and `GOOGLE_PROVIDER_WRITES_ENABLED=false`.
-- Leaving the fictional source content in Account A/Account B itself untouched (Amendment 5) — this phase deletes only LifeFlow's own local copies.
+- Leaving every message/event in Account A/Account B untouched, including GM-12 and both P6 triggers.
 
-## Amendment 2 — exact Calendar fixture refresh (performed immediately before reconnecting)
+## Calendar fixture refresh (unchanged, performed immediately before reconnecting)
 
 | Scenario | New timing, relative to the day of reconnection |
 |---|---|
@@ -55,26 +67,27 @@ Nothing has been executed yet. No branch has been created, no `.env` flag has be
 | CAL-05 | 4 days ahead |
 | CAL-07 | 5 days ahead |
 
-CAL-08 (overlapping same-day pair), CAL-09 (cancelled), and CAL-11 (recurring) are not date-sensitive in the same way and are not refreshed.
+CAL-08 (overlapping same-day pair), CAL-09 (cancelled), and CAL-11 (recurring) are not refreshed.
 
-## Amendment 3 — controlled Calendar-proposal acceptance envelope
+## Controlled Calendar-proposal acceptance envelope (unchanged, now also gated on trigger linkage)
 
-A `create_calendar_event` proposal may be approved **only if it is**:
+A `create_calendar_event` proposal may be approved **only if it is derived from P6-CAL-TEST-01 and**:
 
 - a new-event insertion (never anything resembling an update to an existing event);
 - entirely fictional content;
 - future-dated;
-- exact-payload and exact-account bound (the existing approval-binding behaviour, reconfirmed for this specific approval);
+- exact-payload and exact-account bound;
 - explicit about timezone and attendees (nothing silently inferred);
 - limited to Account B as its only possible external attendee;
 - notification-disabled (`sendUpdates=none`);
-- structurally incapable of modifying or deleting CAL-01 through CAL-11 (already guaranteed — no update/delete action type exists — reconfirmed as an explicit gate here too).
+- structurally incapable of modifying or deleting CAL-01 through CAL-11.
 
-**If no proposal in the Approvals inbox meets every condition, the Calendar write is not performed.** This is recorded as "Calendar write not validated this pass," not as a phase failure, and requires a separately authorised trigger correction (e.g. a more explicit future scheduling request) before it is attempted again. No proposal is ever approved merely to complete the phase.
+**If no proposal traceable to P6-CAL-TEST-01 meets every condition, the Calendar write is not performed.** Recorded as "Calendar write not validated this pass," not a phase failure, requiring a separately authorised trigger correction (e.g. a reworded P6-CAL-TEST-01 in a future attempt) before it is attempted again. No proposal is ever approved merely to complete the phase.
 
 ## Prohibited boundary
 
-- More than one Gmail draft, or any Calendar event that doesn't meet the Amendment 3 envelope, regardless of how many proposals the pipeline generates.
+- More than one Gmail draft, or any Gmail draft not traceable to P6-GM-TEST-01.
+- Any Calendar event that doesn't meet the acceptance envelope, or isn't traceable to P6-CAL-TEST-01.
 - Gmail send, Calendar update, or Calendar delete through LifeFlow (structurally impossible, per the existing proofs — restated as a policy boundary too).
 - Connecting Account B to LifeFlow — Account B remains disconnected throughout.
 - Any personal/business account.
@@ -83,52 +96,55 @@ A `create_calendar_event` proposal may be approved **only if it is**:
 - Participant recruitment activity.
 - Stage 12 work.
 - Creating a Stage 11/11A tag.
-- Any new application code beyond what Phase 4D already built and tested — if a real gap is found during this phase, it will be fixed and reported, not silently worked around.
-- Deleting the fictional source messages/events from Account A or Account B themselves.
+- Any new application code beyond what Phase 4D already built and tested.
+- Deleting any message or event from Account A or Account B themselves.
 
-## Owner-operated checkpoints (Amendment 4 — exact set of eight)
+## Owner-operated checkpoints (eight, updated)
 
-1. **Dataset freshness and GM-18 creation** — confirm GM-12 is 5+ days old, refresh the eight Calendar fixtures per the Amendment 2 table, send GM-18. Confirmation: `DATASET FRESH — GM-18 SENT`.
+1. **Trigger creation and dataset freshness** — refresh the eight Calendar fixtures per the table above, send P6-GM-TEST-01, send P6-CAL-TEST-01. Confirmation: `TRIGGERS SENT — DATASET FRESH`.
 2. **Account A reconnection** — same consent-screen review as Phase 4D: `CONSENT SCREEN VERIFIED — ACCOUNT A — APPROVED FOUR-SCOPE SET`, then `OAUTH CALLBACK COMPLETED — RETURNED TO LIFEFLOW`.
 3. **One manual sync** — owner triggers the sync from the Connections screen; confirmation: `SYNC COMPLETE`.
-4. **Extraction/evaluation review** — owner (and I) review the real extraction results against Phase 4B's expected-outcome table before any approval; confirmation: `EVALUATION REVIEWED — READY FOR APPROVALS`.
-5. **Gmail draft: approval, execution, verification, deletion** — approve exactly one `create_gmail_draft` proposal, confirm execution, verify the exact draft in Gmail, delete it: `GMAIL DRAFT VERIFIED AND DELETED`.
-6. **Calendar event: approval, execution, verification, deletion** — only if a proposal meets the Amendment 3 envelope: approve it, confirm execution, verify the exact event in Calendar, delete it: `CALENDAR EVENT VERIFIED AND DELETED`, or, if nothing qualified: `CALENDAR WRITE NOT VALIDATED — NO QUALIFYING PROPOSAL`.
-7. **Imported-data and inferred-data deletion** — after extraction-accuracy evidence is recorded, run both deletion operations: `IMPORTED AND INFERRED DATA DELETED`.
+4. **Extraction/evaluation review** — owner (and I) review the dataset-accuracy comparison (GM-01–17 excl. GM-12, CAL-01–11) and, separately, whether each P6 trigger produced its intended proposal shape, before any approval; confirmation: `EVALUATION REVIEWED — READY FOR APPROVALS`.
+5. **Gmail draft: approval, execution, verification, deletion** — approve at most one `create_gmail_draft` proposal traceable to P6-GM-TEST-01, confirm execution, verify the exact draft in Gmail, delete it: `GMAIL DRAFT VERIFIED AND DELETED`, or `GMAIL DRAFT NOT VALIDATED — NO QUALIFYING PROPOSAL` if P6-GM-TEST-01 didn't produce one.
+6. **Calendar event: approval, execution, verification, deletion** — only if a proposal traceable to P6-CAL-TEST-01 meets the envelope: approve it, confirm execution, verify the exact event in Calendar, delete it: `CALENDAR EVENT VERIFIED AND DELETED`, or `CALENDAR WRITE NOT VALIDATED — NO QUALIFYING PROPOSAL`.
+7. **Imported-data and inferred-data deletion** — after all evidence is recorded, run both deletion operations: `IMPORTED AND INFERRED DATA DELETED`.
 8. **Revocation, disconnection, flag restoration, zero-residue verification** — as in Phase 4D: `DISCONNECTED — ACCOUNT A — GOOGLE ACCESS REVOKED CONFIRMED`.
 
 `EMERGENCY STOP — <reason>` is always available in place of any of the above.
 
-## Extraction-accuracy evidence (new to this phase, preserved before deletion — Amendment 5)
+## Two separate evidence records (per the owner's requirement 3)
 
-For each of GM-01–17 and CAL-01–11, record — content-free — whether the real pipeline's detected signal type, Today category, and priority band matched Phase 4B's expected-outcome table, **before** running the deletion in checkpoint 7. This is the project's first real-world (not demo-fixture) measurement of extraction accuracy, and is recorded honestly even where it doesn't match expectations — a mismatch here is a finding, not a phase failure, unless it reveals a genuine defect.
+1. **Dataset extraction-accuracy evidence** — GM-01–17 (excluding GM-12, deferred) and CAL-01–11 against Phase 4B's expected-outcome table. First real-world measurement of extraction accuracy; a mismatch is a finding, not a phase failure, unless it reveals a genuine defect.
+2. **Trigger-validation evidence** — for each of P6-GM-TEST-01 and P6-CAL-TEST-01: did it produce exactly one candidate proposal of the intended type, cleanly traceable to that specific trigger message (checked directly against the proposal's evidence/source reference in the Approvals UI, not assumed from category alone)? This record is kept separate from record 1 and is not counted into the GM-01–17/CAL-01–11 denominator.
+
+Both are preserved before checkpoint 7's deletion runs.
 
 ## Safeguards
 
 - Reuse Phase 4D's credential-storage and connection-gate checks unchanged.
 - Before any approval, independently confirm from Audit History / provider-call metrics that zero writes have occurred yet.
-- After execution, independently confirm exactly one `lifeflow_provider_requests_total{provider="gmail",operation="create_draft"}` increment, and (only if a Calendar write happened) exactly one `{provider="calendar",operation="insert_event"}` increment — not merely trusting the UI's own success message.
+- Before approving either proposal, independently verify its evidence/source reference in the Approvals UI actually points to the correct P6 trigger message — not merely that a proposal of the right *type* exists.
+- After execution, independently confirm exactly one `lifeflow_provider_requests_total{provider="gmail",operation="create_draft"}` increment, and (only if a Calendar write happened) exactly one `{provider="calendar",operation="insert_event"}` increment.
 - Re-run the existing write-block and idempotency regression tests fresh, as in the Phase 4D merge-integrity review.
-- Independently verify the Amendment 3 envelope against the actual proposal payload shown in the Approvals UI before approval — not merely trust that it looks reasonable.
 
 ## Evidence rules
 
-Content-free throughout, as in every prior phase: scenario IDs, match/mismatch verdicts, and counts — never message bodies, event details, or account identifiers.
+Content-free throughout: scenario IDs, match/mismatch verdicts, and counts — never message bodies, event details, or account identifiers.
 
 ## Emergency stops
 
-Reuses [real-provider-data-boundary.md](../evaluation/stage-11/owner-validation/phase-4b/real-provider-data-boundary.md)'s incident procedure for any real/personal content, and Phase 4D's emergency-stop table for connection-related failures, extended with: a second draft appearing unexpectedly; a Calendar proposal being approved despite failing the envelope; the approved payload not matching what's shown before approval; an uncertain write being retried; cleanup failing to remove the draft/event.
+Reuses [real-provider-data-boundary.md](../evaluation/stage-11/owner-validation/phase-4b/real-provider-data-boundary.md)'s incident procedure for any real/personal content, and Phase 4D's emergency-stop table for connection-related failures, extended with: a second draft appearing unexpectedly; a proposal being approved despite failing trigger-linkage or the envelope; the approved payload not matching what's shown before approval; an uncertain write being retried; cleanup failing to remove the draft/event.
 
 ## Exit decision
 
 Exactly one of:
 
-- **PASS — FIRST PROVIDER WRITE AND REAL-INGESTION VALIDATION COMPLETE** (Gmail draft validated; Calendar event either validated or honestly recorded as not-validated-this-pass with no envelope-qualifying proposal).
-- **CONDITIONAL PASS** (a non-safety gap recorded, e.g. an extraction-accuracy mismatch that isn't a defect).
+- **PASS — FIRST PROVIDER WRITE AND REAL-INGESTION VALIDATION COMPLETE** (Gmail draft validated against P6-GM-TEST-01; Calendar event either validated against P6-CAL-TEST-01 or honestly recorded as not-validated-this-pass).
+- **CONDITIONAL PASS** (a non-safety gap recorded, e.g. a dataset extraction-accuracy mismatch that isn't a defect).
 - **FAIL — REAL PROVIDER WRITE REMAINS UNVALIDATED** (the Gmail draft itself could not be validated, or any emergency stop fired).
 
-A PASS does not authorise the soak period or recruitment — those remain separately gated.
+A PASS does not authorise the soak period or recruitment, and does not itself close out GM-12's deferred evaluation.
 
 ## Immediate next step
 
-Checkpoint 1 is entirely yours to perform, at your own pace: wait until GM-12 is 5+ days old, then immediately before you're ready to reconnect, refresh the eight Calendar fixtures per the table above and send GM-18. Reply `DATASET FRESH — GM-18 SENT` when that's done, and I'll walk you through checkpoint 2 (reconnection).
+Checkpoint 1 is entirely yours, and can happen today: refresh the eight Calendar fixtures per the table above, then send P6-GM-TEST-01 and P6-CAL-TEST-01. Reply `TRIGGERS SENT — DATASET FRESH` when done, and I'll walk you through checkpoint 2 (reconnection).
