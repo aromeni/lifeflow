@@ -23,6 +23,36 @@ def redact(message: str) -> str:
     return _SENSITIVE_PATTERN.sub(r"\1=[REDACTED]", message)
 
 
+_OAUTH_CALLBACK_PATHS = ("/auth/google/callback", "/connected-accounts/google/callback")
+
+
+class UvicornAccessQueryStringRedactor(logging.Filter):
+    """`uvicorn.access` writes straight to its own handler (uvicorn's
+    default `LOGGING_CONFIG` sets `propagate=False` on it), so it never
+    reaches `JsonFormatter`/`redact()` above — a real gap found during
+    Stage 11A Phase 4D's live-connection leakage inspection: the OAuth
+    callback's single-use `code` and `state` query parameters were
+    reaching the terminal in plaintext via uvicorn's default access log.
+
+    `record.args` for this logger is the fixed 5-tuple `(client_addr,
+    method, full_path, http_version, status_code)`
+    (`uvicorn.logging.AccessFormatter.formatMessage`); only `full_path`'s
+    query string is redacted, and only for the two OAuth callback paths —
+    every other route's access log line is left untouched.
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if isinstance(record.args, tuple) and len(record.args) == 5:
+            full_path = record.args[2]
+            if isinstance(full_path, str) and "?" in full_path:
+                path, _, _query = full_path.partition("?")
+                if path in _OAUTH_CALLBACK_PATHS:
+                    args = list(record.args)
+                    args[2] = f"{path}?[REDACTED]"
+                    record.args = tuple(args)
+        return True
+
+
 class JsonFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         payload = {
@@ -44,3 +74,7 @@ def configure_logging(level: str) -> None:
     root = logging.getLogger()
     root.handlers = [handler]
     root.setLevel(level.upper())
+    # uvicorn.access has propagate=False in uvicorn's own default logging
+    # config, so it never reaches the root handler above — it needs its
+    # own, separately-attached filter.
+    logging.getLogger("uvicorn.access").addFilter(UvicornAccessQueryStringRedactor())
