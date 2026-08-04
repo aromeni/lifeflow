@@ -78,6 +78,94 @@ async def test_storing_again_updates_rather_than_duplicates(
     assert count == 1
 
 
+class _FakeOAuthClient:
+    def __init__(self, *, revoke_result: bool) -> None:
+        self._revoke_result = revoke_result
+        self.revoke_calls = 0
+
+    async def revoke_token(self, *, token: str) -> bool:
+        self.revoke_calls += 1
+        return self._revoke_result
+
+
+async def test_disconnect_records_true_revocation_confirmation_truthfully(
+    session: AsyncSession, service: ConnectedAccountService
+) -> None:
+    await _store(service)
+    fake_client = _FakeOAuthClient(revoke_result=True)
+    assert await service.disconnect("google", oauth_client=fake_client) is True  # type: ignore[arg-type]
+    assert fake_client.revoke_calls == 1
+
+    row = (
+        (
+            await session.execute(
+                text(
+                    "SELECT safe_metadata_json FROM audit_events "
+                    "WHERE event_type = 'account.disconnected'"
+                )
+            )
+        )
+        .mappings()
+        .one()
+    )
+    assert row["safe_metadata_json"]["revocation_confirmed"] is True
+
+
+async def test_disconnect_records_false_revocation_confirmation_truthfully(
+    session: AsyncSession, service: ConnectedAccountService
+) -> None:
+    await _store(service)
+    fake_client = _FakeOAuthClient(revoke_result=False)
+    assert await service.disconnect("google", oauth_client=fake_client) is True  # type: ignore[arg-type]
+
+    row = (
+        (
+            await session.execute(
+                text(
+                    "SELECT safe_metadata_json FROM audit_events "
+                    "WHERE event_type = 'account.disconnected'"
+                )
+            )
+        )
+        .mappings()
+        .one()
+    )
+    assert row["safe_metadata_json"]["revocation_confirmed"] is False
+
+
+async def test_disconnect_records_none_when_no_refresh_token_existed(
+    session: AsyncSession, service: ConnectedAccountService
+) -> None:
+    """No refresh token to revoke — the question does not apply and must
+    not be fabricated as `False` (which would read as "Google rejected
+    it") or `True` (which would read as a confirmation that never
+    happened)."""
+    await service.store_tokens(
+        provider="google",
+        access_token=ACCESS_TOKEN,
+        refresh_token=None,
+        granted_scopes=["gmail.readonly"],
+        expires_at=datetime.now(UTC) + timedelta(hours=1),
+    )
+    fake_client = _FakeOAuthClient(revoke_result=True)
+    assert await service.disconnect("google", oauth_client=fake_client) is True  # type: ignore[arg-type]
+    assert fake_client.revoke_calls == 0
+
+    row = (
+        (
+            await session.execute(
+                text(
+                    "SELECT safe_metadata_json FROM audit_events "
+                    "WHERE event_type = 'account.disconnected'"
+                )
+            )
+        )
+        .mappings()
+        .one()
+    )
+    assert row["safe_metadata_json"]["revocation_confirmed"] is None
+
+
 async def test_disconnect_drops_tokens_and_audits(
     session: AsyncSession, service: ConnectedAccountService
 ) -> None:

@@ -22,6 +22,7 @@ import httpx
 import pytest
 from asgi_lifespan import LifespanManager
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from tests.conftest import CSRF_HEADERS, TEST_DB_URL, _test_settings
 from tests.helpers import TIMEZONE, demo_source_items, scheduling_email_source
@@ -31,13 +32,19 @@ from lifeflow_api.google.calendar_client import CalendarEventClient
 from lifeflow_api.google.gmail_client import GmailDraftClient
 from lifeflow_api.google.oauth import GoogleOAuthClient
 from lifeflow_api.main import create_app
-from lifeflow_api.models import AccountStatus, ConnectedAccount, User
+from lifeflow_api.models import AccountStatus, ConnectedAccount, SourceItem, User
 
 pytestmark = pytest.mark.integration
 
 GOOGLE_SETTINGS_OVERRIDES = {
     "google_oauth_enabled": True,
     "google_oauth_initiation_enabled": True,
+    # This module's whole purpose is proving real Google execution actually
+    # happens through the running app, so its baseline enables the Stage
+    # 11A Phase 4D write kill switch too; the two tests that specifically
+    # prove the kill switch's default-off behaviour override it back to
+    # `False` explicitly via `_app_client(..., overrides=...)`.
+    "google_provider_writes_enabled": True,
     "google_oidc_client_id": "oidc-id",
     "google_oidc_client_secret": "oidc-secret",
     "google_oidc_redirect_uri": "http://localhost:8010/auth/google/callback",
@@ -54,11 +61,15 @@ FULL_CONNECTOR_SCOPE = (
 )
 
 
-async def _app_client(mock_transport: httpx.MockTransport) -> AsyncIterator[AsyncClient]:
+async def _app_client(
+    mock_transport: httpx.MockTransport, *, overrides: dict | None = None
+) -> AsyncIterator[AsyncClient]:
     """The exact `create_app()` composition, with only the Google clients'
     transport swapped for a mock — nothing about the route/service/wiring
     layer is bypassed."""
-    settings = _test_settings("development").model_copy(update=GOOGLE_SETTINGS_OVERRIDES)
+    settings = _test_settings("development").model_copy(
+        update=overrides or GOOGLE_SETTINGS_OVERRIDES
+    )
     app = create_app(settings)
     mock_http = httpx.AsyncClient(transport=mock_transport)
     app.state.google_oauth_client = GoogleOAuthClient(mock_http)
@@ -591,6 +602,138 @@ async def test_real_calendar_execution_calls_exactly_events_insert_with_send_upd
     assert len(insert_calls) == 1
     assert insert_calls[0].url.params["sendUpdates"] == "none"
     assert insert_calls[0].method == "POST"
+
+
+async def test_gmail_write_blocked_when_provider_writes_disabled() -> None:
+    """Stage 11A Phase 4D hard write kill switch: with a real, correctly-
+    scoped Google account connected but `google_provider_writes_enabled`
+    left at its default `false`, executing a `create_gmail_draft` proposal
+    fails with `provider_writes_disabled` and the mock transport receives
+    zero Gmail requests beyond the OAuth token exchange itself — the block
+    runs before `GmailDraftClient.create_draft` is ever reachable."""
+    calls: list[httpx.Request] = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/token":
+            return _token_response(FULL_CONNECTOR_SCOPE)
+        calls.append(request)
+        raise AssertionError(f"unexpected request: {request.url.path} (writes must be blocked)")
+
+    email = f"gmail-write-blocked-{uuid.uuid4()}@example.com"
+    await _seed_google_sourced_proposals(email, granted_scopes=[])
+    writes_disabled = {**GOOGLE_SETTINGS_OVERRIDES, "google_provider_writes_enabled": False}
+    async for client in _app_client(httpx.MockTransport(handle), overrides=writes_disabled):
+        await _dev_login(client, email)
+        await _connect_google(client, _token_response(FULL_CONNECTOR_SCOPE).json())
+
+        proposals = await client.get("/action-proposals")
+        draft = next(
+            p for p in proposals.json()["proposals"] if p["action_type"] == "create_gmail_draft"
+        )
+        assert draft["execution_mode"] == "real"
+
+        await client.post(
+            f"/action-proposals/{draft['id']}/approve",
+            json={
+                "expected_version": draft["version"],
+                "action_type": "create_gmail_draft",
+                "displayed_payload_hash": draft["payload_hash"],
+                "displayed_execution_context_hash": draft["execution_context_hash"],
+            },
+            headers=CSRF_HEADERS,
+        )
+        execute = await client.post(
+            f"/action-proposals/{draft['id']}/execute", headers=CSRF_HEADERS
+        )
+        assert execute.status_code == 200
+        execution = execute.json()["execution"]
+        assert execution["effective_status"] == "failed"
+        assert execution["error_code"] == "provider_writes_disabled"
+        break
+
+    assert calls == []
+
+
+async def test_calendar_write_blocked_when_provider_writes_disabled() -> None:
+    """Same kill switch, Calendar side: zero `events.insert` calls, failure
+    is `provider_writes_disabled`, not a policy denial or a simulated
+    success — the write is refused before any Calendar HTTP request."""
+    calls: list[httpx.Request] = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/token":
+            return _token_response(FULL_CONNECTOR_SCOPE)
+        calls.append(request)
+        raise AssertionError(f"unexpected request: {request.method} {request.url.path}")
+
+    email = f"cal-write-blocked-{uuid.uuid4()}@example.com"
+    await _seed_google_sourced_proposals(email, granted_scopes=[])
+    writes_disabled = {**GOOGLE_SETTINGS_OVERRIDES, "google_provider_writes_enabled": False}
+    async for client in _app_client(httpx.MockTransport(handle), overrides=writes_disabled):
+        await _dev_login(client, email)
+        await _connect_google(client, _token_response(FULL_CONNECTOR_SCOPE).json())
+
+        proposals = await client.get("/action-proposals")
+        event = next(
+            p for p in proposals.json()["proposals"] if p["action_type"] == "create_calendar_event"
+        )
+        assert event["execution_mode"] == "real"
+
+        await client.post(
+            f"/action-proposals/{event['id']}/approve",
+            json={
+                "expected_version": event["version"],
+                "action_type": "create_calendar_event",
+                "displayed_payload_hash": event["payload_hash"],
+                "displayed_execution_context_hash": event["execution_context_hash"],
+            },
+            headers=CSRF_HEADERS,
+        )
+        execute = await client.post(
+            f"/action-proposals/{event['id']}/execute", headers=CSRF_HEADERS
+        )
+        assert execute.status_code == 200
+        execution = execute.json()["execution"]
+        assert execution["effective_status"] == "failed"
+        assert execution["error_code"] == "provider_writes_disabled"
+        break
+
+    assert calls == []
+
+
+async def test_connecting_google_never_triggers_automatic_import() -> None:
+    """Stage 11A Phase 4D §6: the connector-consent callback stores tokens
+    and redirects — it must never itself start a mailbox/Calendar import,
+    enqueue a sync, or create a `SourceItem`. Sync in this application is
+    exclusively a separate, explicit `POST /connected-accounts/google/sync`
+    call the frontend only ever makes on a button click (`apps/web/src/app/
+    connections/page.tsx`'s `syncGoogle`), never automatically on connect or
+    on page load."""
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/token":
+            return _token_response(FULL_CONNECTOR_SCOPE)
+        raise AssertionError(
+            f"unexpected request: {request.url.path} (connecting must not read anything)"
+        )
+
+    email = f"no-auto-import-{uuid.uuid4()}@example.com"
+    async for client in _app_client(httpx.MockTransport(handle)):
+        await _dev_login(client, email)
+        await _connect_google(client, _token_response(FULL_CONNECTOR_SCOPE).json())
+        break
+
+    engine = create_async_engine(TEST_DB_URL)
+    try:
+        maker = async_sessionmaker(engine, expire_on_commit=False)
+        async with maker() as session:
+            user = (await session.execute(select(User).where(User.email == email))).scalar_one()
+            source_item_count = await session.scalar(
+                select(func.count()).select_from(SourceItem).where(SourceItem.user_id == user.id)
+            )
+    finally:
+        await engine.dispose()
+    assert source_item_count == 0
 
 
 async def test_simulation_path_reports_simulation_and_never_calls_google() -> None:

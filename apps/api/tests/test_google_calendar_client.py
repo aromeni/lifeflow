@@ -23,7 +23,12 @@ def test_client_exposes_no_update_patch_or_delete_method() -> None:
     """Structural proof, not just behavioural: the capability to modify or
     delete an existing event does not exist in this class at all."""
     public_methods = {name for name in dir(CalendarEventClient) if not name.startswith("_")}
-    assert public_methods == {"list_events", "insert_event", "get_event"}
+    assert public_methods == {
+        "list_events",
+        "insert_event",
+        "get_event",
+        "get_primary_calendar_metadata",
+    }
 
 
 async def test_insert_event_always_sends_send_updates_none() -> None:
@@ -172,3 +177,18 @@ async def test_list_events_sync_token_expiry_is_a_distinct_outcome_not_unknown_e
         {"provider": "calendar", "operation": "list_events", "outcome": "sync_token_expired"},
     )
     assert after == before + 1
+
+
+async def test_get_primary_calendar_metadata_reads_the_calendar_resource_not_events() -> None:
+    """Stage 11A Phase 4D: `calendars.get` on the primary calendar itself —
+    a different endpoint from every other method in this client, which all
+    operate on the `/events` sub-resource."""
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        assert request.method == "GET"
+        assert request.url.path == "/calendar/v3/calendars/primary"
+        return httpx.Response(200, json={"id": "owner@example.com", "summary": "Owner"})
+
+    client = _client(httpx.MockTransport(handle))
+    calendar_id = await client.get_primary_calendar_metadata(access_token="token")
+    assert calendar_id == "owner@example.com"

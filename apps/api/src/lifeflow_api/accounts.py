@@ -156,12 +156,20 @@ class ConnectedAccountService:
     ) -> bool:
         """Mark the account disconnected and drop stored tokens. Best-effort
         revokes the token with Google first — a failure to reach Google must
-        never block the user's local disconnect (D20)."""
+        never block the user's local disconnect (D20). Whether Google
+        objectively confirmed revocation (`True`/`False`) or the question
+        did not apply (`None` — no refresh token existed, or no
+        `oauth_client` was supplied) is recorded truthfully in this event's
+        audit metadata (Stage 11A Phase 4D: the caller needs this to decide
+        between reporting `GOOGLE_ACCESS_REVOCATION=CONFIRMED` and asking
+        the owner to check manually) — never fabricated as confirmed when
+        it was merely attempted."""
         account = await self._accounts.get_by_provider(provider)
         if account is None:
             return False
+        revocation_confirmed: bool | None = None
         if oauth_client is not None and account.encrypted_refresh_token is not None:
-            await oauth_client.revoke_token(
+            revocation_confirmed = await oauth_client.revoke_token(
                 token=_decrypt_field(
                     self._cipher, account, REFRESH_TOKEN_FIELD, account.encrypted_refresh_token
                 )
@@ -179,7 +187,7 @@ class ConnectedAccountService:
             event_type="account.disconnected",
             entity_type="connected_account",
             entity_id=str(account.id),
-            metadata={"provider": provider},
+            metadata={"provider": provider, "revocation_confirmed": revocation_confirmed},
         )
         await self._session.flush()
         return True

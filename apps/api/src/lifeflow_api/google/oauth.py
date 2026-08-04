@@ -210,13 +210,19 @@ class GoogleOAuthClient:
                 f"({type(exc).__name__})."
             ) from exc
 
-    async def revoke_token(self, *, token: str) -> None:
+    async def revoke_token(self, *, token: str) -> bool:
         """Best-effort: local disconnect must never be blocked by Google
-        being unreachable (D20)."""
+        being unreachable (D20). Returns whether Google objectively
+        confirmed revocation (HTTP 200, per Google's own documented
+        contract) — `False` covers both an explicit non-200 response and a
+        network failure; either way the local disconnect proceeds
+        regardless (Stage 11A Phase 4D: existing callers that ignore the
+        return value are unaffected, this is purely additive)."""
         try:
-            await self._http.post(REVOKE_ENDPOINT, data={"token": token})
+            response = await self._http.post(REVOKE_ENDPOINT, data={"token": token})
         except httpx.HTTPError:
-            pass
+            return False
+        return response.status_code == 200
 
 
 def _error_code(response: httpx.Response) -> str | None:

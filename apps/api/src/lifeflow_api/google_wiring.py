@@ -23,6 +23,7 @@ from lifeflow_api.action_executors import (
     GoogleCalendarEventExecutor,
     GoogleExecutorRegistry,
     GoogleGmailDraftExecutor,
+    ProviderWritesDisabledExecutorRegistry,
 )
 from lifeflow_api.google.oauth import GoogleOAuthClient
 from lifeflow_api.google_sync import GoogleSyncService
@@ -65,6 +66,16 @@ def build_google_executor_registry(
     to simulating silently."""
     if not google_integration_ready(request):
         return None
+    settings = request.app.state.settings
+    if not settings.google_provider_writes_enabled:
+        # Stage 11A Phase 4D hard write kill switch: a real Google
+        # integration and a real connected account may both exist (exactly
+        # the read-only-validation state this phase creates), but no write
+        # executor is ever wired while this flag is false — the block runs
+        # before any Gmail/Calendar client method is reachable, not as a
+        # policy check that could be bypassed by an already-approved
+        # proposal or a replayed request.
+        return ProviderWritesDisabledExecutorRegistry()
     tokens = build_google_token_service(request, session, user_id)
     state = request.app.state
     return GoogleExecutorRegistry(
