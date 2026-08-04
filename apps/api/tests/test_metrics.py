@@ -254,8 +254,10 @@ _CLOSED_OPERATIONS = {
     "get_message",
     "list_history",
     "get_current_history_id",
+    "get_profile_email",
     "insert_event",
     "get_event",
+    "get_primary_calendar_metadata",
     "list_events",
     "refresh_access_token",
 }

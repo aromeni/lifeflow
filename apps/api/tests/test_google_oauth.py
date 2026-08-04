@@ -251,7 +251,27 @@ async def test_revoke_is_best_effort_and_never_raises() -> None:
         raise httpx.ConnectError("network down", request=request)
 
     client = GoogleOAuthClient(_mock_client(httpx.MockTransport(handle)))
-    await client.revoke_token(token="whatever")  # must not raise
+    confirmed = await client.revoke_token(token="whatever")  # must not raise
+    assert confirmed is False
+
+
+async def test_revoke_reports_true_only_on_an_objective_200() -> None:
+    """Stage 11A Phase 4D: the caller needs to know whether Google actually
+    confirmed revocation, to decide between recording
+    `GOOGLE_ACCESS_REVOCATION=CONFIRMED` and asking the owner to check
+    manually."""
+
+    def ok(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={})
+
+    client = GoogleOAuthClient(_mock_client(httpx.MockTransport(ok)))
+    assert await client.revoke_token(token="whatever") is True
+
+    def rejected(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(400, json={"error": "invalid_token"})
+
+    client = GoogleOAuthClient(_mock_client(httpx.MockTransport(rejected)))
+    assert await client.revoke_token(token="whatever") is False
 
 
 async def test_verify_id_token_rejects_unverified_email() -> None:

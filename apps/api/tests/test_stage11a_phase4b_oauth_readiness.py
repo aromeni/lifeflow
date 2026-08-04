@@ -121,6 +121,39 @@ async def test_replaying_a_consumed_signin_callback_is_rejected(
         assert "invalid_state" in second.headers["location"]
 
 
+async def test_replaying_a_consumed_connector_callback_is_rejected() -> None:
+    """Stage 11A Phase 4D §21: "callback replay" is a named emergency-stop
+    trigger for the connector-consent flow specifically — the sign-in
+    equivalent above proves the shared `consume_oauth_flow` mechanism, but
+    the connector flow (the one this phase actually uses) had no direct
+    end-to-end proof of its own."""
+    async for gclient in _google_client(_token_handler()):
+        login = await gclient.post(
+            "/auth/dev-login",
+            json={"email": "connector-replay@example.com", "display_name": "R"},
+            headers=CSRF_HEADERS,
+        )
+        assert login.status_code == 200
+
+        connect = await gclient.get("/connected-accounts/google/connect", follow_redirects=False)
+        state = _extract_state(connect.headers["location"])
+
+        first = await gclient.get(
+            "/connected-accounts/google/callback",
+            params={"code": "connector-code", "state": state},
+            follow_redirects=False,
+        )
+        assert first.status_code == 302
+        assert "connected=google" in first.headers["location"]
+
+        second = await gclient.get(
+            "/connected-accounts/google/callback",
+            params={"code": "connector-code", "state": state},
+            follow_redirects=False,
+        )
+        assert "invalid_state" in second.headers["location"]
+
+
 # --- callback after logout --------------------------------------------------
 
 
@@ -223,6 +256,7 @@ def test_gmail_client_has_no_send_capable_method() -> None:
         "get_message",
         "list_history",
         "get_current_history_id",
+        "get_profile_email",
         "create_draft",
         "get_draft",
     }
@@ -250,7 +284,12 @@ def test_calendar_client_has_no_update_or_delete_method() -> None:
         for name, _ in inspect.getmembers(CalendarEventClient, predicate=inspect.isfunction)
         if not name.startswith("_")
     }
-    assert public_methods == {"list_events", "insert_event", "get_event"}
+    assert public_methods == {
+        "list_events",
+        "insert_event",
+        "get_event",
+        "get_primary_calendar_metadata",
+    }
     for forbidden in ("update", "patch", "delete"):
         assert forbidden not in public_methods
     source = inspect.getsource(CalendarEventClient)

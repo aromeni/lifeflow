@@ -245,6 +245,21 @@ async def test_get_current_history_id_is_a_single_fixed_read() -> None:
     assert history_id == "999"
 
 
+async def test_get_profile_email_reads_the_same_endpoint_for_a_different_field() -> None:
+    """Stage 11A Phase 4D: shares the `users.getProfile` endpoint with
+    `get_current_history_id`, reading `emailAddress` instead of
+    `historyId`."""
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        assert request.method == "GET"
+        assert request.url.path == "/gmail/v1/users/me/profile"
+        return httpx.Response(200, json={"emailAddress": "owner@example.com", "historyId": "1"})
+
+    client = _client(httpx.MockTransport(handle))
+    email = await client.get_profile_email(access_token="token")
+    assert email == "owner@example.com"
+
+
 def _requests_value(*, operation: str, outcome: str) -> float:
     return (
         REGISTRY.get_sample_value(
