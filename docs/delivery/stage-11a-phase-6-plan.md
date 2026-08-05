@@ -1,10 +1,10 @@
 # Stage 11A Phase 6 — Real Ingestion, Extraction, and First Provider-Write Validation
 
-**Status:** Approved by the project owner 2026-08-04, amended twice (five initial amendments, then a further amendment replacing the write triggers) — all incorporated below · **Date:** 2026-08-04
+**Status:** Complete — **CONDITIONAL PASS** · **Date:** 2026-08-05
 
 Governed by [engineering-acceptance-contract.md](engineering-acceptance-contract.md). Follows Phase 5 (`PASS — DATASET POPULATED, READY FOR OWNER DECISION ON NEXT STEP`) and the project owner's authorisation: **AUTHORISE DECISION 2 — FIRST REAL PROVIDER-WRITE**.
 
-Nothing has been executed yet. No branch has been created, no `.env` flag has been changed, and Account A remains disconnected. Checkpoint 1 (below) is entirely owner-performed and must complete before I do anything else.
+See the full evidence pack in [docs/evaluation/stage-11/owner-validation/phase-6/](../evaluation/stage-11/owner-validation/phase-6/), especially [phase-6-decision.md](../evaluation/stage-11/owner-validation/phase-6/phase-6-decision.md). In short: the Gmail-write path was fully validated (finding and fixing a genuine defect along the way — PR #17); the Calendar-write path was honestly recorded as not validated this pass, per this plan's own rule against forcing an unqualified proposal; a second, contained real finding (an OIDC sign-in boundary crossing, with Account A only, no real/personal data exposed) was caught, cleaned, and its architectural fix deferred to a future owner decision.
 
 ## Supersession note — dedicated write-validation triggers replace GM-18/CAL-12
 
