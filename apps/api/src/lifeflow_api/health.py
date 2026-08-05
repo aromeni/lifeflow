@@ -14,6 +14,10 @@
           dependency-name list, never a connection string or exception.
 /config — public, unauthenticated capability flags the frontend needs before
           any session exists (e.g. whether to render "Sign in with Google").
+          Stage 11A Phase 6A.1: three independent booleans — provider
+          configuration and each of the two split OAuth flows — so the
+          frontend can represent the same split the backend already
+          enforces, rather than collapsing both flows onto one flag.
 /metrics — Prometheus text-exposition operational metrics (Stage 9 Delivery
           Phase 5, `metrics.py`); bounded-cardinality labels only, never a
           user id, email, or exception message (threat model T6).
@@ -69,10 +73,19 @@ class ReadyStatus(BaseModel):
 
 
 class PublicConfig(BaseModel):
-    # Reuses `google_wiring.google_integration_ready` — the same check the
-    # sync/execute routes use — so this can never claim Google is available
-    # when it isn't actually wired (ADR 0003 D23).
-    google_oauth_enabled: bool
+    # Stage 11A Phase 6A.1: three independent, content-free capability
+    # booleans — never a client ID, secret, redirect URI, account address,
+    # project ID, or token. `google_provider_configured` reuses
+    # `google_wiring.google_integration_ready` (ADR 0003 D23) and is
+    # configuration-completeness only; it must never by itself imply either
+    # OAuth flow is authorised for a user to start. Each per-flow boolean
+    # already folds provider-configuredness into its own value, so the
+    # frontend never has to combine them itself and can't accidentally
+    # treat "configured" as "authorised" the way the pre-Phase-6A.1 landing
+    # page did.
+    google_provider_configured: bool
+    google_oidc_signin_enabled: bool
+    google_connector_oauth_enabled: bool
 
 
 async def check_redis(redis_url: str, *, timeout_seconds: float) -> bool:
@@ -103,7 +116,15 @@ async def health() -> HealthStatus:
 
 @router.get("/config")
 async def config(request: Request) -> PublicConfig:
-    return PublicConfig(google_oauth_enabled=google_integration_ready(request))
+    settings = request.app.state.settings
+    provider_configured = google_integration_ready(request)
+    return PublicConfig(
+        google_provider_configured=provider_configured,
+        google_oidc_signin_enabled=provider_configured and settings.google_oidc_signin_enabled,
+        google_connector_oauth_enabled=(
+            provider_configured and settings.google_connector_oauth_enabled
+        ),
+    )
 
 
 @router.get("/metrics")

@@ -1606,8 +1606,12 @@ export interface components {
         ProposalStatus: "proposed" | "edited" | "approved" | "rejected" | "executing" | "executed" | "failed" | "expired";
         /** PublicConfig */
         PublicConfig: {
-            /** Google Oauth Enabled */
-            google_oauth_enabled: boolean;
+            /** Google Connector Oauth Enabled */
+            google_connector_oauth_enabled: boolean;
+            /** Google Oidc Signin Enabled */
+            google_oidc_signin_enabled: boolean;
+            /** Google Provider Configured */
+            google_provider_configured: boolean;
         };
         /** ReadyStatus */
         ReadyStatus: {
