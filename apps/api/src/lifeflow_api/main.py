@@ -147,9 +147,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.google_oauth_client = None
     app.state.gmail_client = None
     app.state.calendar_client = None
-    if settings.google_oauth_initiation_enabled and not settings.google_oauth_enabled:
+    if settings.google_oidc_signin_enabled and not settings.google_oauth_enabled:
+        raise RuntimeError("GOOGLE_OIDC_SIGNIN_ENABLED=true requires GOOGLE_OAUTH_ENABLED=true.")
+    if settings.google_connector_oauth_enabled and not settings.google_oauth_enabled:
         raise RuntimeError(
-            "GOOGLE_OAUTH_INITIATION_ENABLED=true requires GOOGLE_OAUTH_ENABLED=true."
+            "GOOGLE_CONNECTOR_OAUTH_ENABLED=true requires GOOGLE_OAUTH_ENABLED=true."
         )
     if settings.google_oauth_enabled:
         missing = [

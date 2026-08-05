@@ -261,14 +261,48 @@ async def _run_checks() -> list[ReadinessCheck]:
         )
     )
 
-    initiation_blocked = not settings.google_oauth_initiation_enabled
+    # Stage 11A Phase 6A: the original single `oauth_initiation_blocked`
+    # check covered one flag shared by both Google flows — exactly the
+    # coupling a real incident showed was unsafe. Four independent states
+    # are reported now, matching the four independent flags that actually
+    # exist: GOOGLE_PROVIDER_CONFIGURED (informational — client
+    # configuration is complete) and three safety states that must each be
+    # blocked by default (PASS = disabled), never inferred from one another.
     checks.append(
         ReadinessCheck(
-            "oauth_initiation_blocked",
-            initiation_blocked,
+            "GOOGLE_PROVIDER_CONFIGURED",
+            clients_configured,
+            "configured" if clients_configured else "not configured",
+        )
+    )
+    oidc_signin_blocked = not settings.google_oidc_signin_enabled
+    checks.append(
+        ReadinessCheck(
+            "GOOGLE_OIDC_SIGNIN_ENABLED",
+            oidc_signin_blocked,
             "blocked pending explicit owner authorisation"
-            if initiation_blocked
-            else "enabled — Phase 4C requires this to be blocked",
+            if oidc_signin_blocked
+            else "enabled — must be blocked outside an explicitly authorised sign-in window",
+        )
+    )
+    connector_oauth_blocked = not settings.google_connector_oauth_enabled
+    checks.append(
+        ReadinessCheck(
+            "GOOGLE_CONNECTOR_OAUTH_ENABLED",
+            connector_oauth_blocked,
+            "blocked pending explicit owner authorisation"
+            if connector_oauth_blocked
+            else "enabled — must be blocked outside an explicitly authorised connection window",
+        )
+    )
+    provider_writes_blocked = not settings.google_provider_writes_enabled
+    checks.append(
+        ReadinessCheck(
+            "GOOGLE_PROVIDER_WRITES_ENABLED",
+            provider_writes_blocked,
+            "blocked pending explicit owner authorisation"
+            if provider_writes_blocked
+            else "enabled — must be blocked outside an explicitly authorised write window",
         )
     )
 

@@ -133,7 +133,7 @@ async def _run_cycle(cycle: int) -> None:
         token_key_id="rehearsal-active-1",  # noqa: S106 -- a key *identifier*, not a secret
         session_secret="r" * 32,
         google_oauth_enabled=True,
-        google_oauth_initiation_enabled=True,
+        google_connector_oauth_enabled=True,
         # The one flag this whole rehearsal exists to prove: even with a
         # real (fake-transport) connected account, writes stay blocked.
         google_provider_writes_enabled=False,

@@ -64,12 +64,21 @@ class Settings(BaseSettings):
     # Stage 11A Phase 4C: client configuration and OAuth initiation are two
     # separate operator decisions. A deployment may load and validate its
     # client configuration while every route capable of starting or
-    # completing an OAuth flow remains blocked. This flag must stay false
-    # until the project owner explicitly authorises the next phase. It does
-    # not disable disconnect/sync/execution for an account that was already
-    # connected under a later authorisation; it gates initiation/callbacks
-    # only.
-    google_oauth_initiation_enabled: bool = False
+    # completing an OAuth flow remains blocked.
+    #
+    # Stage 11A Phase 6A: Phase 4C originally used one shared flag
+    # (`google_oauth_initiation_enabled`) for both the OIDC sign-in flow and
+    # the connector-consent flow. A real incident during Phase 6 showed why
+    # that was unsafe: enabling it to authorise a connector reconnection
+    # necessarily also armed OIDC sign-in, with no way to authorise one
+    # without the other. Replaced with two independent flags — neither
+    # implies the other, and enabling one is never sufficient to enable the
+    # other. Each must stay false until the project owner explicitly
+    # authorises that specific flow. Neither disables disconnect/sync/
+    # execution for an account already connected under a prior
+    # authorisation; each gates only its own flow's initiation/callbacks.
+    google_oidc_signin_enabled: bool = False
+    google_connector_oauth_enabled: bool = False
     # Stage 11A Phase 4D: a third, independent operator decision from the two
     # above. A deployment may have OAuth initiation enabled and a real
     # connected account, yet still be forbidden from writing to that
@@ -77,7 +86,7 @@ class Settings(BaseSettings):
     # validation. This flag must stay false until the project owner
     # explicitly authorises provider writes. It gates `create_gmail_draft`/
     # `create_calendar_event` execution only — reads (sync) and disconnect
-    # are unaffected, matching `google_oauth_initiation_enabled`'s own
+    # are unaffected, matching `google_connector_oauth_enabled`'s own
     # narrow scope above.
     google_provider_writes_enabled: bool = False
     # App sign-in (OIDC): openid+email+profile only, never mailbox access.
