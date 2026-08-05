@@ -21,4 +21,4 @@
 | P6A1-015 | Evidence pack created; Phase 6A decision addended, not rewritten | **Verified** — this pack; addendum in `phase-6a-decision.md` |
 | P6A1-016 | Zero provider activity throughout | **Verified** — see `zero-provider-activity-results.md` |
 | P6A1-017 | Full verification gate run | **Verified** — see `automated-verification-results.md` |
-| P6A1-018 | PR opened against `main`, not merged, not tagged, no Google account connected | **Verified** — see final report for PR number |
+| P6A1-018 | PR opened against `main`, not merged, not tagged, no Google account connected | **Verified** — PR #19 |
