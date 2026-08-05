@@ -38,7 +38,8 @@ pytestmark = pytest.mark.integration
 
 GOOGLE_SETTINGS_OVERRIDES = {
     "google_oauth_enabled": True,
-    "google_oauth_initiation_enabled": True,
+    "google_oidc_signin_enabled": True,
+    "google_connector_oauth_enabled": True,
     # This module's whole purpose is proving real Google execution actually
     # happens through the running app, so its baseline enables the Stage
     # 11A Phase 4D write kill switch too; the two tests that specifically
