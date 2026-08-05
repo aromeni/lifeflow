@@ -115,6 +115,18 @@ absorbed as `unchanged`.
 6. Log the elapsed hours since T0 at the moment of expiry, and resume the
    daily protocol from §3.
 
+## 5a. Watch for a full resync (see day-00-connection-evidence.md)
+
+Phase 6B's imported-data deletion emptied `source_items`/`signals` but never
+reset `ConnectedAccount.sync_cursors` — so incremental syncs correctly
+report zero imports until Gmail's `historyId` or Calendar's sync token
+naturally expires and the connector falls back to a bounded full resync
+(`connectors/google_email.py`, 14-day window). Check each day's sync
+response for `gmail_cursor_status`/`calendar_cursor_status` flipping from
+`"incremental"` to `"resynced"` — that is the day the disposable fixture
+dataset (and GM-12, if still within the 14-day window) becomes visible to
+LifeFlow again. Do not force this with a manual database write.
+
 ## 6. GM-12 eligibility and evaluation (once, the first day it qualifies)
 
 ```sql
