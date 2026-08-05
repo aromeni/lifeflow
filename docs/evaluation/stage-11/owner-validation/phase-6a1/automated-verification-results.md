@@ -18,7 +18,7 @@
 | Functional E2E — `connections.spec.ts` | Passed, updated for the new safe-text disabled state |
 | E2E-design — accessibility (18 tests incl. "Connections has no serious accessibility violations") | 18/18 passed |
 | E2E-design — responsive (incl. "Connections has no horizontal overflow at any breakpoint") | Passed |
-| E2E-design — visual regression | 8/8 passed after updating two macOS baselines (`landing-darwin.png`, `connections-darwin.png`) to the corrected, capability-accurate rendering — see `visual-baseline-corrections.md` |
+| E2E-design — visual regression | 8/8 passed locally (macOS) after updating two macOS baselines (`landing-darwin.png`, `connections-darwin.png`); 8/8 passed on real Linux/Chromium CI after updating the one Linux baseline that actually changed (`connections-linux.png`) — see `visual-baseline-corrections.md` |
 | Contracts regeneration (`scripts/generate-contracts.sh`) | Regenerated; committed diff matches exactly what was already staged — no drift |
 | Alembic | Unaffected — no migration in this phase; single head unchanged |
 | `detect-secrets` scan | No new findings (only the tool's own `.secrets.baseline` timestamp field changes on each run, discarded, not committed) |
