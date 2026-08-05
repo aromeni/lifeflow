@@ -21,6 +21,8 @@ All scenarios verified with mocked `/config` responses (unit tests, `apps/web/sr
 
 Both pages default their capability state to `false` before the `/config` fetch resolves and on outright fetch failure (network error, non-2xx): `page.test.tsx`'s *"before the config response arrives"* and *"when the config request fails outright"*; `connections/page.test.tsx`'s equivalent *"when the config request fails outright, the connector control fails closed"*.
 
+An integrity review before merge found this coverage stopped short of a malformed-but-non-throwing response (e.g. a backend response missing the expected field entirely, with no network error). Added one test per page — *"a malformed config response (missing capability field) fails closed, not enabled"* — confirming the existing falsy-check (`config.google_oidc_signin_enabled` / `config.google_connector_oauth_enabled` both simply `undefined`) already handles this correctly; no implementation change was needed.
+
 ## Stale or manipulated frontend state cannot bypass backend guards
 
 Not applicable as a distinct frontend test — by construction, the frontend performs no authorisation itself. Every control is a plain link to a real backend route (`/auth/google/login`, `/connected-accounts/google/connect`); hiding or showing it changes only what is easy to click, never what the backend accepts. `require_google_oidc_signin`/`require_google_connector_oauth` (Phase 6A, untouched by this phase) re-check their own flag on every request regardless of what any client believes. A manually-constructed request to either route with the corresponding flag disabled still receives 404/409, exactly as Phase 6A's own regression suite (re-run clean in this phase, see `automated-verification-results.md`) already proves.

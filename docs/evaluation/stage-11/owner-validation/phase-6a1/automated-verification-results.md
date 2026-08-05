@@ -11,7 +11,7 @@
 | Ruff format --check | 216 files already formatted |
 | Ruff check | All checks passed |
 | mypy | Success: no issues found in 94 source files |
-| Frontend unit tests (`vitest`) | **99 passed**, 0 failed (10 test files) — 30 in `connections/page.test.tsx` (6 new this phase), 10 in `page.test.tsx` (2 new this phase) |
+| Frontend unit tests (`vitest`) | **101 passed**, 0 failed (10 test files) — 31 in `connections/page.test.tsx` (7 new this phase), 11 in `page.test.tsx` (3 new this phase); +2 added during merge-integrity review to close a malformed-response coverage gap |
 | Frontend lint (ESLint) | Clean |
 | Frontend typecheck (`tsc --noEmit`) | Clean |
 | Frontend production build (`next build`) | Succeeded, all 10 routes generated |
