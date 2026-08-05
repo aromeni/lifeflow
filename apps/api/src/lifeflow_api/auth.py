@@ -20,7 +20,7 @@ from lifeflow_api.deps import CurrentUser, DbSession
 from lifeflow_api.google.errors import IdTokenVerificationError
 from lifeflow_api.google.oauth import build_authorization_url, verify_id_token
 from lifeflow_api.models import User
-from lifeflow_api.oauth_initiation import require_google_oauth_initiation
+from lifeflow_api.oauth_initiation import require_google_oidc_signin
 from lifeflow_api.oauth_state import (
     OAuthStateError,
     begin_oauth_flow,
@@ -101,7 +101,7 @@ async def logout(request: Request, user: CurrentUser, session: DbSession) -> Non
 
 @router.get("/google/login", dependencies=[RateLimited("anonymous_auth")])
 async def google_login(request: Request) -> RedirectResponse:
-    require_google_oauth_initiation(request)
+    require_google_oidc_signin(request)
     settings = request.app.state.settings
     state, pkce, nonce = begin_oauth_flow(request, purpose=OIDC_PURPOSE, include_nonce=True)
     url = build_authorization_url(
@@ -123,7 +123,7 @@ async def google_callback(
     state: str | None = None,
     error: str | None = None,
 ) -> RedirectResponse:
-    require_google_oauth_initiation(request)
+    require_google_oidc_signin(request)
     settings = request.app.state.settings
     web_origin = settings.web_origin
     if error is not None:

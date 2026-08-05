@@ -99,7 +99,7 @@ The approved local mechanism is the repository-root `.env`, already ignored by G
 - `GOOGLE_CONNECTOR_CLIENT_SECRET`
 - `GOOGLE_CONNECTOR_REDIRECT_URI`
 - `GOOGLE_OAUTH_ENABLED=true`
-- `GOOGLE_OAUTH_INITIATION_ENABLED=false`
+- `GOOGLE_OAUTH_INITIATION_ENABLED=false` *(superseded 2026-08-05 by Stage 11A Phase 6A — see that ADR 0003 addendum: this single flag is replaced by two independent flags, `GOOGLE_OIDC_SIGNIN_ENABLED`/`GOOGLE_CONNECTOR_OAUTH_ENABLED`, both false by default, after a real incident showed the shared flag armed both OAuth flows at once)*
 
 Validation reports configured/unset and approved/unapproved states only. It never reports value length, prefix, suffix, project/client identifiers, or secret material. `.env.example` contains safe placeholders and the block remains false by default.
 
