@@ -8,6 +8,7 @@ import type {
   DeletionOperation,
   GoogleSyncResult,
   PrivacySummary,
+  PublicConfig,
 } from "@/lib/types";
 
 import ConnectionsPage from "./page";
@@ -128,6 +129,16 @@ function deletionOp(overrides: Partial<DeletionOperation> = {}): DeletionOperati
   };
 }
 
+// Every existing test in this file predates Stage 11A Phase 6A.1's capability
+// gate and is about the connect/sync/disconnect UX, not the gate itself — so
+// it defaults to "everything enabled" and only the dedicated capability
+// tests below override it.
+const CONNECTOR_ENABLED_CONFIG: PublicConfig = {
+  google_provider_configured: true,
+  google_oidc_signin_enabled: true,
+  google_connector_oauth_enabled: true,
+};
+
 /** Route the mocked `api` by path so the page can fetch /privacy/summary and,
  *  independently, POST sync/disconnect/deletion — mirroring the real client. */
 function mockApi(options: {
@@ -137,12 +148,14 @@ function mockApi(options: {
   preview?: DeletionOperation;
   confirm?: DeletionOperation;
   status?: DeletionOperation;
+  config?: PublicConfig;
 }) {
   apiMock.mockImplementation(async (path: string) => {
     if (path === "/privacy/summary") {
       if (options.summaryError) throw Object.assign(new Error("boom"), { status: 500 });
       return typeof options.summary === "function" ? options.summary() : options.summary;
     }
+    if (path === "/config") return options.config ?? CONNECTOR_ENABLED_CONFIG;
     if (path === "/connected-accounts/google/sync") return options.sync ?? syncResult({});
     if (path === "/connected-accounts/google/disconnect") return undefined;
     if (path.endsWith("/preview")) return options.preview ?? deletionOp();
@@ -575,4 +588,104 @@ test("a fully clean sync shows no notices", async () => {
   expect(screen.queryByTestId("gmail-excluded-notice")).not.toBeInTheDocument();
   expect(screen.queryByTestId("gmail-incomplete-notice")).not.toBeInTheDocument();
   expect(screen.queryByTestId("calendar-incomplete-notice")).not.toBeInTheDocument();
+});
+
+// --- Stage 11A Phase 6A.1: connector capability gate --------------------
+
+test("when connector consent is disabled, no active Connect Google control renders — safe text instead", async () => {
+  mockApi({
+    summary: summaryWith([]),
+    config: {
+      google_provider_configured: true,
+      google_oidc_signin_enabled: false,
+      google_connector_oauth_enabled: false,
+    },
+  });
+  render(<ConnectionsPage />);
+
+  await waitFor(() => expect(apiMock).toHaveBeenCalledWith("/config"));
+  expect(screen.queryByRole("link", { name: "Connect Google" })).not.toBeInTheDocument();
+  expect(screen.getByTestId("google-connect-unavailable")).toHaveTextContent(
+    /not enabled in this environment/i,
+  );
+});
+
+test("when connector consent is enabled, Connect Google is visible and usable", async () => {
+  mockApi({
+    summary: summaryWith([]),
+    config: {
+      google_provider_configured: true,
+      google_oidc_signin_enabled: false,
+      google_connector_oauth_enabled: true,
+    },
+  });
+  render(<ConnectionsPage />);
+
+  const link = await screen.findByRole("link", { name: "Connect Google" });
+  expect(link).toHaveAttribute("href", "http://localhost:8010/connected-accounts/google/connect");
+  expect(screen.queryByTestId("google-connect-unavailable")).not.toBeInTheDocument();
+});
+
+test("Stage 11A Phase 6A.1: Google sign-in being enabled never displays the connector control — reproduces the exact Phase 6 incident configuration in reverse", async () => {
+  // Sign-in authorised, connector consent not — the opposite half of the
+  // same incident configuration exercised on the landing page. This page's
+  // only Google control (connector consent) must stay hidden regardless of
+  // the sign-in flag.
+  mockApi({
+    summary: summaryWith([]),
+    config: {
+      google_provider_configured: true,
+      google_oidc_signin_enabled: true,
+      google_connector_oauth_enabled: false,
+    },
+  });
+  render(<ConnectionsPage />);
+
+  await waitFor(() => expect(apiMock).toHaveBeenCalledWith("/config"));
+  expect(screen.queryByRole("link", { name: "Connect Google" })).not.toBeInTheDocument();
+  expect(screen.getByTestId("google-connect-unavailable")).toBeInTheDocument();
+});
+
+test("provider unconfigured: neither flag can make Connect Google appear", async () => {
+  mockApi({
+    summary: summaryWith([]),
+    config: {
+      google_provider_configured: false,
+      google_oidc_signin_enabled: false,
+      google_connector_oauth_enabled: false,
+    },
+  });
+  render(<ConnectionsPage />);
+
+  await waitFor(() => expect(apiMock).toHaveBeenCalledWith("/config"));
+  expect(screen.queryByRole("link", { name: "Connect Google" })).not.toBeInTheDocument();
+});
+
+test("when the config request fails outright, the connector control fails closed", async () => {
+  apiMock.mockImplementation(async (path: string) => {
+    if (path === "/privacy/summary") return summaryWith([]);
+    if (path === "/config") throw new Error("network unavailable");
+    throw new Error(`unexpected path ${path}`);
+  });
+  render(<ConnectionsPage />);
+
+  await screen.findByText("Not connected.");
+  expect(screen.queryByRole("link", { name: "Connect Google" })).not.toBeInTheDocument();
+  expect(screen.getByTestId("google-connect-unavailable")).toBeInTheDocument();
+});
+
+test("the capability gate never exposes a secret value — only the three closed booleans", async () => {
+  const config: PublicConfig = {
+    google_provider_configured: true,
+    google_oidc_signin_enabled: true,
+    google_connector_oauth_enabled: true,
+  };
+  expect(Object.keys(config).sort()).toEqual(
+    [
+      "google_provider_configured",
+      "google_oidc_signin_enabled",
+      "google_connector_oauth_enabled",
+    ].sort(),
+  );
+  expect(Object.values(config).every((value) => typeof value === "boolean")).toBe(true);
 });

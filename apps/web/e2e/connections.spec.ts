@@ -11,6 +11,13 @@ import { expect, test, type Page } from "@playwright/test";
 // equivalent would require making Google's endpoint hostnames configurable
 // via environment overrides, a change deliberately out of scope for this
 // remediation (see stage-07.md).
+//
+// Stage 11A Phase 6A.1: this webServer has no Google provider configured at
+// all (`GOOGLE_OAUTH_ENABLED` unset), so `/config` now reports
+// `google_connector_oauth_enabled: false` and the page shows safe
+// explanatory text instead of a "Connect Google" link that would 404 —
+// previously this test asserted the link rendered unconditionally, which was
+// exactly the frontend/backend mismatch this phase fixes.
 
 const API_URL = "http://localhost:8010";
 const MUTATION_HEADERS = { "X-LifeFlow-CSRF": "1" };
@@ -35,7 +42,8 @@ test("connections screen shows the not-connected state and links back to Today",
 
   await expect(page.getByRole("heading", { name: "Connections" })).toBeVisible();
   await expect(page.getByTestId("google-connection-card")).toContainText("Not connected");
-  await expect(page.getByRole("link", { name: "Connect Google" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Connect Google" })).toHaveCount(0);
+  await expect(page.getByTestId("google-connect-unavailable")).toBeVisible();
   await expect(page.getByTestId("sync-google-now")).toHaveCount(0);
   await expect(page.getByTestId("google-connection-status")).toHaveCount(0);
 
