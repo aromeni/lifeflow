@@ -9,15 +9,18 @@ import type { PublicConfig } from "@/lib/types";
 
 export default function Home() {
   // Fail closed: until (or unless) the API confirms Google sign-in is
-  // actually wired for this deployment (ADR 0003 D23), never render a
-  // button that could 404 — the initial/error state is "not enabled".
-  const [googleOAuthEnabled, setGoogleOAuthEnabled] = useState(false);
+  // actually authorised for this deployment (ADR 0003 D23; Stage 11A Phase
+  // 6A.1), never render a button that could 404 or 409 — the initial/error
+  // state is "not enabled". Deliberately reads only the sign-in capability,
+  // never the provider-configured flag alone and never the connector-consent
+  // flag — enabling connector consent must never make this button appear.
+  const [googleSigninEnabled, setGoogleSigninEnabled] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     api<PublicConfig>("/config")
       .then((config) => {
-        if (!cancelled) setGoogleOAuthEnabled(config.google_oauth_enabled);
+        if (!cancelled) setGoogleSigninEnabled(config.google_oidc_signin_enabled);
       })
       .catch(() => {
         // Network/API unavailable: stay in the fail-closed default above.
@@ -47,7 +50,7 @@ export default function Home() {
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <TryDemoButton />
-            {googleOAuthEnabled ? (
+            {googleSigninEnabled ? (
               <a
                 href={`${API_URL}/auth/google/login`}
                 data-testid="sign-in-with-google"

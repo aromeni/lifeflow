@@ -38,3 +38,7 @@ This does not authorise a corrected Calendar-write trigger attempt, GM-12's defe
 
 - `AUTHORISE A CORRECTED CALENDAR-WRITE TRIGGER ATTEMPT`
 - `DO NOT AUTHORISE — GOOGLE CONNECTION REMAINS BLOCKED`
+
+---
+
+**Addendum (Stage 11A Phase 6A.1, dated 2026-08-05):** this decision's backend scope stands unchanged — the split controls above were, and remain, correct and unweakened. However, this phase's own merge report understated one piece of surrounding context: the frontend at merge time still read only the old, pre-split `google_oauth_enabled` configuration-completeness signal, not either new per-flow flag. Phase 6A.1 ([stage-11a-phase-6a1-plan.md](../../../../delivery/stage-11a-phase-6a1-plan.md)) closed that gap by extending `GET /config` with the two per-flow booleans and aligning both frontend Google controls to them. This addendum records the correction; it does not alter anything above.

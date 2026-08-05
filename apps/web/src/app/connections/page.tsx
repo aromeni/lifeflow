@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/Button";
 import { FormSection } from "@/components/ui/Form";
 import { Notice } from "@/components/ui/Notice";
 import { API_URL, api, ApiError, RateLimitError } from "@/lib/api";
-import type { GoogleSyncResult, PrivacySummary } from "@/lib/types";
+import type { GoogleSyncResult, PrivacySummary, PublicConfig } from "@/lib/types";
 
 import DeletionControls from "./DeletionControls";
 
@@ -68,6 +68,12 @@ export default function ConnectionsPage() {
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<GoogleSyncResult | null>(null);
   const [syncError, setSyncError] = useState<SyncErrorState | null>(null);
+  // Fail closed: until (or unless) the API confirms connector consent is
+  // actually authorised (Stage 11A Phase 6A.1), never render a "Connect
+  // Google" control that would predictably 404/409 after clicking. Reads
+  // only the connector capability — enabling Google sign-in must never make
+  // this control appear.
+  const [connectorOAuthEnabled, setConnectorOAuthEnabled] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -80,14 +86,47 @@ export default function ConnectionsPage() {
   }, []);
 
   useEffect(() => {
-    // The only fetch happens here, once, in response to the component
+    // The only fetches happen here, once, in response to the component
     // mounting — never on a timer and never as a side effect of a provider
     // sync, so opening or refreshing this page never causes Google traffic.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
+    let cancelled = false;
+    api<PublicConfig>("/config")
+      .then((config) => {
+        if (!cancelled) setConnectorOAuthEnabled(config.google_connector_oauth_enabled);
+      })
+      .catch(() => {
+        // Network/API unavailable: stay in the fail-closed default above.
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [load]);
 
   const google = summary?.connections.find((account) => account.provider === "google");
+
+  // Stage 11A Phase 6A.1: a single rendering, used everywhere the page would
+  // otherwise show "Connect Google" — so the capability gate can never be
+  // forgotten at one call site while applied at another.
+  function connectControl() {
+    if (!connectorOAuthEnabled) {
+      return (
+        <p data-testid="google-connect-unavailable" className="text-sm text-text-tertiary">
+          Connecting a Google account is not enabled in this environment.
+        </p>
+      );
+    }
+    return (
+      <a
+        href={`${API_URL}/connected-accounts/google/connect`}
+        data-testid="connect-google"
+        className="inline-flex w-fit items-center justify-center rounded-md bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover"
+      >
+        Connect Google
+      </a>
+    );
+  }
 
   async function disconnectGoogle() {
     if (pending) return;
@@ -190,12 +229,7 @@ export default function ConnectionsPage() {
                           </Button>
                         </>
                       ) : (
-                        <a
-                          href={`${API_URL}/connected-accounts/google/connect`}
-                          className="inline-flex w-fit items-center justify-center rounded-md bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover"
-                        >
-                          Connect Google
-                        </a>
+                        connectControl()
                       )}
                     </div>
                     {syncError ? (
@@ -256,12 +290,7 @@ export default function ConnectionsPage() {
                 ) : (
                   <div className="flex flex-col gap-3 text-sm">
                     <p className="text-text-secondary">Not connected.</p>
-                    <a
-                      href={`${API_URL}/connected-accounts/google/connect`}
-                      className="inline-flex w-fit items-center justify-center rounded-md bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover"
-                    >
-                      Connect Google
-                    </a>
+                    {connectControl()}
                   </div>
                 )}
               </div>

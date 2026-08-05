@@ -2318,13 +2318,23 @@
       },
       "PublicConfig": {
         "properties": {
-          "google_oauth_enabled": {
-            "title": "Google Oauth Enabled",
+          "google_connector_oauth_enabled": {
+            "title": "Google Connector Oauth Enabled",
+            "type": "boolean"
+          },
+          "google_oidc_signin_enabled": {
+            "title": "Google Oidc Signin Enabled",
+            "type": "boolean"
+          },
+          "google_provider_configured": {
+            "title": "Google Provider Configured",
             "type": "boolean"
           }
         },
         "required": [
-          "google_oauth_enabled"
+          "google_provider_configured",
+          "google_oidc_signin_enabled",
+          "google_connector_oauth_enabled"
         ],
         "title": "PublicConfig",
         "type": "object"
