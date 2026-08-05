@@ -73,7 +73,7 @@ See [emergency-stop-results.md](../evaluation/stage-11/owner-validation/phase-4d
 
 ## Revocation, disconnect and cleanup
 
-Four-step mandatory sequence after any read-only validation (success or stop): (A) restore `GOOGLE_OAUTH_INITIATION_ENABLED=false` locally; (B) revoke Google OAuth access (max 1 programmatic attempt; owner-confirmed manually only if uncertain); (C) LifeFlow disconnect (clears credential ciphertext and key-version fields); (D) final residue check (all credential/binding/SourceItem/write/Redis/browser counts back to zero, `clear_to_connect=true`). This sequence runs regardless of whether the smoke reads succeed — see [disconnect-and-residue-results.md](../evaluation/stage-11/owner-validation/phase-4d/disconnect-and-residue-results.md).
+Four-step mandatory sequence after any read-only validation (success or stop): (A) restore the OAuth initiation flag(s) to `false` locally *(originally one flag, `GOOGLE_OAUTH_INITIATION_ENABLED`; superseded 2026-08-05 by Stage 11A Phase 6A's two independent flags, `GOOGLE_OIDC_SIGNIN_ENABLED`/`GOOGLE_CONNECTOR_OAUTH_ENABLED`, after a real incident showed the shared flag armed both OAuth flows at once)*; (B) revoke Google OAuth access (max 1 programmatic attempt; owner-confirmed manually only if uncertain); (C) LifeFlow disconnect (clears credential ciphertext and key-version fields); (D) final residue check (all credential/binding/SourceItem/write/Redis/browser counts back to zero, `clear_to_connect=true`). This sequence runs regardless of whether the smoke reads succeed — see [disconnect-and-residue-results.md](../evaluation/stage-11/owner-validation/phase-4d/disconnect-and-residue-results.md).
 
 ## Evidence rules
 
