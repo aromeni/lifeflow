@@ -674,6 +674,21 @@ test("when the config request fails outright, the connector control fails closed
   expect(screen.getByTestId("google-connect-unavailable")).toBeInTheDocument();
 });
 
+test("a malformed config response (missing capability field) fails closed, not enabled", async () => {
+  // Simulates a broken/incomplete backend response — no exception thrown,
+  // but the field this component reads is simply absent.
+  apiMock.mockImplementation(async (path: string) => {
+    if (path === "/privacy/summary") return summaryWith([]);
+    if (path === "/config") return {} as unknown as PublicConfig;
+    throw new Error(`unexpected path ${path}`);
+  });
+  render(<ConnectionsPage />);
+
+  await screen.findByText("Not connected.");
+  expect(screen.queryByRole("link", { name: "Connect Google" })).not.toBeInTheDocument();
+  expect(screen.getByTestId("google-connect-unavailable")).toBeInTheDocument();
+});
+
 test("the capability gate never exposes a secret value — only the three closed booleans", async () => {
   const config: PublicConfig = {
     google_provider_configured: true,

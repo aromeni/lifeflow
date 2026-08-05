@@ -114,6 +114,16 @@ test("when the config request fails outright, fails closed with no sign-in butto
   expect(screen.getByTestId("google-sign-in-unavailable")).toBeInTheDocument();
 });
 
+test("a malformed config response (missing capability field) fails closed, not enabled", async () => {
+  // Simulates a broken/incomplete backend response — no exception thrown,
+  // but the field this component reads is simply absent.
+  apiMock.mockResolvedValue({} as unknown as { google_oidc_signin_enabled: boolean });
+  render(<Home />);
+  await waitFor(() => expect(apiMock).toHaveBeenCalledWith("/config"));
+  expect(screen.queryByTestId("sign-in-with-google")).not.toBeInTheDocument();
+  expect(screen.getByTestId("google-sign-in-unavailable")).toBeInTheDocument();
+});
+
 test("Stage 11A Phase 6A.1: connector consent being enabled never displays Google sign-in — reproduces the exact Phase 6 incident configuration", async () => {
   // The exact flag combination that caused the Phase 6 incident: connector
   // consent authorised, OIDC sign-in not. The landing page's only Google
