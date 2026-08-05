@@ -42,6 +42,26 @@ def _is_retryable(exc: BaseException) -> bool:
     return classify_exception(exc).retryable
 
 
+_REPLY_PREFIX = "re:"
+
+
+def _subject_matches(approved_subject: str, actual_subject: str, *, is_reply: bool) -> bool:
+    """Stage 11A Phase 6 finding, against a real Gmail account: when a draft
+    is created with a `thread_id`, Gmail can canonicalise its stored subject
+    to the thread's own subject line, silently dropping the leading "Re: "
+    this app added — the same class of Gmail-controlled threading decision
+    already exempted for `thread_id` itself below (`threadId` is deliberately
+    never compared against what was requested). This tolerates exactly that
+    one, narrow difference — a missing reply prefix, and only for a draft
+    that was actually submitted as a reply — never a subject that differs in
+    any other way, which still counts as a genuine mismatch."""
+    if actual_subject == approved_subject:
+        return True
+    if not is_reply or not approved_subject.lower().startswith(_REPLY_PREFIX):
+        return False
+    return actual_subject == approved_subject[len(_REPLY_PREFIX) :].lstrip()
+
+
 class FinalExecutionError(RuntimeError):
     """A clear, final failure; the service must not retry automatically."""
 
@@ -272,7 +292,9 @@ class GoogleGmailDraftExecutor:
         approved_body = payload.body.replace("\r\n", "\n").strip()
         if (
             set(content.to) != approved_to
-            or content.subject != approved_subject
+            or not _subject_matches(
+                approved_subject, content.subject, is_reply=payload.thread_id is not None
+            )
             or content.body != approved_body
         ):
             return ExecutorOutcome(

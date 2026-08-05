@@ -138,6 +138,52 @@ async def test_gmail_draft_succeeds_even_when_gmail_declines_the_requested_threa
     assert outcome.result["thread_id"] == "a-completely-different-thread"
 
 
+async def test_gmail_draft_succeeds_when_gmail_drops_the_reply_prefix_on_a_threaded_draft() -> None:
+    """Stage 11A Phase 6 finding, against a real Gmail account: creating a
+    draft with a `thread_id` can make Gmail canonicalise the stored subject
+    to the thread's own subject, dropping the "Re: " this app added — the
+    same class of Gmail-controlled threading decision already tolerated for
+    `thread_id` itself above. Only the reply prefix is missing; nothing else
+    differs, so this must still succeed."""
+    executor = _gmail_executor(
+        _gmail_create_then_get(_get_draft_response(subject="Quarterly review"))
+    )
+    outcome = await executor.execute(
+        proposal_id=PROPOSAL_ID, payload=DRAFT_PAYLOAD, approved_authorization=SAMPLE_AUTHORIZATION
+    )
+    assert outcome.status == "succeeded"
+
+
+async def test_gmail_draft_uncertain_when_subject_differs_by_more_than_the_reply_prefix() -> None:
+    """The reply-prefix tolerance is narrow: a subject that differs in any
+    other way is still a genuine mismatch, even for a threaded draft."""
+    executor = _gmail_executor(
+        _gmail_create_then_get(_get_draft_response(subject="Completely different subject"))
+    )
+    outcome = await executor.execute(
+        proposal_id=PROPOSAL_ID, payload=DRAFT_PAYLOAD, approved_authorization=SAMPLE_AUTHORIZATION
+    )
+    assert outcome.status == "uncertain"
+
+
+async def test_gmail_draft_uncertain_when_reply_prefix_missing_on_a_non_threaded_draft() -> None:
+    """The tolerance only applies to an actual threaded reply (`thread_id`
+    set) — a non-reply draft missing its approved "Re: " is still a genuine
+    mismatch, not Gmail's threading behaviour."""
+    non_reply_payload = GmailDraftCreatePayload(
+        to=["dana@example.com"], subject="Re: Quarterly review", body="Hi Dana", thread_id=None
+    )
+    executor = _gmail_executor(
+        _gmail_create_then_get(_get_draft_response(subject="Quarterly review"))
+    )
+    outcome = await executor.execute(
+        proposal_id=PROPOSAL_ID,
+        payload=non_reply_payload,
+        approved_authorization=SAMPLE_AUTHORIZATION,
+    )
+    assert outcome.status == "uncertain"
+
+
 async def test_gmail_draft_uncertain_when_verified_recipient_does_not_match_approved_payload() -> (
     None
 ):
