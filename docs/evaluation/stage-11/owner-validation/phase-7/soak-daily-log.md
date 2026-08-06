@@ -23,3 +23,33 @@ is reconnected.
 - Reconnection events: none (this was the initial Day-0 connection, not a
   post-expiry reconnection).
 - Observed gaps: none.
+
+## Day 1 — 2026-08-06T20:49Z — 22.1h elapsed
+
+- Flags: all three confirmed `false` at check-in start.
+- Observed gap: Docker Desktop (and therefore `db`/`redis`) was down at
+  check-in time — `/health` ok, `/ready` `"unavailable"`
+  (`database_readiness_failures_total` incremented from 0 to 1 across the
+  gap). Most likely cause: the host machine slept overnight; no evidence of
+  any flag drift or unexpected process during the gap. Restarted Docker
+  Desktop and `docker compose up -d db redis --wait`; both containers came
+  back healthy within seconds (same containers, not recreated — "6 days
+  ago" created, so no data loss). `/ready` recovered to `ok` **without any
+  API restart** — the app's own DB/Redis connection handling recovered on
+  its own once the dependencies returned. Logged as an observed gap per the
+  soak's best-effort-uptime model, not a failure; the Google-side
+  authorisation/token clock is unaffected by local downtime.
+- (An apparent API-process-identity discrepancy was investigated and ruled
+  out as a non-event — the "new" PID was simply this soak's own Day-0
+  restart, whose OS-recorded start time reflected real elapsed conversation
+  time, not a second, unlogged restart.)
+- Connection status: `active`, `authorisation_revision: 3` — unchanged,
+  unaffected by the local outage, as expected.
+- Sync: `imported=0 updated=0 unchanged=0`, both cursors still
+  `"incremental"` — no resync yet.
+- Duplicates: 0/0/0 (SourceItem/Signal/proposal group-by checks, all empty).
+- Writes: confirmed 0 `action_executions` with `started_at` after T0 — the
+  one execution row tied to this account is Phase 6B's pre-soak Calendar
+  insertion (`started_at` 2026-08-05T18:51:11Z, before T0), unaffected.
+- GM-12: not observable yet (no resync yet).
+- Reconnection events: none.
