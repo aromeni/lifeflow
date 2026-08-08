@@ -53,3 +53,31 @@ is reconnected.
   insertion (`started_at` 2026-08-05T18:51:11Z, before T0), unaffected.
 - GM-12: not observable yet (no resync yet).
 - Reconnection events: none.
+
+## Day 2 — 2026-08-08T07:25Z — 56.7h elapsed
+
+- Flags: all three confirmed `false` at check-in start. API/web processes
+  are the same PIDs as Day 1 (no crash, no restart in between).
+- Observed gap: Docker Desktop was down again at check-in (same signature as
+  Day 1 — most likely the host sleeping between check-ins). Same recovery:
+  reopened Docker Desktop, `docker compose up -d db redis --wait`, same
+  containers came back healthy in seconds (7 days old, not recreated), no
+  API restart needed, `/ready` recovered to `ok`.
+- New counter since Day 1: `provider_requests_total{operation="refresh_access_token",provider="google_oauth",outcome="success"}=1` —
+  the stored Google access token expired (normal, ~1h lifetime) and was
+  successfully refreshed using the refresh token at some point in this
+  window. This is expected, healthy behaviour, and separate from the 7-day
+  refresh*-token*-itself expiry this phase is watching for.
+- Connection status: `active`, `authorisation_revision: 3` — unchanged.
+- Sync: `imported=0 updated=0 unchanged=0`, both cursors still
+  `"incremental"` (no full resync yet) — but `gmail_incomplete=2` appeared
+  for the first time (previously 0). Per the code's own documented D38
+  case, this means Gmail's history API referenced 2 message IDs that then
+  404'd on individual fetch — a real, non-error outcome the connector
+  already handles, not a LifeFlow defect. No corresponding `SourceItem` was
+  created for either (consistent with "incomplete", not "imported"). Noted
+  for the record; will keep watching whether this count grows.
+- Duplicates: 0/0/0.
+- Writes: confirmed 0 `action_executions` with `started_at` after T0.
+- GM-12: not observable yet (no resync yet).
+- Reconnection events: none.
