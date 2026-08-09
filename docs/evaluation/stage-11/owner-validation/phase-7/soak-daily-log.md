@@ -81,3 +81,24 @@ is reconnected.
 - Writes: confirmed 0 `action_executions` with `started_at` after T0.
 - GM-12: not observable yet (no resync yet).
 - Reconnection events: none.
+
+## Day 3 — 2026-08-09T16:07Z — 89.4h elapsed
+
+- Flags: all three confirmed `false` at check-in start. Same API/web PIDs
+  as Day 1/2 — no crash or restart since Day 0.
+- Observed gap: Docker Desktop down again at check-in, same signature as
+  Day 1/2 (host sleep between check-ins). Same clean recovery: containers
+  came back healthy in seconds (8 days old, not recreated), no API restart
+  needed, `/ready` recovered to `ok`.
+- Counters: `refresh_access_token` success now `2` (one more successful
+  access-token refresh since Day 2, expected). `get_message` /
+  `client_error` = `2` confirms Day 2's `gmail_incomplete=2` was exactly 2
+  individual message-fetch 404s, not a miscount.
+- Sync: `imported=0 updated=0 unchanged=0`, both cursors still
+  `"incremental"`. `gmail_incomplete` back to `0` this time — Day 2's
+  occurrence was a one-off, not a growing/persistent issue.
+- Connection status: `active`, `authorisation_revision: 3` — unchanged.
+- Duplicates: 0/0/0.
+- Writes: confirmed 0 `action_executions` with `started_at` after T0.
+- GM-12: not observable yet (no resync yet).
+- Reconnection events: none.
