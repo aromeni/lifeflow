@@ -102,3 +102,21 @@ is reconnected.
 - Writes: confirmed 0 `action_executions` with `started_at` after T0.
 - GM-12: not observable yet (no resync yet).
 - Reconnection events: none.
+
+## Day 4 — 2026-08-10T14:30Z — 111.7h elapsed
+
+- Flags: all three confirmed `false` at check-in start. Same API/web PIDs
+  since Day 0.
+- No observed gap this time — Docker/db/redis stayed up continuously since
+  Day 3 (22h container uptime at check-in), first fully clean interval.
+- Counters: `refresh_access_token` success now `3` (one more since Day 3,
+  expected). `get_message`/`client_error` unchanged at `2` — Day 2's
+  incomplete-fetch pair has not recurred or grown.
+- Sync: `imported=0 updated=0 unchanged=0`, both cursors still
+  `"incremental"` — no resync yet, ~4.7 days in, within the expected ~7-day
+  window.
+- Connection status: `active`, `authorisation_revision: 3` — unchanged.
+- Duplicates: 0/0/0.
+- Writes: confirmed 0 `action_executions` with `started_at` after T0.
+- GM-12: not observable yet (no resync yet).
+- Reconnection events: none.
