@@ -137,3 +137,31 @@ is reconnected.
 - Writes: confirmed 0 `action_executions` with `started_at` after T0.
 - GM-12: not observable yet (no resync yet).
 - Reconnection events: none.
+
+## Day 6 — 2026-08-12T22:19Z — 167.6h elapsed (6.98 days)
+
+- Flags: all three confirmed `false` at check-in start.
+- Observed gap, different in kind from Day 1/2/3: no `uvicorn`/`next
+  dev`/`arq` processes were running at all (not just Docker) — a full
+  machine reboot is the likely cause, not just sleep. Docker Desktop was
+  also down. Recovery: reopened Docker Desktop, `docker compose up -d db
+  redis --wait` (same containers, 12 days old, not recreated — no data
+  loss), confirmed `SESSION_SECRET` still fixed in `.env` (so no session
+  disruption once the API restarted), restarted the API process fresh.
+  `/health`/`/ready`/`/config` all confirmed healthy and flags still safe
+  immediately after restart.
+- Counter caveat: Prometheus counters are in-process only and reset on an
+  API restart, so this check-in's `refresh_access_token`/`list_history`/
+  `list_events` all read `1` rather than continuing yesterday's tally — this
+  reflects the restart, not a regression; the historical counts from Day
+  0–5 remain valid for the intervals they covered.
+- **7-day boundary status**: at 6.98 days elapsed, the connection is still
+  `status: active` and the controlled sync succeeded (HTTP 200,
+  `imported=0 updated=0 unchanged=0`, both cursors still `"incremental"`).
+  The refresh token has not expired yet — right at the edge of the
+  documented ~7-day window, not past it. Watching the next check-in closely
+  for the expected `revoked`/409 event.
+- Duplicates: 0/0/0.
+- Writes: confirmed 0 `action_executions` with `started_at` after T0.
+- GM-12: not observable yet (no resync yet).
+- Reconnection events: none.
