@@ -115,6 +115,14 @@ absorbed as `unchanged`.
 6. Log the elapsed hours since T0 at the moment of expiry, and resume the
    daily protocol from §3.
 
+**Residue note (observed Day 7):** the revocation path clears
+`encrypted_access_token` but leaves `refresh_token_key_id` /
+`encrypted_refresh_token` in place while the account sits in `revoked`
+status. Not a blocker — the refresh token is already rejected by Google and
+unusable — but it means the final teardown's zero-credential check (§8 below
+/ soak completion) must be verified strictly *after* disconnect, not
+inferred from a `revoked` account alone.
+
 ## 5a. Watch for a full resync (see day-00-connection-evidence.md)
 
 Phase 6B's imported-data deletion emptied `source_items`/`signals` but never

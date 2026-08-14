@@ -165,3 +165,57 @@ is reconnected.
 - Writes: confirmed 0 `action_executions` with `started_at` after T0.
 - GM-12: not observable yet (no resync yet).
 - Reconnection events: none.
+
+## Day 7 — 2026-08-14T18:35Z (expiry) / 22:52Z (reconnection) — 211.8h elapsed at check-in
+
+**The 7-day Testing-status boundary occurred.** No gap this time (Docker/API
+had been up 44h continuously; same PIDs since the Day 6 restart).
+
+- First sync attempt at check-in (211.8h / 8.83 days elapsed) returned
+  **HTTP 409 `reauthorisation_required`**. Verified in the database
+  immediately after: `connected_accounts.status` flipped from `active` to
+  `revoked`; `audit_events` recorded `account.revoked` at
+  `2026-08-14T18:35:58.657833+00:00`. The last confirmed-`active` check-in
+  was Day 6 at 6.98 days, so the actual expiry happened somewhere in that
+  ~46-hour gap between check-ins — consistent with, though not more
+  precisely pinned within, Google's documented "~7 days from consent"
+  Testing-status window.
+- Bounded-failure check: `provider_requests_total{operation="refresh_access_token",outcome="grant_invalid"}=1`,
+  no repeat attempts, and `list_history`/`list_events` counters did **not**
+  increment on this call — the sync correctly short-circuited on the failed
+  refresh rather than proceeding to call Gmail/Calendar anyway. A single,
+  non-retried 409 was returned to the caller. No cron/background job in
+  this codebase touches Google, so no retry storm was possible by
+  construction, consistent with the fake-provider rehearsal from earlier
+  phases.
+- Residue note for the record: `store_tokens`'s revocation handling clears
+  `encrypted_access_token` but **not** `refresh_token_key_id`/
+  `encrypted_refresh_token` — both were still present (`has_refresh: true`)
+  while the account sat in `revoked` status, before reconnection. Not a
+  soak-blocking issue (the refresh token itself is already rejected by
+  Google and unusable), but worth being precise about for the final
+  zero-residue check at soak completion — "0 stored credentials" needs to
+  be verified strictly *after* disconnect, not merely inferred from the
+  revoked state.
+- **Controlled reconnection**: `GOOGLE_CONNECTOR_OAUTH_ENABLED` set to
+  `true`; API and web restarted; owner reconnected Account A only
+  (`SOAK RECONNECTION SENT`). Verified independently against the database
+  before proceeding: `status: active`, `authorisation_revision` incremented
+  from `3` to `4` (exactly +1), exactly the same four scopes, exactly one
+  `connected_accounts` row for this user+provider (no duplicate row created
+  by the reconnect), zero other real-credentialed `google` rows (Account B
+  still untouched), zero `google_subject` bindings. Audit event:
+  `account.tokens_refreshed` at `2026-08-14T22:52:37.53686+00:00`
+  (`authorisation_revision: 4`) — same pre-existing audit-vocabulary quirk
+  noted in `daily-checklist.md` §5. `GOOGLE_CONNECTOR_OAUTH_ENABLED` set
+  back to `false` immediately after, confirmed live via `/config`.
+- Resumed the daily protocol post-reconnection: sync succeeded
+  (`imported=0 updated=0 unchanged=0`, both cursors still `"incremental"` —
+  the sync cursor survived the revoke/reconnect cycle, same as it survived
+  Phase 6B's disconnect/reconnect). Duplicates: 0/0/0. Writes: confirmed 0
+  `action_executions` with `started_at` after T0.
+- GM-12: still not observable (no resync yet).
+- **T0 is unchanged** — the soak clock remains anchored to the original
+  2026-08-05T22:46:02Z consent, per the plan ("the soak clock does not
+  reset" on a mid-soak reconnection). Soak still ends no earlier than
+  2026-08-15T22:46:02Z — under 24h away from this check-in.
