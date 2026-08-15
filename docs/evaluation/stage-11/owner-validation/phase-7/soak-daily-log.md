@@ -219,3 +219,25 @@ had been up 44h continuously; same PIDs since the Day 6 restart).
   2026-08-05T22:46:02Z consent, per the plan ("the soak clock does not
   reset" on a mid-soak reconnection). Soak still ends no earlier than
   2026-08-15T22:46:02Z — under 24h away from this check-in.
+
+## Day 8 — 2026-08-15T10:20Z — 227.6h elapsed (9.48 days)
+
+- Flags: all three confirmed `false` at check-in start. Same API/web PIDs
+  since Day 7's post-reconnection restart; Docker up 2 days continuously —
+  no observed gap.
+- Connection status: `active`, `authorisation_revision: 4` — unchanged
+  since the Day 7 reconnection, refresh continuing to work normally on the
+  new grant.
+- Sync: `imported=0 updated=0 unchanged=0`, both cursors still
+  `"incremental"`.
+- Duplicates: 0/0/0.
+- Writes: confirmed 0 `action_executions` with `started_at` after T0.
+- GM-12: still not observable (no resync yet — it has now gone unobserved
+  for the entire soak; will record this honestly at completion rather than
+  force it, per the plan).
+- Reconnection events: none since Day 7.
+- **Soak completes at 2026-08-15T22:46:02Z — approximately 12.4 hours from
+  this check-in.** Next check-in at or after that time should be the final
+  one, moving to the completion teardown (imported-data deletion,
+  revocation, disconnect, zero-residue proof) instead of another daily
+  cycle.
