@@ -1,6 +1,6 @@
 # Stage 11A Phase 7 — 10-Day Owner-Only Soak
 
-**Status:** In progress · **Started:** see [day-00-connection-evidence.md](../evaluation/stage-11/owner-validation/phase-7/day-00-connection-evidence.md) for the exact recorded consent timestamp (T0)
+**Status:** Complete · **Started:** 2026-08-05T22:46:02Z (T0) · **Completed:** 2026-08-16 (257.9 hours elapsed)
 
 Companion: [daily-checklist.md](../evaluation/stage-11/owner-validation/phase-7/daily-checklist.md) · [soak-daily-log.md](../evaluation/stage-11/owner-validation/phase-7/soak-daily-log.md) · [soak-period-decision.md](../evaluation/stage-11/owner-validation/phase-4b/soak-period-decision.md) · [Engineering Acceptance Contract](engineering-acceptance-contract.md)
 
@@ -34,7 +34,31 @@ Two operational questions were put to the project owner before this phase began,
 
 ## What happened
 
-_Filled in at soak completion — see [soak-daily-log.md](../evaluation/stage-11/owner-validation/phase-7/soak-daily-log.md) for the day-by-day record as it accumulates._
+The soak ran 257.9 hours (10.75 days) from T0, with an owner-triggered
+check-in roughly once a day. Every check-in ran the same daily protocol:
+flag/process verification, a stability snapshot, one controlled read-only
+sync, and duplicate/write checks — all zero duplicates and zero new writes,
+every single day. Several genuine local-environment gaps occurred (Docker/
+DB/Redis outages, most likely the host sleeping or rebooting) and
+self-recovered cleanly every time with no flag drift and no data loss. The
+headline event was the Google Testing-status 7-day refresh-token boundary
+(Day 7): the token expired, the app correctly returned a single non-retried
+`409` rather than looping, and Account A was reconnected under a
+controlled, independently-verified procedure without resetting the soak
+clock. GM-12's stale-follow-up evaluation was never reached — the fixture
+mail's local copy had already been deleted before this soak began, and
+neither provider's incremental-sync cursor happened to expire into a full
+resync during the window, so it was never re-imported; forcing this was
+considered and deliberately rejected (see `phase-7-decision.md`). Full
+teardown (imported-data deletion, disconnect, flag restoration) completed
+cleanly at soak end; Google-side revocation could not be objectively
+confirmed this time (network/non-200, indistinguishable), though local
+credentials are verifiably fully cleared regardless. Decision:
+**CONDITIONAL PASS — 10-DAY SOAK COMPLETE, TWO NAMED OPEN ITEMS, NO
+BLOCKING DEFECTS.** Does not authorise Stage 12 or participant recruitment.
+See [stage-11a-phase-6b-plan.md](stage-11a-phase-6b-plan.md) for the prior
+phase and [docs/evaluation/stage-11/owner-validation/phase-7/](../evaluation/stage-11/owner-validation/phase-7/)
+for the full evidence pack.
 
 ## Evidence pack
 
@@ -42,4 +66,5 @@ See [docs/evaluation/stage-11/owner-validation/phase-7/](../evaluation/stage-11/
 
 ## Exit decision
 
-_Recorded at soak completion in `phase-7-decision.md`._
+`CONDITIONAL PASS — 10-DAY SOAK COMPLETE, TWO NAMED OPEN ITEMS, NO BLOCKING
+DEFECTS`. See [phase-7-decision.md](../evaluation/stage-11/owner-validation/phase-7/phase-7-decision.md).

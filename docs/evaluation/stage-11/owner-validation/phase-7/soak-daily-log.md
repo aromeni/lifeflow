@@ -241,3 +241,31 @@ had been up 44h continuously; same PIDs since the Day 6 restart).
   one, moving to the completion teardown (imported-data deletion,
   revocation, disconnect, zero-residue proof) instead of another daily
   cycle.
+
+## Day 9 (final) — 2026-08-16T16:41Z — 257.9h elapsed (10.75 days)
+
+**Past the 240-hour minimum — this is the completion check-in.** No gap
+since Day 8 (Docker up 3 days continuously, same PIDs). Flags confirmed
+`false` at check-in start.
+
+- Connection status: `active`, `authorisation_revision: 4` — unchanged.
+- Sync: `imported=1 updated=0 unchanged=0`, `gmail_cursor_status` still
+  `"incremental"` (not `"resynced"` — this was not a full resync). The one
+  imported item is an `email` SourceItem with `occurred_at` `2026-08-01`,
+  i.e. original fixture mail from *before* T0, not anything newly sent
+  during the soak. Its subject does not match GM-12's known text. Most
+  likely explanation: Gmail's history log generated a change event
+  referencing this already-existing message (e.g. a label/read-state
+  change) that only surfaced now, distinct from the deletion/cursor
+  interaction documented on Day 0. It produced **zero** new `Signal`s or
+  `ActionProposal`s — this soak never triggered brief generation/extraction
+  (only the daily read-only sync), so a freshly imported item stays inert
+  until a separate, human-initiated step acts on it; none did.
+- Duplicates: 0/0/0 (re-checked after the new import — still empty).
+- Writes: confirmed 0 `action_executions` with `started_at` after T0.
+- GM-12: **not observed this soak.** Discussed with the owner before this
+  check-in; the agreed position (owner did not request forcing it) is
+  recorded in `phase-7-decision.md` — not a defect, a documented and
+  understood limitation of testing against fixture mail whose local copy
+  was already deleted before the soak began, not a soak failure.
+- Proceeding to completion teardown below.
