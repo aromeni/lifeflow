@@ -68,3 +68,12 @@ observation).
    `false` throughout this check, same as the rest of Stage 11A.
 5. Full teardown afterwards: imported-data deletion, disconnect, revoke,
    zero-residue re-verification — same discipline as every prior phase.
+
+## Trigger sent
+
+Owner confirmed: `P8-FOLLOWUP-TEST-01 SENT`, 2026-08-17 (checked-in at
+`2026-08-17T20:32Z`; exact `occurred_at` will be confirmed from the
+`SourceItem` once imported at the follow-up check). Account A stayed
+disconnected in the meantime — no reason to hold a live connection open
+for a multi-day wait that doesn't require it. Follow-up check-in due no
+earlier than 2026-08-23.
