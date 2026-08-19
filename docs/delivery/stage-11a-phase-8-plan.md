@@ -1,6 +1,6 @@
 # Stage 11A Phase 8 — Closing Phase 7's Open Items and the Stage 11A Exit Decision
 
-**Status:** In progress · **Date:** 2026-08-16
+**Status:** Complete · **Date:** 2026-08-16–2026-08-19
 
 Companion: [Phase 7 plan](stage-11a-phase-7-plan.md) · [Phase 7 decision](../evaluation/stage-11/owner-validation/phase-7/phase-7-decision.md) · [Stage 11A owner-validation plan](stage-11a-owner-validation-plan.md) · [owner-validation-exit-template.md](../evaluation/stage-11/owner-validation-exit-template.md) · [Engineering Acceptance Contract](engineering-acceptance-contract.md)
 
@@ -23,7 +23,37 @@ Project owner selected "Close the two open items, then exit Stage 11A" when aske
 
 ## What happened
 
-_Filled in as this phase completes._
+The owner asked, directly, whether the ~5-day wait for a fresh GM-12
+trigger to age was actually necessary before Phase 8 could close — a fair
+question this plan answers honestly: the wait is a genuine technical
+constraint (the detector requires real elapsed time against a real Gmail
+timestamp), but it does not need to block Stage 11A's exit, since the
+underlying detection logic is already unit-tested independent of any live
+Gmail question. The owner then explicitly authorised proceeding with
+closure now, treating GM-12 as an explicit, named, deferred condition
+rather than a blocker.
+
+Revocation was closed: the owner independently checked Google's own
+connected-apps page, found LifeFlow's access genuinely still active
+(confirming Phase 7's uncertain result was real, not a masked success),
+and removed it directly via Google's interface. GM-12's cheap-path
+attempt (immediate reconnect + sync, on the chance enough real time had
+already passed) did not work; a fresh trigger (`P8-FOLLOWUP-TEST-01`) was
+designed against the actual `detect_follow_ups` logic and sent by the
+owner, then explicitly deferred rather than waited on.
+
+The overall Stage 11A exit decision was then produced by synthesising all
+8 phases against `owner-validation-success-criteria.md`'s thresholds:
+**CONDITIONAL READINESS**, with four named non-safety conditions (GM-12
+re-verification, daily-brief-generation-under-real-load never measured
+during the soak, no formal owner-usability self-review conducted, and
+§D's low-disk-space exercise never run — the last found by directly
+checking Phase 2's evidence pack rather than assumed). Zero unresolved
+P0/P1 across every phase. `stage-11a-owner-validation-plan.md` (stale
+since Phase 4C), `owner-validation-evidence-register.md` (never
+populated), and `owner-validation-success-criteria.md` (needed a changelog
+entry for two honest scope deviations) were all brought up to date. No
+application code changed this phase.
 
 ## Evidence pack
 
@@ -31,4 +61,9 @@ See [docs/evaluation/stage-11/owner-validation/phase-8/](../evaluation/stage-11/
 
 ## Exit decision
 
-_Recorded at completion in `phase-8-decision.md`, alongside the overall Stage 11A exit decision._
+**PASS — BOTH PHASE 7 OPEN ITEMS ADDRESSED.** See
+[phase-8-decision.md](../evaluation/stage-11/owner-validation/phase-8/phase-8-decision.md)
+for this phase's own decision, and
+[owner-validation-exit-template.md](../evaluation/stage-11/owner-validation-exit-template.md)
+for the overall Stage 11A exit decision (**CONDITIONAL READINESS**) this
+phase produced.
