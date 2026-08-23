@@ -1,6 +1,6 @@
 # Stage 11A — Owner-Validation Exit Decision
 
-**Status:** Filled in — Stage 11A execution complete through Phase 8 · **Date:** 2026-08-19 (template created 2026-07-30)
+**Status:** Filled in — Stage 11A execution complete through Phase 9; verdict unchanged (still CONDITIONAL READINESS), one of four conditions closed · **Date:** 2026-08-23 (originally recorded 2026-08-19, template created 2026-07-30)
 
 Companion: [owner-validation-success-criteria.md](owner-validation-success-criteria.md) · [owner-validation-evidence-register.md](owner-validation-evidence-register.md) · [recruitment-authorisation-checklist.md](recruitment-authorisation-checklist.md)
 
@@ -71,14 +71,17 @@ findings across all 8 phases (1, 2, 3, 4A, 4B, 4C, 4D, 5, 6, 6A, 6A.1, 6B,
   independently-verified controlled reconnection — resolving
   `soak-period-decision.md`'s Option A in practice, not just on paper.
 
-Four explicit, non-safety P2 conditions keep this from an unqualified
-READY (see "Conditions" below). None implicates safety, privacy, duplicate
-writes, cross-user isolation, or any deletion path — each is a scope gap
-against the original Stage 11A plan's assumptions, honestly recorded rather
-than silently reconciled, per
+Four explicit, non-safety P2 conditions originally kept this from an
+unqualified READY (see "Conditions" below); **one (GM-12) was closed by
+Phase 9 on 2026-08-23**, leaving three open. None implicates safety,
+privacy, duplicate writes, cross-user isolation, or any deletion path —
+each is a scope gap against the original Stage 11A plan's assumptions,
+honestly recorded rather than silently reconciled, per
 [owner-validation-success-criteria.md](owner-validation-success-criteria.md)'s
 2026-08-19 changelog entry and
-[phase-8/gm12-deferral.md](owner-validation/phase-8/gm12-deferral.md).
+[phase-8/gm12-deferral.md](owner-validation/phase-8/gm12-deferral.md). The
+verdict remains `CONDITIONAL READINESS` — closing one of four conditions
+does not by itself reach an unqualified READY while three remain.
 
 The soak itself ran 10 days (257.9 hours), on the project owner's own
 explicit authorisation (`AUTHORISE A 10-DAY STAGE 11A OWNER-ONLY SOAK`),
@@ -89,15 +92,16 @@ condition is considered met on the terms the owner actually set.
 
 **Conditions (CONDITIONAL READINESS):**
 
-1. **GM-12 / fresh-trigger stale-follow-up re-verification.** The
-   deterministic detector logic is already proven correct independent of
-   live Gmail (`test_overdue_follow_ups`); what remains unconfirmed is
-   whether real Gmail's `SENT`/`INBOX` labels and thread IDs propagate
-   correctly through the real connector. A fresh trigger
-   (`P8-FOLLOWUP-TEST-01`) was sent 2026-08-17; re-verifiable any time from
-   2026-08-23 onward. No fixed deadline — see
-   [phase-8/gm12-deferral.md](owner-validation/phase-8/gm12-deferral.md)
-   for the exact re-verification steps.
+1. ~~**GM-12 / fresh-trigger stale-follow-up re-verification.**~~ **CLOSED
+   2026-08-23 (Phase 9).** `P8-FOLLOWUP-TEST-01`, sent 2026-08-17, was
+   reconnected, synced, and briefed 6 days later: it correctly imported
+   with `folder: "sent"` and was correctly identified by
+   `detect_follow_ups` as an unanswered follow-up
+   (`reason_codes: ["no_reply_6d"]`, confidence 0.85) — confirming real
+   Gmail's `SENT`/`INBOX` labels and thread IDs propagate correctly through
+   the real connector into the exact shape the detector expects. See
+   [phase-9/verification-results.md](owner-validation/phase-9/verification-results.md)
+   and [phase-9/phase-9-decision.md](owner-validation/phase-9/phase-9-decision.md).
 2. **Daily brief generation under real elapsed time was not measured.**
    Phase 7's soak deliberately ran read-only sync only, never brief
    generation, to avoid running extraction/proposal-composition
@@ -138,6 +142,7 @@ for the full phase-by-phase evidence-pack index this decision is built on.
 **Decided by:** Produced by Claude Code per the project owner's explicit
 instruction ("Proceed with Stage 11A Phase 8 — Closure and Exit... Produce
 a final Stage 11A owner-validation exit decision"), for project-owner
-review.
+review. Condition 1 revised 2026-08-23 following Phase 9's fresh-trigger
+verification, at the project owner's request.
 
-**Date:** 2026-08-19
+**Date:** 2026-08-19 (condition 1 closed 2026-08-23)
