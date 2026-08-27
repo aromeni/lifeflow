@@ -1,6 +1,6 @@
 # Stage 11A — Owner-Validation Exit Decision
 
-**Status:** Filled in — Stage 11A execution complete through Phase 9; verdict unchanged (still CONDITIONAL READINESS), one of four conditions closed · **Date:** 2026-08-23 (originally recorded 2026-08-19, template created 2026-07-30)
+**Status:** Filled in — Stage 11A execution through Phase 10; verdict unchanged (still CONDITIONAL READINESS), three of four conditions closed, one remaining in progress · **Date:** 2026-08-24 (originally recorded 2026-08-19, template created 2026-07-30)
 
 Companion: [owner-validation-success-criteria.md](owner-validation-success-criteria.md) · [owner-validation-evidence-register.md](owner-validation-evidence-register.md) · [recruitment-authorisation-checklist.md](recruitment-authorisation-checklist.md)
 
@@ -72,16 +72,31 @@ findings across all 8 phases (1, 2, 3, 4A, 4B, 4C, 4D, 5, 6, 6A, 6A.1, 6B,
   `soak-period-decision.md`'s Option A in practice, not just on paper.
 
 Four explicit, non-safety P2 conditions originally kept this from an
-unqualified READY (see "Conditions" below); **one (GM-12) was closed by
-Phase 9 on 2026-08-23**, leaving three open. None implicates safety,
-privacy, duplicate writes, cross-user isolation, or any deletion path —
-each is a scope gap against the original Stage 11A plan's assumptions,
-honestly recorded rather than silently reconciled, per
+unqualified READY (see "Conditions" below). **Three are now closed**: GM-12
+(Phase 9, 2026-08-23), the owner-usability self-review (Phase 10,
+2026-08-24), and §D's low-disk-space exercise (Phase 10, 2026-08-24). **One
+remains open**: daily brief generation under real elapsed time, currently
+in progress (Phase 10). None of the four implicated safety, privacy,
+duplicate writes, cross-user isolation, or any deletion path — each was a
+scope gap against the original Stage 11A plan's assumptions, honestly
+recorded rather than silently reconciled, per
 [owner-validation-success-criteria.md](owner-validation-success-criteria.md)'s
 2026-08-19 changelog entry and
-[phase-8/gm12-deferral.md](owner-validation/phase-8/gm12-deferral.md). The
-verdict remains `CONDITIONAL READINESS` — closing one of four conditions
-does not by itself reach an unqualified READY while three remain.
+[phase-8/gm12-deferral.md](owner-validation/phase-8/gm12-deferral.md).
+
+Closing the usability-review condition itself surfaced **three new,
+separate, genuine P2 findings** (not exit conditions — a completed review
+does not require zero findings): deletion-choice clarity, outage guidance,
+and — most significantly — uncertain-outcome guidance, where the owner
+reported consistently disregarding `uncertain` results rather than acting
+on them. These are carried forward as product-improvement items for a
+future UX/copy pass, not as blockers to this decision, and not silently
+dropped — see
+[owner-observation-template.md](owner-observation-template.md)'s "§F
+walkthrough" entry.
+
+The verdict remains `CONDITIONAL READINESS` — one condition (daily brief
+generation) is still open.
 
 The soak itself ran 10 days (257.9 hours), on the project owner's own
 explicit authorisation (`AUTHORISE A 10-DAY STAGE 11A OWNER-ONLY SOAK`),
@@ -110,30 +125,34 @@ condition is considered met on the terms the owner actually set.
    the full soak) that runs brief generation against a real connected
    account across at least several real days and confirms stable,
    consistent output with no unexplained failures.
-3. **No formal owner-usability self-review (§F) was conducted** using
+3. ~~**No formal owner-usability self-review (§F) was conducted.**~~
+   **CLOSED 2026-08-24 (Phase 10).** The four already-known friction
+   points were reformatted into
    [owner-observation-template.md](owner-observation-template.md)'s
-   structured, labelled format. Substantively similar content exists
-   scattered across phase defect registers (e.g. D-6B-02 session
-   invalidation on restart, D-6B-03 deletion-control UI gating, Turbopack
-   cache contamination, the Phase 7/8 revoke-token intermittent failure),
-   but was never consolidated into the prescribed
-   `OWNER OBSERVATION — NOT PARTICIPANT EVIDENCE` format. Re-verification:
-   a dedicated pass through §F's evaluation list, recorded in that
-   template, whenever convenient.
+   prescribed format, and the project owner then conducted a genuine,
+   direct, conversational walkthrough of all ten §F dimensions with Claude,
+   giving their own impressions in their own words for each. Seven
+   dimensions surfaced no defect (two carried a visual-design suggestion
+   only); **three surfaced genuine, open P2 findings, carried forward as
+   product-improvement items, not silently closed**: deletion-choice
+   clarity (the owner does not feel the difference between the four
+   deletion options is clear enough to act on confidently), outage
+   guidance (has not always been clear when seen), and — the most
+   significant — uncertain-outcome guidance (the owner has consistently
+   disregarded `uncertain` results rather than acting on them, which cuts
+   against the product's own design assumption that a human resolves an
+   uncertain outcome). Closing this condition required conducting the
+   review, not achieving zero findings — see
+   [phase-10/owner-usability-review-status.md](owner-validation/phase-10/owner-usability-review-status.md).
 
-4. **§D's "low disk space" failure/recovery exercise was never run.**
-   Checked directly against Phase 2's evidence pack (`owner-validation/phase-2/`)
-   — no mention of a disk-space exercise anywhere in it; every other §D
-   item (API/web/worker/scheduler restart, Redis/PostgreSQL outage,
-   provider-timeout before/after write, token expiry, revoked consent,
-   backup/restore, rollback) is present, this one specifically is not. Not
-   safety-blocking on its own (no code path in this application writes
-   unbounded local data outside the database/Redis containers, which have
-   their own operational monitoring), but it is a genuine, named gap
-   against §D's original list rather than a silently-assumed pass.
-   Re-verification: a bounded local exercise filling the disk (or a
-   constrained test volume) and confirming the API degrades safely rather
-   than corrupting data.
+4. ~~**§D's "low disk space" failure/recovery exercise was never run.**~~
+   **CLOSED 2026-08-24 (Phase 10).** Run against an isolated, throwaway
+   48MB-tmpfs Postgres container — never the real dev database or host
+   disk. Confirmed the app degrades safely under genuine disk exhaustion
+   (a clean `500` with no leaked internals, zero partial/corrupted rows, no
+   crash) and recovers automatically the instant space frees, with no
+   restart required. See
+   [phase-10/low-disk-space-results.md](owner-validation/phase-10/low-disk-space-results.md).
 
 **Evidence citations:** see
 [owner-validation-evidence-register.md](owner-validation-evidence-register.md)
@@ -143,6 +162,8 @@ for the full phase-by-phase evidence-pack index this decision is built on.
 instruction ("Proceed with Stage 11A Phase 8 — Closure and Exit... Produce
 a final Stage 11A owner-validation exit decision"), for project-owner
 review. Condition 1 revised 2026-08-23 following Phase 9's fresh-trigger
-verification, at the project owner's request.
+verification, at the project owner's request. Conditions 3 and 4 revised
+2026-08-24 following Phase 10's low-disk-space exercise and a direct
+conversational §F walkthrough with the project owner.
 
-**Date:** 2026-08-19 (condition 1 closed 2026-08-23)
+**Date:** 2026-08-19 (condition 1 closed 2026-08-23; conditions 3 and 4 closed 2026-08-24)
