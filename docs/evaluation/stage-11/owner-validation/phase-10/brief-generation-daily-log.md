@@ -47,3 +47,51 @@ error, section counts, any anomaly), connection/stability status.
   specifically gates *new* connections and Account A is deliberately still
   connected mid-exercise; every other row still passes.
 - No anomalies.
+
+## Day 7 — 2026-08-31T19:09:20Z (second check-in since Day 3; ~6.99 real days elapsed since T0)
+
+- No gap: API process is the same PID as Day 0/Day 3 (running continuously
+  since, started the prior Monday evening); `db`/`redis` up 2 weeks
+  straight, healthy. `/health` and `/ready` both clean (`degraded_dependencies: []`).
+  Flags confirmed `false`/`false`/`false`.
+- Connection status: `active`, `authorisation_revision: 7` — unchanged since
+  Day 0's reconnection, `has_access`/`has_refresh` both true.
+- Sync: `imported=0 updated=0 unchanged=0`, both `gmail_cursor_status` and
+  `calendar_cursor_status` still `"incremental"` (no full resync triggered
+  yet).
+- Brief generation: `HTTP 200`, `status: "complete"`, version `1` for the
+  new briefing date (2026-08-30T23:00Z, i.e. 2026-08-31 Europe/London) —
+  correct, not a stall. Section counts: needs_attention 7, today_upcoming 4,
+  waiting_for **3** (up from 2 on Day 0/Day 3 — a third stale-follow-up
+  crossed its threshold as real days advanced: `no_reply_8d` on the
+  Northgate contract-terms reply, alongside the existing 13-day and 20-day
+  items), suggested_actions 6, low_confidence_review 1. Extraction: 17
+  deterministic signals, 0 LLM used, 0 failed; `persisted_new: 1`,
+  `persisted_updated: 7`, `persisted_unchanged: 9`.
+- Proposal generation: `created: 2` — investigated, not assumed benign.
+  Both new proposals (`60122480…` a `create_task` traced to `em-019`,
+  `62ccde42…` a `create_gmail_draft` traced to `em-009`) are freshly
+  created because their underlying deadlines (`before the end of the
+  month`, `by the 30th`) became due/overdue exactly as real calendar days
+  advanced — deterministic, date-driven proposal generation working
+  correctly, not duplication. Confirmed distinct `source_refs` from every
+  prior proposal on this account.
+- Duplicates: all three checks (`source_items` by external_id,
+  `signals` by dedupe_key, `action_proposals` by origin_fingerprint) return
+  0 rows.
+- Writes: confirmed 0 `action_executions` against this connected account
+  with `started_at` after T0.
+- `preconnection_readiness_check.py` again correctly reports `NOT READY`
+  (`stored_credential_rows=1`) — same expected, explained condition as
+  Day 3; every other check passes.
+- No anomalies.
+
+**Assessment:** three check-ins (Day 0, Day 3, Day 7) spanning just under 7
+real days, each independently verified end-to-end (sync → brief generation
+→ duplicate checks → write checks), all clean with no unexplained failures
+and only expected, explainable variation (per-day version numbering,
+date-relative extraction counts, newly-due proposals as calendar time
+advances). This satisfies the exit template's condition 2 wording ("across
+at least several real days... stable, consistent output with no unexplained
+failures"). **Condition 2 is closed** — see
+[phase-10-decision.md](phase-10-decision.md).

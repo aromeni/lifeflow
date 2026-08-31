@@ -1,6 +1,6 @@
 # Stage 11A Phase 10 — Closing the Remaining Three Exit Conditions
 
-**Status:** In progress · **Date:** 2026-08-24
+**Status:** Complete · **Date:** 2026-08-24 (all three conditions closed by 2026-08-31)
 
 Companion: [Phase 8 plan](stage-11a-phase-8-plan.md) · [Phase 9 plan](stage-11a-phase-9-plan.md) · [owner-validation-exit-template.md](../evaluation/stage-11/owner-validation-exit-template.md) · [Engineering Acceptance Contract](engineering-acceptance-contract.md)
 
@@ -27,7 +27,24 @@ Continuation of the project owner's "continue with the remaining conditions" ins
 
 ## What happened
 
-_Filled in as each condition closes._
+All three conditions closed:
+
+1. §D low-disk-space exercise — closed 2026-08-24 against an isolated
+   throwaway tmpfs Postgres container. See
+   [phase-10/low-disk-space-results.md](../evaluation/stage-11/owner-validation/phase-10/low-disk-space-results.md).
+2. Owner-usability self-review (§F) — closed 2026-08-24 via a direct
+   conversational walkthrough with the project owner; three genuine P2
+   findings surfaced and carried forward. See
+   [phase-10/owner-usability-review-status.md](../evaluation/stage-11/owner-validation/phase-10/owner-usability-review-status.md).
+3. Daily brief generation under real elapsed time — closed 2026-08-31
+   after three independently-verified check-ins (Day 0, Day 3, Day 7)
+   spanning just under 7 real days. See
+   [phase-10/brief-generation-daily-log.md](../evaluation/stage-11/owner-validation/phase-10/brief-generation-daily-log.md).
+
+See
+[phase-10/phase-10-decision.md](../evaluation/stage-11/owner-validation/phase-10/phase-10-decision.md)
+for the full decision record. Live-account teardown for the
+brief-generation exercise is pending the project owner's go-ahead.
 
 ## Evidence pack
 
@@ -35,4 +52,11 @@ See [docs/evaluation/stage-11/owner-validation/phase-10/](../evaluation/stage-11
 
 ## Exit decision
 
-_Recorded per-condition as each closes; overall Stage 11A verdict revisited once all three are addressed._
+**PASS — all three Phase 10 conditions closed** (see
+[phase-10-decision.md](../evaluation/stage-11/owner-validation/phase-10/phase-10-decision.md)).
+Combined with Phase 9's GM-12 closure, all four conditions named in the
+Stage 11A exit decision are closed. Whether the overall verdict moves
+beyond `CONDITIONAL READINESS` — given three new P2 findings surfaced by
+the usability review — is deferred to the project owner; see
+[owner-validation-exit-template.md](../evaluation/stage-11/owner-validation-exit-template.md)'s
+"Open question."

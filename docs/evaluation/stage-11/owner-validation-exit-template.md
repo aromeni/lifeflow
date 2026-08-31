@@ -1,6 +1,6 @@
 # Stage 11A — Owner-Validation Exit Decision
 
-**Status:** Filled in — Stage 11A execution through Phase 10; verdict unchanged (still CONDITIONAL READINESS), three of four conditions closed, one remaining in progress · **Date:** 2026-08-24 (originally recorded 2026-08-19, template created 2026-07-30)
+**Status:** Filled in — Stage 11A execution through Phase 10; all four original conditions now closed, verdict revision pending project-owner review (see "Open question" below) · **Date:** 2026-08-31 (originally recorded 2026-08-19, template created 2026-07-30)
 
 Companion: [owner-validation-success-criteria.md](owner-validation-success-criteria.md) · [owner-validation-evidence-register.md](owner-validation-evidence-register.md) · [recruitment-authorisation-checklist.md](recruitment-authorisation-checklist.md)
 
@@ -72,14 +72,14 @@ findings across all 8 phases (1, 2, 3, 4A, 4B, 4C, 4D, 5, 6, 6A, 6A.1, 6B,
   `soak-period-decision.md`'s Option A in practice, not just on paper.
 
 Four explicit, non-safety P2 conditions originally kept this from an
-unqualified READY (see "Conditions" below). **Three are now closed**: GM-12
-(Phase 9, 2026-08-23), the owner-usability self-review (Phase 10,
-2026-08-24), and §D's low-disk-space exercise (Phase 10, 2026-08-24). **One
-remains open**: daily brief generation under real elapsed time, currently
-in progress (Phase 10). None of the four implicated safety, privacy,
-duplicate writes, cross-user isolation, or any deletion path — each was a
-scope gap against the original Stage 11A plan's assumptions, honestly
-recorded rather than silently reconciled, per
+unqualified READY (see "Conditions" below). **All four are now closed**:
+GM-12 (Phase 9, 2026-08-23), §D's low-disk-space exercise (Phase 10,
+2026-08-24), the owner-usability self-review (Phase 10, 2026-08-24), and
+daily brief generation under real elapsed time (Phase 10, 2026-08-31).
+None of the four implicated safety, privacy, duplicate writes, cross-user
+isolation, or any deletion path — each was a scope gap against the
+original Stage 11A plan's assumptions, honestly recorded rather than
+silently reconciled, per
 [owner-validation-success-criteria.md](owner-validation-success-criteria.md)'s
 2026-08-19 changelog entry and
 [phase-8/gm12-deferral.md](owner-validation/phase-8/gm12-deferral.md).
@@ -95,8 +95,15 @@ dropped — see
 [owner-observation-template.md](owner-observation-template.md)'s "§F
 walkthrough" entry.
 
-The verdict remains `CONDITIONAL READINESS` — one condition (daily brief
-generation) is still open.
+**Open question — not yet decided:** all four originally-named conditions
+are now closed, but the usability-review closure itself introduced three
+new, genuine, open P2 findings that were never exit conditions in their
+own right. The verdict recorded here remains `CONDITIONAL READINESS`
+pending the project owner's explicit direction on whether closing the
+original four conditions warrants a fresh assessment toward an upgraded
+verdict, or whether the three new P2 findings should themselves become the
+named conditions of a continued `CONDITIONAL READINESS`. This document
+will not be revised to a different verdict without that direction.
 
 The soak itself ran 10 days (257.9 hours), on the project owner's own
 explicit authorisation (`AUTHORISE A 10-DAY STAGE 11A OWNER-ONLY SOAK`),
@@ -117,14 +124,17 @@ condition is considered met on the terms the owner actually set.
    the real connector into the exact shape the detector expects. See
    [phase-9/verification-results.md](owner-validation/phase-9/verification-results.md)
    and [phase-9/phase-9-decision.md](owner-validation/phase-9/phase-9-decision.md).
-2. **Daily brief generation under real elapsed time was not measured.**
-   Phase 7's soak deliberately ran read-only sync only, never brief
-   generation, to avoid running extraction/proposal-composition
-   unattended against the live account for 10 days. Re-verification would
-   require a separate, bounded, owner-attended exercise (not a repeat of
-   the full soak) that runs brief generation against a real connected
-   account across at least several real days and confirms stable,
-   consistent output with no unexplained failures.
+2. ~~**Daily brief generation under real elapsed time was not measured.**~~
+   **CLOSED 2026-08-31 (Phase 10).** Three independently-verified
+   check-ins (Day 0 2026-08-24, Day 3 2026-08-27, Day 7 2026-08-31)
+   spanning just under 7 real days against the real reconnected Account A,
+   each running the full protocol (sync → brief generation → duplicate
+   checks → write checks): zero duplicates, zero unauthorised writes, and
+   only expected, explainable variation (per-day version numbering,
+   date-relative extraction counts, newly-due proposals appearing as
+   calendar time genuinely advanced). See
+   [phase-10/brief-generation-daily-log.md](owner-validation/phase-10/brief-generation-daily-log.md)
+   and [phase-10/phase-10-decision.md](owner-validation/phase-10/phase-10-decision.md).
 3. ~~**No formal owner-usability self-review (§F) was conducted.**~~
    **CLOSED 2026-08-24 (Phase 10).** The four already-known friction
    points were reformatted into
@@ -164,6 +174,9 @@ a final Stage 11A owner-validation exit decision"), for project-owner
 review. Condition 1 revised 2026-08-23 following Phase 9's fresh-trigger
 verification, at the project owner's request. Conditions 3 and 4 revised
 2026-08-24 following Phase 10's low-disk-space exercise and a direct
-conversational §F walkthrough with the project owner.
+conversational §F walkthrough with the project owner. Condition 2 revised
+2026-08-31 following Phase 10's three-check-in brief-generation exercise.
+Overall verdict left unrevised pending the project owner's explicit
+direction (see "Open question" above).
 
-**Date:** 2026-08-19 (condition 1 closed 2026-08-23; conditions 3 and 4 closed 2026-08-24)
+**Date:** 2026-08-19 (condition 1 closed 2026-08-23; conditions 3 and 4 closed 2026-08-24; condition 2 closed 2026-08-31)
