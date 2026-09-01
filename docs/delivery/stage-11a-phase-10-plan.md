@@ -55,8 +55,11 @@ See [docs/evaluation/stage-11/owner-validation/phase-10/](../evaluation/stage-11
 **PASS — all three Phase 10 conditions closed** (see
 [phase-10-decision.md](../evaluation/stage-11/owner-validation/phase-10/phase-10-decision.md)).
 Combined with Phase 9's GM-12 closure, all four conditions named in the
-Stage 11A exit decision are closed. Whether the overall verdict moves
-beyond `CONDITIONAL READINESS` — given three new P2 findings surfaced by
-the usability review — is deferred to the project owner; see
-[owner-validation-exit-template.md](../evaluation/stage-11/owner-validation-exit-template.md)'s
-"Open question."
+Stage 11A exit decision are closed. On 2026-09-01 the project owner,
+on Claude's recommendation, re-affirmed `CONDITIONAL READINESS` rather
+than upgrading, with the usability review's three new findings
+(deletion-choice clarity, outage guidance, uncertain-outcome guidance)
+becoming the exit decision's new named conditions — see
+[verdict-reaffirmation.md](../evaluation/stage-11/owner-validation/phase-10/verdict-reaffirmation.md)
+and the updated
+[owner-validation-exit-template.md](../evaluation/stage-11/owner-validation-exit-template.md).

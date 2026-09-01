@@ -49,21 +49,20 @@ All three conditions this phase set out to address are now closed:
 **PASS — ALL THREE PHASE 10 CONDITIONS CLOSED.**
 
 Combined with Phase 9's closure of the GM-12 condition, **all four
-conditions named in the Stage 11A exit decision are now closed.** This
-does not, on its own, upgrade the overall Stage 11A verdict — closing the
+conditions named in the Stage 11A exit decision are now closed.** This did
+not, on its own, upgrade the overall Stage 11A verdict — closing the
 usability review surfaced three new, separate, genuine P2 findings
 (deletion-choice clarity, outage guidance, uncertain-outcome guidance)
 that were not exit conditions themselves but are real, open product-
-improvement items. Whether the overall verdict should move beyond
-`CONDITIONAL READINESS` given all four original conditions are closed but
-three new P2s exist is a separate determination, deferred to
-[owner-validation-exit-template.md](../../owner-validation-exit-template.md)
-and the project owner's review — not decided by this document.
+improvement items. On 2026-09-01 the project owner, on Claude's
+recommendation, explicitly re-affirmed `CONDITIONAL READINESS` with those
+three findings as the new named conditions rather than upgrading — see
+[verdict-reaffirmation.md](verdict-reaffirmation.md) and the updated
+[owner-validation-exit-template.md](../../owner-validation-exit-template.md).
 
 Live-account teardown (imported-data deletion, disconnect, revocation,
-zero-residue verification) for the brief-generation exercise has not yet
-been run — pending the owner's go-ahead, per this engagement's established
-pattern of owner-attended teardown rather than a unilaterally-triggered
-one.
+zero-residue verification) for the brief-generation exercise follows this
+decision, per this engagement's established pattern of owner-attended
+teardown once an exercise's evidence-gathering purpose is complete.
 
 Does not authorise recruitment or Stage 12.

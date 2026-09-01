@@ -1,6 +1,6 @@
 # Stage 11A — Owner-Validation Exit Decision
 
-**Status:** Filled in — Stage 11A execution through Phase 10; all four original conditions now closed, verdict revision pending project-owner review (see "Open question" below) · **Date:** 2026-08-31 (originally recorded 2026-08-19, template created 2026-07-30)
+**Status:** Filled in — Stage 11A execution through Phase 10; all four original conditions closed, verdict re-affirmed as CONDITIONAL READINESS under three new named conditions per the project owner's explicit direction · **Date:** 2026-09-01 (originally recorded 2026-08-19, template created 2026-07-30)
 
 Companion: [owner-validation-success-criteria.md](owner-validation-success-criteria.md) · [owner-validation-evidence-register.md](owner-validation-evidence-register.md) · [recruitment-authorisation-checklist.md](recruitment-authorisation-checklist.md)
 
@@ -85,25 +85,29 @@ silently reconciled, per
 [phase-8/gm12-deferral.md](owner-validation/phase-8/gm12-deferral.md).
 
 Closing the usability-review condition itself surfaced **three new,
-separate, genuine P2 findings** (not exit conditions — a completed review
-does not require zero findings): deletion-choice clarity, outage guidance,
-and — most significantly — uncertain-outcome guidance, where the owner
-reported consistently disregarding `uncertain` results rather than acting
-on them. These are carried forward as product-improvement items for a
-future UX/copy pass, not as blockers to this decision, and not silently
-dropped — see
+separate, genuine P2 findings** (not exit conditions at the time — a
+completed review does not require zero findings): deletion-choice
+clarity, outage guidance, and — most significantly — uncertain-outcome
+guidance, where the owner reported consistently disregarding `uncertain`
+results rather than acting on them. See
 [owner-observation-template.md](owner-observation-template.md)'s "§F
 walkthrough" entry.
 
-**Open question — not yet decided:** all four originally-named conditions
-are now closed, but the usability-review closure itself introduced three
-new, genuine, open P2 findings that were never exit conditions in their
-own right. The verdict recorded here remains `CONDITIONAL READINESS`
-pending the project owner's explicit direction on whether closing the
-original four conditions warrants a fresh assessment toward an upgraded
-verdict, or whether the three new P2 findings should themselves become the
-named conditions of a continued `CONDITIONAL READINESS`. This document
-will not be revised to a different verdict without that direction.
+**Verdict re-affirmed, not upgraded (decided 2026-09-01):** with all four
+originally-named conditions closed, the project owner was asked to choose
+between an upgraded verdict (treating the three new findings as
+carried-forward improvement items) or continuing `CONDITIONAL READINESS`
+with the three new findings as its named conditions, and explicitly chose
+the latter. The reasoning: the template's own READY bar requires "the
+product is stable enough that a participant would not be acting as a
+defect-finder for problems Stage 11A should have already caught," and the
+uncertain-outcome finding is exactly that — a real, owner-demonstrated
+point of confusion in a design that assumes a human resolves an uncertain
+outcome. Recommending READY here would knowingly carry a known, unfixed
+gap into a future human-participant evaluation instead of treating it as
+what Stage 11A is for: catching this before a participant does. The three
+findings become this document's new conditions below; the original four
+are kept, struck through, for the historical record.
 
 The soak itself ran 10 days (257.9 hours), on the project owner's own
 explicit authorisation (`AUTHORISE A 10-DAY STAGE 11A OWNER-ONLY SOAK`),
@@ -112,7 +116,7 @@ envisioned. This is treated as the owner exercising their own authority to
 set scope, not as a shortfall — the "soak period... completed" READY
 condition is considered met on the terms the owner actually set.
 
-**Conditions (CONDITIONAL READINESS):**
+**Original conditions (all closed — kept for the historical record):**
 
 1. ~~**GM-12 / fresh-trigger stale-follow-up re-verification.**~~ **CLOSED
    2026-08-23 (Phase 9).** `P8-FOLLOWUP-TEST-01`, sent 2026-08-17, was
@@ -164,6 +168,48 @@ condition is considered met on the terms the owner actually set.
    restart required. See
    [phase-10/low-disk-space-results.md](owner-validation/phase-10/low-disk-space-results.md).
 
+**Current conditions (CONDITIONAL READINESS, set 2026-09-01):**
+
+5. **Deletion-choice clarity.** *What must change:* add clear, in-product
+   copy/guidance distinguishing what each of the four deletion controls
+   does and does not do (disconnect vs. imported-data deletion vs.
+   inferred-memory deletion vs. account deletion), including which are
+   reversible, so a user can act on the right one without fear of an
+   accidental risky action. *By when:* before recruitment authorisation is
+   requested (not a Stage 11A blocker — Stage 11A's own scope prohibits
+   adding application code, per Phase 8's explicit constraint; this is
+   UX/copy work for a future stage). *How re-verified:* a dedicated,
+   repeat walkthrough of this one dimension — with the owner or another
+   reviewer — confirming they can state the distinction and consequence of
+   each option without hesitation.
+6. **Outage guidance.** *What must change:* audit and make unambiguous
+   every surface where an outage/degraded state is communicated (health
+   banners, sync-failure states, degraded brief-generation paths), closing
+   the gap the owner reported ("this sometimes hasn't been clear"). *By
+   when:* before recruitment authorisation is requested. *How
+   re-verified:* a scripted outage-simulation walkthrough (reusing Phase
+   2's failure/recovery fixtures) with the owner confirming the message
+   was clear every time it appeared.
+7. **Uncertain-outcome guidance (the most significant of the three).**
+   *What must change:* add explicit in-product guidance for `uncertain`/
+   low-confidence items — what they mean and what the user is expected to
+   do with them — closing the gap between the product's design assumption
+   (a human resolves an uncertain outcome) and the observed behaviour (the
+   owner has consistently disregarded them, and was themselves unsure
+   whether that's correct). *By when:* before recruitment authorisation is
+   requested — this one specifically, because it is the clearest instance
+   of "a problem Stage 11A should have already caught" reaching a future
+   participant unfixed. *How re-verified:* a follow-up walkthrough of the
+   low-confidence-review section specifically, confirming the owner no
+   longer defaults to ignoring `uncertain` items and can state what action
+   they took and why.
+
+None of the three implicate safety, privacy, duplicate/uncertain writes,
+cross-user isolation, or any deletion path's correctness — they are
+clarity/guidance gaps in already-correct, already-safe behaviour, which is
+exactly the shape of finding `CONDITIONAL READINESS` exists to carry
+forward rather than block on.
+
 **Evidence citations:** see
 [owner-validation-evidence-register.md](owner-validation-evidence-register.md)
 for the full phase-by-phase evidence-pack index this decision is built on.
@@ -176,7 +222,8 @@ verification, at the project owner's request. Conditions 3 and 4 revised
 2026-08-24 following Phase 10's low-disk-space exercise and a direct
 conversational §F walkthrough with the project owner. Condition 2 revised
 2026-08-31 following Phase 10's three-check-in brief-generation exercise.
-Overall verdict left unrevised pending the project owner's explicit
-direction (see "Open question" above).
+On 2026-09-01, given Claude's explicit recommendation to re-affirm rather
+than upgrade the verdict, the project owner directed exactly that;
+conditions 5–7 were added accordingly.
 
-**Date:** 2026-08-19 (condition 1 closed 2026-08-23; conditions 3 and 4 closed 2026-08-24; condition 2 closed 2026-08-31)
+**Date:** 2026-08-19 (condition 1 closed 2026-08-23; conditions 3 and 4 closed 2026-08-24; condition 2 closed 2026-08-31; conditions 5–7 set 2026-09-01)
