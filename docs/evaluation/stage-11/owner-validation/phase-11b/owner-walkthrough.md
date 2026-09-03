@@ -34,4 +34,30 @@ All three conditions' acceptance criteria (stated in [stage-11b-pre-recruitment-
 - Condition 6: the owner confirmed the outage message is clear on what's unavailable/safe/needed — **met**.
 - Condition 7: the owner confirmed they would now know what to do with an uncertain outcome, directly addressing the original finding (they had "always disregarded items listed as uncertain") — **met**.
 
+## Per-condition record (added during the 2026-09-03 integrity review, for structured traceability)
+
+### Condition 5 — deletion-choice clarity
+
+- **Prior problem:** the owner did not feel the difference between the four deletion options (disconnect, imported-data, learned-preferences, account) was clear enough to act on confidently, specifically to avoid an accidental risky action (§F walkthrough, Phase 10).
+- **Changed experience:** a single comparison table states removes/keeps/reversible for all four options; disconnect and both memory-delete controls now require an explicit confirm step naming the consequence before firing.
+- **Owner's actual reaction:** "its a yes, makes sense." Independently, on the live memory-delete confirm flow: "Yep, works. Clikced it and was asked to confirm it. But I did not as you indicated I didn't need to."
+- **Original confusion:** does not remain — the owner stated the distinction without hesitation when asked directly.
+- **Final status:** CLOSED.
+
+### Condition 6 — outage guidance
+
+- **Prior problem:** outage/degraded-state messaging "has not always been clear" (§F walkthrough, Phase 10).
+- **Changed experience:** the sync-degraded notice now states what's unavailable (only Google syncing), what remains safe (everything already imported and the rest of LifeFlow), and that no action is needed / it's safe to retry.
+- **Owner's actual reaction:** "Outage guidance, yes!"
+- **Original confusion:** does not remain, on the specific real notice shown.
+- **Final status:** CLOSED.
+
+### Condition 7 — uncertain-outcome guidance
+
+- **Prior problem:** the owner reported consistently disregarding `uncertain` results rather than acting on them, and was themselves unsure whether that was correct — the most significant of the three findings (§F walkthrough, Phase 10).
+- **Changed experience:** the uncertain-execution notice now states the outcome is unknown (not failed), why LifeFlow won't retry automatically, exactly what to verify (action-type-specific — Gmail Drafts or Google Calendar), what's safe to do next, and that no in-product reconciliation exists today.
+- **Owner's actual reaction:** asked directly whether this changes what they'd do, given their earlier admission — "yes makes sense."
+- **Original confusion:** does not remain, per the owner's direct answer to that specific question.
+- **Final status:** CLOSED.
+
 **Conditions 5, 6, and 7 are closed.** See [owner-validation-exit-template.md](../../owner-validation-exit-template.md) for the updated exit decision.
