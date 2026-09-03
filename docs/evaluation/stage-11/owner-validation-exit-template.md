@@ -1,6 +1,6 @@
 # Stage 11A — Owner-Validation Exit Decision
 
-**Status:** Filled in — Stage 11A execution through Phase 10; all four original conditions closed, verdict re-affirmed as CONDITIONAL READINESS under three new named conditions per the project owner's explicit direction · **Date:** 2026-09-01 (originally recorded 2026-08-19, template created 2026-07-30)
+**Status:** Filled in — Stage 11A execution through Phase 10, plus Stage 11B (pre-recruitment UX hardening); all seven conditions now closed, verdict reassessment recorded below, pending the project owner's explicit decision · **Date:** 2026-09-03 (originally recorded 2026-08-19, template created 2026-07-30)
 
 Companion: [owner-validation-success-criteria.md](owner-validation-success-criteria.md) · [owner-validation-evidence-register.md](owner-validation-evidence-register.md) · [recruitment-authorisation-checklist.md](recruitment-authorisation-checklist.md)
 
@@ -168,47 +168,87 @@ condition is considered met on the terms the owner actually set.
    restart required. See
    [phase-10/low-disk-space-results.md](owner-validation/phase-10/low-disk-space-results.md).
 
-**Current conditions (CONDITIONAL READINESS, set 2026-09-01):**
+**Conditions 5–7 (all closed — kept for the historical record):**
 
-5. **Deletion-choice clarity.** *What must change:* add clear, in-product
-   copy/guidance distinguishing what each of the four deletion controls
-   does and does not do (disconnect vs. imported-data deletion vs.
-   inferred-memory deletion vs. account deletion), including which are
-   reversible, so a user can act on the right one without fear of an
-   accidental risky action. *By when:* before recruitment authorisation is
-   requested (not a Stage 11A blocker — Stage 11A's own scope prohibits
-   adding application code, per Phase 8's explicit constraint; this is
-   UX/copy work for a future stage). *How re-verified:* a dedicated,
-   repeat walkthrough of this one dimension — with the owner or another
-   reviewer — confirming they can state the distinction and consequence of
-   each option without hesitation.
-6. **Outage guidance.** *What must change:* audit and make unambiguous
-   every surface where an outage/degraded state is communicated (health
-   banners, sync-failure states, degraded brief-generation paths), closing
-   the gap the owner reported ("this sometimes hasn't been clear"). *By
-   when:* before recruitment authorisation is requested. *How
-   re-verified:* a scripted outage-simulation walkthrough (reusing Phase
-   2's failure/recovery fixtures) with the owner confirming the message
-   was clear every time it appeared.
-7. **Uncertain-outcome guidance (the most significant of the three).**
-   *What must change:* add explicit in-product guidance for `uncertain`/
-   low-confidence items — what they mean and what the user is expected to
-   do with them — closing the gap between the product's design assumption
-   (a human resolves an uncertain outcome) and the observed behaviour (the
-   owner has consistently disregarded them, and was themselves unsure
-   whether that's correct). *By when:* before recruitment authorisation is
-   requested — this one specifically, because it is the clearest instance
-   of "a problem Stage 11A should have already caught" reaching a future
-   participant unfixed. *How re-verified:* a follow-up walkthrough of the
-   low-confidence-review section specifically, confirming the owner no
-   longer defaults to ignoring `uncertain` items and can state what action
-   they took and why.
+5. ~~**Deletion-choice clarity.**~~ **CLOSED 2026-09-03 (Stage 11B).** A
+   comparison table added to the Connections page states removes/keeps/
+   reversible for all four controls in one place; disconnect and both
+   memory-delete controls now require an explicit confirm step naming the
+   consequence before firing. Re-verified: the owner, walking through the
+   real UI, stated the distinction and consequence of each option without
+   hesitation ("its a yes, makes sense"). See
+   [phase-11b/owner-walkthrough.md](owner-validation/phase-11b/owner-walkthrough.md).
+6. ~~**Outage guidance.**~~ **CLOSED 2026-09-03 (Stage 11B).** Every
+   existing outage/degraded-state surface (Google sync degraded/error,
+   Gmail/Calendar partial-read, Today's brief partial/degraded notices)
+   revised to explicitly state what's unavailable, what remains safe,
+   whether action is needed, and retry guidance — verified against actual
+   backend behaviour first, so no copy overclaims. Re-verified: the owner
+   confirmed a real outage screenshot was clear ("Outage guidance, yes!").
+   See [phase-11b/owner-walkthrough.md](owner-validation/phase-11b/owner-walkthrough.md).
+7. ~~**Uncertain-outcome guidance (the most significant of the three).**~~
+   **CLOSED 2026-09-03 (Stage 11B).** The uncertain-execution notice now
+   explains all five required elements (outcome unknown; why no
+   auto-retry; action-type-specific what-to-verify; what's safe next; how
+   reconciliation becomes authorised — honestly: no in-product mechanism
+   exists today) without adding any new state-mutating capability against
+   the no-automatic-retry invariant. Re-verified: the owner, shown a real
+   uncertain-execution screenshot and asked directly whether this changes
+   what they'd do given their prior admission of always disregarding such
+   items, confirmed it does ("yes makes sense"). See
+   [phase-11b/owner-walkthrough.md](owner-validation/phase-11b/owner-walkthrough.md).
 
-None of the three implicate safety, privacy, duplicate/uncertain writes,
-cross-user isolation, or any deletion path's correctness — they are
-clarity/guidance gaps in already-correct, already-safe behaviour, which is
-exactly the shape of finding `CONDITIONAL READINESS` exists to carry
-forward rather than block on.
+None of the three implicated safety, privacy, duplicate/uncertain writes,
+cross-user isolation, or any deletion path's correctness — they were
+clarity/guidance gaps in already-correct, already-safe behaviour, closed
+by the smallest coherent UX/copy remediation (Stage 11B), not by lowering
+any threshold.
+
+## Verdict reassessment (2026-09-03, Stage 11B)
+
+With all seven conditions across Stage 11A and Stage 11B now closed, this
+section walks the READY checklist above against current evidence, as
+directed by the project owner's Stage 11B authorisation ("reassess the
+Stage 11 exit verdict against the existing exit-template criteria").
+
+- [x] All mandatory thresholds in
+  [owner-validation-success-criteria.md](owner-validation-success-criteria.md)
+  met — every row of that table's threshold checked against phase
+  evidence; the "Owner friction" row's bar ("documented with remediation
+  or explicit, reasoned acceptance") is now met in its stronger form
+  (remediated and re-verified, not merely accepted).
+- [x] No unresolved P0 or P1 finding in the owner-validation issue log —
+  unchanged, zero across all phases.
+- [x] The soak period (§C) completed — met on the terms the owner set
+  (10 days / 257.9 hours), as previously recorded.
+- [x] All failure/recovery exercises (§D) completed — Phase 2 plus
+  Phase 10's low-disk-space exercise.
+- [x] Test-account cleanup (§B) verified — Phase 10's teardown, zero
+  residue, independently confirmed on Google's own side.
+- [x] The product is stable enough that a participant would not be acting
+  as a defect-finder for problems Stage 11A should have already caught —
+  this was the specific criterion that justified re-affirming
+  `CONDITIONAL READINESS` on 2026-09-01 rather than upgrading. The gap it
+  named (the owner would hit unresolved confusion on an uncertain
+  outcome) has since been closed and independently re-verified by the
+  owner directly. This box is now checked on genuine evidence, not
+  assumption.
+
+**Claude's recommendation:** every box above is met. The honest reading of
+this document's own decision framework is
+**READY FOR INDEPENDENT ETHICS AND RECRUITMENT PREPARATION** — not because
+the bar was lowered, but because the specific, named gaps that justified
+`CONDITIONAL READINESS` have each been closed and re-verified in turn
+(GM-12, low-disk-space, and daily-brief-generation in Stage 11A Phase 10;
+deletion clarity, outage guidance, and uncertain-outcome guidance in Stage
+11B). As stated throughout this document, **a READY verdict here does not
+itself authorise recruitment** — `recruitment-authorisation-checklist.md`
+(items 5–20) and `evaluation-context-decision.md`'s outstanding ethics/
+privacy/lawful-basis items remain entirely separate, unresolved gates.
+This recommendation is not self-executing: the `Decision:` field below is
+left as `CONDITIONAL READINESS` until the project owner explicitly
+directs otherwise, consistent with how every prior verdict change in this
+engagement has been made.
 
 **Evidence citations:** see
 [owner-validation-evidence-register.md](owner-validation-evidence-register.md)
@@ -224,6 +264,12 @@ conversational §F walkthrough with the project owner. Condition 2 revised
 2026-08-31 following Phase 10's three-check-in brief-generation exercise.
 On 2026-09-01, given Claude's explicit recommendation to re-affirm rather
 than upgrade the verdict, the project owner directed exactly that;
-conditions 5–7 were added accordingly.
+conditions 5–7 were added accordingly. On 2026-09-03, per the project
+owner's explicit Stage 11B authorisation, conditions 5–7 were closed
+following implementation and a real owner re-verification walkthrough of
+each; the verdict reassessment above was produced per that same
+authorisation's instruction to "reassess the Stage 11 exit verdict against
+the existing exit-template criteria." The `Decision:` field itself is left
+unchanged pending the project owner's explicit direction.
 
-**Date:** 2026-08-19 (condition 1 closed 2026-08-23; conditions 3 and 4 closed 2026-08-24; condition 2 closed 2026-08-31; conditions 5–7 set 2026-09-01)
+**Date:** 2026-08-19 (condition 1 closed 2026-08-23; conditions 3 and 4 closed 2026-08-24; condition 2 closed 2026-08-31; conditions 5–7 set 2026-09-01, closed 2026-09-03)

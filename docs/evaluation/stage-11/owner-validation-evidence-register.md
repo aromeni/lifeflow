@@ -63,6 +63,7 @@ Test-account credentials and any raw evidence containing account-specific detail
 | 8 — Closure and Stage 11A Exit | [phase-8/](owner-validation/phase-8/) | PASS |
 | 9 — GM-12 Fresh-Trigger Follow-Up | [phase-9/](owner-validation/phase-9/) | PASS (closes one of Phase 8's four exit conditions) |
 | 10 — Closing the Remaining Three Exit Conditions | [phase-10/](owner-validation/phase-10/) | PASS (closes the remaining three of Phase 8's four exit conditions) |
+| 11B — Pre-Recruitment UX Hardening | [phase-11b/](owner-validation/phase-11b/) | PASS (closes conditions 5–7; verdict reassessment recommends READY, decision left to owner) |
 
 Automated-suite results, security-scan summaries, and failure/recovery
 outcomes are recorded within each phase's own evidence pack rather than

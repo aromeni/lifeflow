@@ -1,6 +1,6 @@
 # Stage 11B — Pre-Recruitment UX Hardening
 
-**Status:** In progress · **Date:** 2026-09-03
+**Status:** Complete — all three conditions closed and owner re-verified · **Date:** 2026-09-03
 
 Companion: [Engineering Acceptance Contract](engineering-acceptance-contract.md) · [owner-validation-exit-template.md](../evaluation/stage-11/owner-validation-exit-template.md) (conditions 5–7) · [docs/product/design-system.md](../product/design-system.md)
 
@@ -37,24 +37,24 @@ Do not reconnect Google. Do not perform provider reads or writes. Do not run ano
 | P11B-R004 | Delete-all memory requires an explicit two-step confirm with consequence copy before the API call fires | UX | `settings/page.tsx` | Unit test | Implemented |
 | P11B-R005 | New `ConfirmButton` primitive is accessible (focus moves to Confirm on arm, cancel returns to initial state, explanation is in a live region) | UX, accessibility | `apps/web/src/components/ui/ConfirmButton.tsx` | Unit test | Implemented |
 | P11B-R006 | Existing disconnect/imported-data/account-deletion/memory-delete E2E and unit tests updated for the new two-step flow, none weakened | Test | `connections/page.test.tsx`, `settings/page.test.tsx`, `e2e/deletion.spec.ts` | Full suite run | Implemented |
-| P11B-R007 | Owner walkthrough of condition 5 conducted; actual impression recorded, not fabricated | UX, documentation | `docs/evaluation/stage-11/owner-validation/phase-11b/` | Manual, owner's own words | Pending walkthrough |
+| P11B-R007 | Owner walkthrough of condition 5 conducted; actual impression recorded, not fabricated | UX, documentation | `docs/evaluation/stage-11/owner-validation/phase-11b/` | Manual, owner's own words | Verified — "its a yes, makes sense" |
 | P11B-R008 | Google sync degraded/error notices explicitly state: what's unavailable, what remains safe/unaffected, whether action is needed, retry guidance | UX | `connections/page.tsx` | Unit test | Implemented |
 | P11B-R009 | Gmail/Calendar partial-read notices explicitly state the same four elements, without claiming an automatic retry that does not exist (verified: D38 — the cursor advances past an incomplete item; it is not retried by a later sync) | UX | `connections/page.tsx` | Unit test | Implemented |
 | P11B-R010 | Today brief `partial`/`degraded` status notices explicitly state the same four elements | UX | `apps/web/src/app/today/page.tsx` | Unit test | Implemented |
 | P11B-R011 | No claim in any revised copy is factually inaccurate relative to actual backend retry/cursor behaviour | Correctness | backend inspection (`google_sync.py`, `connected_accounts.py`) | Inspection, cited in this table | Verified |
 | P11B-R012 | Existing outage/degraded unit and E2E tests (`stage10-outage-notice-fixture.spec.ts` etc.) updated for new copy, none weakened | Test | frontend unit tests, `e2e-resilience/` | Full suite run | Implemented |
-| P11B-R013 | Owner walkthrough of condition 6 conducted; actual impression recorded | UX, documentation | `docs/evaluation/stage-11/owner-validation/phase-11b/` | Manual | Pending walkthrough |
+| P11B-R013 | Owner walkthrough of condition 6 conducted; actual impression recorded | UX, documentation | `docs/evaluation/stage-11/owner-validation/phase-11b/` | Manual | Verified — "Outage guidance, yes!" |
 | P11B-R014 | Uncertain-execution notice explicitly explains: the outcome is unknown; why LifeFlow won't auto-retry; what to verify (action-type-specific: Gmail Drafts vs. Google Calendar); what's safe next; how reconciliation/retry becomes authorised (honestly: no in-product mechanism today) | UX | `apps/web/src/components/ActionProposalPanel.tsx` | Unit test | Implemented |
 | P11B-R015 | Copy is specific to `action_type` (`create_gmail_draft` vs `create_calendar_event`) — verified those are the only two action types that can reach `uncertain` (`create_task` cannot; inspected `action_executors.py`) | Correctness | `ActionProposalPanel.tsx` | Inspection + unit test | Verified |
 | P11B-R016 | No new backend endpoint, no new `ActionExecution`/`ActionProposal` state, no change to `no automatic retry` invariant | Boundary | n/a (explicit exclusion) | Diff inspection | Verified — nothing added |
 | P11B-R017 | Existing uncertain-execution unit/E2E tests updated for new copy, none weakened | Test | `ActionProposalPanel.test.tsx`, `stage10-uncertain-execution-fixture.spec.ts`, `journey-b-uncertain-write.spec.ts` | Full suite run | Implemented |
-| P11B-R018 | Owner walkthrough of condition 7 conducted; actual impression recorded — specifically whether the owner would now act differently on an `uncertain`/low-confidence item | UX, documentation | `docs/evaluation/stage-11/owner-validation/phase-11b/` | Manual | Pending walkthrough |
+| P11B-R018 | Owner walkthrough of condition 7 conducted; actual impression recorded — specifically whether the owner would now act differently on an `uncertain`/low-confidence item | UX, documentation | `docs/evaluation/stage-11/owner-validation/phase-11b/` | Manual | Verified — "yes makes sense" |
 | P11B-R019 | Frontend unit tests, lint, typecheck, build all green | Quality | n/a | `pnpm web:test && pnpm web:lint && pnpm web:typecheck && pnpm web:build` | Verified — 109/109 tests, lint/typecheck/build clean |
 | P11B-R020 | Backend unmodified — no `apps/api` production code changed (this phase is frontend-copy-only; no backend route, schema, or model touched) | Boundary | n/a | `git diff --stat` scoped to `apps/api/src` | Verified — no backend src changes |
 | P11B-R021 | `GOOGLE_OIDC_SIGNIN_ENABLED`, `GOOGLE_CONNECTOR_OAUTH_ENABLED`, `GOOGLE_PROVIDER_WRITES_ENABLED` all stay `false` throughout (no provider reads/writes; demo mode only) | Safety | `.env` | Inspection at every checkpoint | Verified |
 | P11B-R022 | Relevant E2E suites pass against the updated UI | Test | Playwright | Full run | Verified — `e2e-resilience` full suite (6/6), `e2e/deletion.spec.ts` (2/2), `e2e-design` (24/26, 2 pre-existing unrelated failures confirmed via `main` comparison, 1 baseline legitimately updated) |
-| P11B-R023 | If all three owner re-verifications pass, `owner-validation-exit-template.md` conditions 5–7 marked closed and Stage 11 exit verdict reassessed against existing criteria | Documentation | `owner-validation-exit-template.md` | Manual, after walkthroughs | Pending |
-| P11B-R024 | Dedicated branch (`stage-11b-pre-recruitment-ux-hardening`) and PR opened; not merged or tagged | Git boundary | n/a | `git log`, `gh pr view` | Pending |
+| P11B-R023 | If all three owner re-verifications pass, `owner-validation-exit-template.md` conditions 5–7 marked closed and Stage 11 exit verdict reassessed against existing criteria | Documentation | `owner-validation-exit-template.md` | Manual, after walkthroughs | Verified — conditions 5–7 closed; reassessment recorded (recommendation: READY, decision left to owner) |
+| P11B-R024 | Dedicated branch (`stage-11b-pre-recruitment-ux-hardening`) and PR opened; not merged or tagged | Git boundary | n/a | `git log`, `gh pr view` | In progress — branch created and committed; PR not yet opened |
 
 ## Acceptance criteria, stated before editing (per condition)
 
@@ -83,7 +83,30 @@ Do not reconnect Google. Do not perform provider reads or writes. Do not run ano
 - `e2e-design` (visual-regression, accessibility, responsive): 24/26 pass. Two failures (`Today with a generated brief`, `Approvals: a single proposal card`) were investigated, not assumed benign — independently reproduced against unmodified `main` (via `git stash`) and confirmed **pre-existing**, caused by the demo dataset's date-relative content drifting against static baseline images (the same phenomenon documented extensively during Stage 11A Phase 10), unrelated to this phase's changes. Left untouched. The one genuinely-affected baseline (`connections.png`, taller page from the new table) was regenerated and its diff visually inspected before accepting.
 - Backend: zero files under `apps/api/src` touched (confirmed via `git diff --stat`).
 
-**Owner walkthroughs.** _Pending — see below._
+**Owner walkthroughs (2026-09-03).** Conducted directly against the running app for all three conditions — see
+[phase-11b/owner-walkthrough.md](../evaluation/stage-11/owner-validation/phase-11b/owner-walkthrough.md)
+for the full method and verbatim owner impressions. All three passed:
+deletion clarity ("its a yes, makes sense"), outage guidance ("Outage
+guidance, yes!"), and uncertain-outcome guidance ("yes makes sense" —
+directly addressing the owner's earlier admission of always disregarding
+`uncertain` items). One methodological note: the real Account A was
+already disconnected from Phase 10's teardown, and reconnecting it live
+was correctly out of scope for this phase (prohibited), so the disconnect
+confirm-armed state was shown via a screenshot captured through the same
+isolated fake-Google fixture mechanism the `e2e-resilience` suite already
+uses, never a real Google account; the memory-delete confirm flow was
+demonstrated live by seeding one demo memory item directly (a local-only
+database write, no external side effect), which the owner then interacted
+with in their own browser and which was cleaned up afterward.
+
+**All three conditions closed 2026-09-03.**
+`owner-validation-exit-template.md` was updated accordingly, including a
+verdict reassessment against the READY checklist: with all seven
+conditions (across Stage 11A and Stage 11B) now closed, every READY box
+is met. Claude's recommendation is recorded as **READY FOR INDEPENDENT
+ETHICS AND RECRUITMENT PREPARATION** — but the `Decision:` field itself
+is left unchanged (`CONDITIONAL READINESS`) pending the project owner's
+explicit direction, per this engagement's standing practice.
 
 ## Evidence pack
 
