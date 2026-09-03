@@ -88,7 +88,13 @@ test("Stage 10 fixture — temporary provider outage renders a real, accessible,
   // Real message, not a fabricated one: exact backend safe-message copy.
   await expect(notice).toContainText("Google was temporarily unavailable.");
   // Safe manual-retry guidance is present.
-  await expect(notice).toContainText("It is safe to try syncing again in a moment.");
+  await expect(notice).toContainText("it is safe to try syncing again in a moment.");
+  // Stage 11B (condition 6): what's unavailable is scoped explicitly, and
+  // no action is required.
+  await expect(notice).toContainText(
+    "Only syncing with Google is affected — everything already imported, and the rest of LifeFlow, is unaffected.",
+  );
+  await expect(notice).toContainText("No action is needed");
   // Reconnection guidance must NOT appear for a transient (not permanent)
   // failure — that copy is reserved for the non-retryable branch.
   await expect(notice).not.toContainText("reconnect Google");

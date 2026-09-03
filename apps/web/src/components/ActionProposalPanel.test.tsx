@@ -202,7 +202,15 @@ test("an uncertain execution shows the no-automatic-retry warning", () => {
   );
 
   expect(screen.getByTestId("execution-uncertain-warning")).toHaveTextContent(
-    "has not been retried automatically",
+    "has not retried it automatically",
+  );
+  // Stage 11B (condition 7): action-type-specific verify guidance, not a
+  // generic "check with the provider" — this proposal is a Gmail draft.
+  expect(screen.getByTestId("execution-uncertain-warning")).toHaveTextContent(
+    "your Gmail Drafts folder",
+  );
+  expect(screen.getByTestId("execution-uncertain-warning")).toHaveTextContent(
+    "does not yet offer an in-product way to confirm or retry",
   );
   expect(screen.getByTestId("execution-result")).toHaveTextContent(
     "Outcome uncertain — not retried automatically",
@@ -213,6 +221,48 @@ test("an uncertain execution shows the no-automatic-retry warning", () => {
   // created, but the badge read as "still running").
   expect(screen.getByTestId(`proposal-status-${proposal.action_type}`)).toHaveTextContent(
     "Execution outcome uncertain",
+  );
+});
+
+// Stage 11B (condition 7): the verify-guidance text must match the actual
+// action type — a calendar-event proposal's uncertain outcome should never
+// point the owner at Gmail Drafts.
+test("an uncertain calendar-event execution points the owner at Google Calendar, not Gmail", () => {
+  const uncertainCalendarProposal: ActionProposal = {
+    ...proposal,
+    action_type: "create_calendar_event",
+    status: "executing",
+    execution: {
+      id: "execution-4",
+      idempotency_key: "f".repeat(40),
+      outcome: "uncertain",
+      effective_status: "uncertain",
+      execution_mode: "real",
+      simulation_only: false,
+      started_at: "2026-07-16T09:00:00Z",
+      completed_at: null,
+      action_type: "create_calendar_event",
+      proposal_version: proposal.version,
+      executed_payload: proposal.payload,
+      executed_payload_hash: proposal.payload_hash,
+      approval_binding_hash: "c".repeat(64),
+      result: { message: "Calendar did not confirm event creation before the call ended." },
+      error_code: null,
+    },
+  };
+  render(
+    <ActionProposalPanel
+      proposal={uncertainCalendarProposal}
+      timezone="Europe/London"
+      onChanged={vi.fn()}
+    />,
+  );
+
+  expect(screen.getByTestId("execution-uncertain-warning")).toHaveTextContent(
+    "your Google Calendar",
+  );
+  expect(screen.getByTestId("execution-uncertain-warning")).not.toHaveTextContent(
+    "Gmail Drafts folder",
   );
 });
 

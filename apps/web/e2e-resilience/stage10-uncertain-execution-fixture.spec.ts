@@ -108,8 +108,14 @@ test("Stage 10 fixture — uncertain execution renders a real, non-retryable, re
   const warning = card.getByTestId("execution-uncertain-warning");
   await expect(warning).toBeVisible();
   await expect(warning).toContainText(
-    "We could not confirm this action completed. It has not been retried automatically",
+    "We could not confirm this action completed — the outcome is unknown, not failed.",
   );
+  await expect(warning).toContainText("has not retried it automatically");
+  // Stage 11B (condition 7): action-type-specific verify guidance — this
+  // proposal is a Gmail draft, so it must point at Gmail, never Calendar.
+  await expect(warning).toContainText("your Gmail Drafts folder");
+  await expect(warning).not.toContainText("your Google Calendar");
+  await expect(warning).toContainText("does not yet offer an in-product way to confirm or retry");
   // Accessible semantics: a genuinely uncertain outcome is a "status" the
   // user must review, not an active in-page error — matches the Notice
   // component's own tone/role contract for this call site.

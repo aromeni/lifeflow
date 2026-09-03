@@ -10,6 +10,7 @@ import { useCallback, useEffect, useState } from "react";
 import { rateLimitMessage } from "@/components/RateLimitNotice";
 import { AppShell, PageHeader } from "@/components/ui/AppShell";
 import { Button } from "@/components/ui/Button";
+import { ConfirmButton } from "@/components/ui/ConfirmButton";
 import { FormSection } from "@/components/ui/Form";
 import { Notice } from "@/components/ui/Notice";
 import { API_URL, api, ApiError, RateLimitError } from "@/lib/api";
@@ -218,15 +219,15 @@ export default function ConnectionsPage() {
                           >
                             {syncing ? "Syncing…" : "Sync now"}
                           </Button>
-                          <Button
-                            type="button"
+                          <ConfirmButton
+                            testId="disconnect-google"
                             variant="secondary"
-                            data-testid="disconnect-google"
-                            onClick={disconnectGoogle}
+                            label={pending ? "Disconnecting…" : "Disconnect Google"}
+                            confirmLabel="Confirm disconnect"
                             disabled={pending}
-                          >
-                            {pending ? "Disconnecting…" : "Disconnect Google"}
-                          </Button>
+                            explanation="This revokes LifeFlow's access and stops future syncing. Data LifeFlow already imported stays until you delete it separately — this does not delete anything. It is reversible: you can reconnect at any time."
+                            onConfirm={disconnectGoogle}
+                          />
                         </>
                       ) : (
                         connectControl()
@@ -235,11 +236,14 @@ export default function ConnectionsPage() {
                     {syncError ? (
                       syncError.retryable === true ? (
                         <Notice tone="warning" role="status" testId="sync-degraded-notice">
-                          {syncError.message} It is safe to try syncing again in a moment.
+                          {syncError.message} Only syncing with Google is affected — everything
+                          already imported, and the rest of LifeFlow, is unaffected. No action is
+                          needed; it is safe to try syncing again in a moment.
                         </Notice>
                       ) : (
                         <Notice tone="danger" role="alert" testId="sync-error-notice">
-                          {syncError.message}
+                          {syncError.message} Only syncing with Google is affected — everything
+                          already imported, and the rest of LifeFlow, is unaffected.
                           {syncError.retryable === false
                             ? " Retrying now will not help — reconnect Google if this continues."
                             : ""}
@@ -270,7 +274,9 @@ export default function ConnectionsPage() {
                             className="text-warning-text"
                           >
                             {syncResult.gmail_incomplete} Gmail message
-                            {syncResult.gmail_incomplete === 1 ? "" : "s"} could not be read fully.
+                            {syncResult.gmail_incomplete === 1 ? "" : "s"} could not be read fully —
+                            the rest of this sync completed normally and is unaffected. No action is
+                            needed — this isn&apos;t something you need to retry yourself.
                           </p>
                         ) : null}
                         {syncResult.calendar_incomplete > 0 ? (
@@ -281,7 +287,8 @@ export default function ConnectionsPage() {
                           >
                             {syncResult.calendar_incomplete} calendar event
                             {syncResult.calendar_incomplete === 1 ? "" : "s"} could not be read
-                            fully.
+                            fully — the rest of this sync completed normally and is unaffected. No
+                            action is needed — this isn&apos;t something you need to retry yourself.
                           </p>
                         ) : null}
                       </div>
@@ -381,9 +388,72 @@ export default function ConnectionsPage() {
             {/* 7. Data controls — four distinct operations */}
             <FormSection
               legend="Data controls"
-              description="Disconnecting, deleting imported data, and deleting your account are separate operations with separate consequences — each is explained before you act."
+              description="Disconnecting, deleting imported data, deleting learned preferences, and deleting your account are four separate operations with separate consequences — each is explained before you act."
               testId="data-controls"
             >
+              {/* Stage 11B (condition 5, deletion-choice clarity): a single
+                  at-a-glance comparison, so the difference between all four
+                  options is visible without reading each control in turn. */}
+              <div
+                data-testid="deletion-options-summary"
+                className="overflow-x-auto rounded-md border border-border"
+              >
+                <table className="w-full table-fixed text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-border bg-surface-raised">
+                      <th className="w-1/4 p-2.5 font-medium text-foreground">Option</th>
+                      <th className="w-1/4 p-2.5 font-medium text-foreground">Removes</th>
+                      <th className="w-1/4 p-2.5 font-medium text-foreground">Keeps</th>
+                      <th className="w-1/4 p-2.5 font-medium text-foreground">Reversible?</th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-text-secondary">
+                    <tr className="border-b border-border">
+                      <td className="wrap-break-word p-2.5 font-medium text-foreground">
+                        Disconnect Google
+                      </td>
+                      <td className="wrap-break-word p-2.5">Access and future syncing</td>
+                      <td className="wrap-break-word p-2.5">Everything already imported</td>
+                      <td className="wrap-break-word p-2.5">Yes — reconnect any time</td>
+                    </tr>
+                    <tr className="border-b border-border">
+                      <td className="wrap-break-word p-2.5 font-medium text-foreground">
+                        Delete imported data
+                      </td>
+                      <td className="wrap-break-word p-2.5">
+                        LifeFlow&apos;s imported copy and eligible derived data
+                      </td>
+                      <td className="wrap-break-word p-2.5">
+                        Your real Gmail/Calendar (untouched); unresolved outcomes
+                      </td>
+                      <td className="wrap-break-word p-2.5">No — cannot be undone</td>
+                    </tr>
+                    <tr className="border-b border-border">
+                      <td className="wrap-break-word p-2.5 font-medium text-foreground">
+                        Delete learned preferences
+                      </td>
+                      <td className="wrap-break-word p-2.5">
+                        Preferences inferred from your own actions
+                      </td>
+                      <td className="wrap-break-word p-2.5">
+                        Imported data, explicit settings, Gmail/Calendar
+                      </td>
+                      <td className="wrap-break-word p-2.5">No — cannot be undone</td>
+                    </tr>
+                    <tr>
+                      <td className="wrap-break-word p-2.5 font-medium text-foreground">
+                        Delete account
+                      </td>
+                      <td className="wrap-break-word p-2.5">All personal product data</td>
+                      <td className="wrap-break-word p-2.5">
+                        Your Gmail/Calendar (untouched); content-free integrity records
+                      </td>
+                      <td className="wrap-break-word p-2.5">No — cannot be undone</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
               <div data-testid="control-disconnect" className="rounded-md border border-border p-4">
                 <h3 className="text-sm font-semibold text-foreground">Disconnect a provider</h3>
                 <p className="mt-1 text-sm text-text-secondary">
@@ -391,7 +461,8 @@ export default function ConnectionsPage() {
                   <strong className="text-foreground">
                     The data LifeFlow already imported stays
                   </strong>{" "}
-                  until you delete it separately.
+                  until you delete it separately — this control does not delete anything.{" "}
+                  <strong className="text-foreground">Reversible:</strong> reconnect at any time.
                 </p>
               </div>
 
@@ -410,6 +481,8 @@ export default function ConnectionsPage() {
                 <p className="mt-1 text-sm text-text-secondary">
                   Clears what LifeFlow inferred from your own actions. It does not touch imported
                   Gmail/Calendar evidence or your explicit settings.{" "}
+                  <strong className="text-foreground">Reversible:</strong> no — once deleted, a
+                  preference has to be learned again from your future actions.{" "}
                   <Link
                     href="/settings"
                     data-testid="learned-preferences-link"
