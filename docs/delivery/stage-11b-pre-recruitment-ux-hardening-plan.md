@@ -54,7 +54,7 @@ Do not reconnect Google. Do not perform provider reads or writes. Do not run ano
 | P11B-R021 | `GOOGLE_OIDC_SIGNIN_ENABLED`, `GOOGLE_CONNECTOR_OAUTH_ENABLED`, `GOOGLE_PROVIDER_WRITES_ENABLED` all stay `false` throughout (no provider reads/writes; demo mode only) | Safety | `.env` | Inspection at every checkpoint | Verified |
 | P11B-R022 | Relevant E2E suites pass against the updated UI | Test | Playwright | Full run | Verified — `e2e-resilience` full suite (6/6), `e2e/deletion.spec.ts` (2/2), `e2e-design` (24/26, 2 pre-existing unrelated failures confirmed via `main` comparison, 1 baseline legitimately updated) |
 | P11B-R023 | If all three owner re-verifications pass, `owner-validation-exit-template.md` conditions 5–7 marked closed and Stage 11 exit verdict reassessed against existing criteria | Documentation | `owner-validation-exit-template.md` | Manual, after walkthroughs | Verified — conditions 5–7 closed; reassessment recorded (recommendation: READY, decision left to owner) |
-| P11B-R024 | Dedicated branch (`stage-11b-pre-recruitment-ux-hardening`) and PR opened; not merged or tagged | Git boundary | n/a | `git log`, `gh pr view` | In progress — branch created and committed; PR not yet opened |
+| P11B-R024 | Dedicated branch (`stage-11b-pre-recruitment-ux-hardening`) and PR opened; not merged or tagged | Git boundary | n/a | `git log`, `gh pr view` | Verified — PR #24 opened; not merged or tagged |
 
 ## Acceptance criteria, stated before editing (per condition)
 
