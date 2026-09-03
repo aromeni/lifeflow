@@ -95,3 +95,12 @@ advances). This satisfies the exit template's condition 2 wording ("across
 at least several real days... stable, consistent output with no unexplained
 failures"). **Condition 2 is closed** — see
 [phase-10-decision.md](phase-10-decision.md).
+
+## Teardown — 2026-09-03
+
+Full teardown completed and independently verified as zero-residue:
+imported-data-deletion preview (no-op — 0 real source items on this
+account already), disconnect (owner-run, `revocation_confirmed: false`
+locally but independently confirmed on Google's own side — "You haven't
+linked any apps yet"), and `preconnection_readiness_check.py` 19/19 PASS.
+See [teardown.md](teardown.md) for the full record.

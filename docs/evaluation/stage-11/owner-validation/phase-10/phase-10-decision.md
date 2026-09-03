@@ -61,8 +61,13 @@ three findings as the new named conditions rather than upgrading — see
 [owner-validation-exit-template.md](../../owner-validation-exit-template.md).
 
 Live-account teardown (imported-data deletion, disconnect, revocation,
-zero-residue verification) for the brief-generation exercise follows this
-decision, per this engagement's established pattern of owner-attended
-teardown once an exercise's evidence-gathering purpose is complete.
+zero-residue verification) for the brief-generation exercise is complete
+(2026-09-03) — see
+[teardown.md](teardown.md). Google-side revocation was independently
+confirmed by the owner directly on Google's own connected-apps page ("You
+haven't linked any apps yet"), notwithstanding the disconnect's local
+`revocation_confirmed: false` (the same client-side ambiguity observed
+once before, in Phase 8). Zero residue: 0 source items, 0 stored
+credentials, 19/19 `preconnection_readiness_check.py` PASS.
 
 Does not authorise recruitment or Stage 12.
