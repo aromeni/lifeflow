@@ -115,9 +115,7 @@ test("Stage 10 fixture — uncertain execution renders a real, non-retryable, re
   // proposal is a Gmail draft, so it must point at Gmail, never Calendar.
   await expect(warning).toContainText("your Gmail Drafts folder");
   await expect(warning).not.toContainText("your Google Calendar");
-  await expect(warning).toContainText(
-    "does not yet offer an in-product way to confirm or retry",
-  );
+  await expect(warning).toContainText("does not yet offer an in-product way to confirm or retry");
   // Accessible semantics: a genuinely uncertain outcome is a "status" the
   // user must review, not an active in-page error — matches the Notice
   // component's own tone/role contract for this call site.

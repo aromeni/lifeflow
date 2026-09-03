@@ -274,9 +274,9 @@ export default function ConnectionsPage() {
                             className="text-warning-text"
                           >
                             {syncResult.gmail_incomplete} Gmail message
-                            {syncResult.gmail_incomplete === 1 ? "" : "s"} could not be read fully
-                            — the rest of this sync completed normally and is unaffected. No action
-                            is needed — this isn&apos;t something you need to retry yourself.
+                            {syncResult.gmail_incomplete === 1 ? "" : "s"} could not be read fully —
+                            the rest of this sync completed normally and is unaffected. No action is
+                            needed — this isn&apos;t something you need to retry yourself.
                           </p>
                         ) : null}
                         {syncResult.calendar_incomplete > 0 ? (
@@ -288,8 +288,7 @@ export default function ConnectionsPage() {
                             {syncResult.calendar_incomplete} calendar event
                             {syncResult.calendar_incomplete === 1 ? "" : "s"} could not be read
                             fully — the rest of this sync completed normally and is unaffected. No
-                            action is needed — this isn&apos;t something you need to retry
-                            yourself.
+                            action is needed — this isn&apos;t something you need to retry yourself.
                           </p>
                         ) : null}
                       </div>
