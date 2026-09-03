@@ -323,11 +323,70 @@ test("dismiss and delete-all call distinct endpoints", async () => {
     ).toBe(true),
   );
   await userEvent.click(screen.getByTestId("settings-memory-delete-all"));
+  await userEvent.click(screen.getByTestId("settings-memory-delete-all-confirm"));
   await waitFor(() =>
     expect(
       apiMock.mock.calls.some(([path, init]) => path === "/memories" && init?.method === "DELETE"),
     ).toBe(true),
   );
+});
+
+// Stage 11B (condition 5, deletion-choice clarity): per-item and delete-all
+// memory deletion now require an explicit two-step confirm — a single
+// click must never fire the destructive API call.
+test("a single click on per-item Delete only arms the confirm step — it does not delete", async () => {
+  mockLoad(STATUS_DISABLED, EVIDENCE_EMPTY, MEMORY_WITH_CANDIDATE);
+  render(<SettingsPage />);
+  await waitFor(() => expect(screen.getByTestId("memory-delete-mem-1")).toBeInTheDocument());
+  await userEvent.click(screen.getByTestId("memory-delete-mem-1"));
+
+  const armed = screen.getByTestId("memory-delete-mem-1-armed");
+  expect(armed).toHaveTextContent(/can't be undone/i);
+  expect(
+    apiMock.mock.calls.some(
+      ([path, init]) => path === "/memories/mem-1" && init?.method === "DELETE",
+    ),
+  ).toBe(false);
+});
+
+test("cancelling per-item delete returns to the initial, unarmed state", async () => {
+  mockLoad(STATUS_DISABLED, EVIDENCE_EMPTY, MEMORY_WITH_CANDIDATE);
+  render(<SettingsPage />);
+  await waitFor(() => expect(screen.getByTestId("memory-delete-mem-1")).toBeInTheDocument());
+  await userEvent.click(screen.getByTestId("memory-delete-mem-1"));
+  await userEvent.click(screen.getByTestId("memory-delete-mem-1-cancel"));
+
+  expect(screen.queryByTestId("memory-delete-mem-1-armed")).not.toBeInTheDocument();
+  expect(screen.getByTestId("memory-delete-mem-1")).toBeInTheDocument();
+});
+
+test("confirming per-item delete calls the delete endpoint", async () => {
+  mockLoad(STATUS_DISABLED, EVIDENCE_EMPTY, MEMORY_WITH_CANDIDATE);
+  render(<SettingsPage />);
+  await waitFor(() => expect(screen.getByTestId("memory-delete-mem-1")).toBeInTheDocument());
+  await userEvent.click(screen.getByTestId("memory-delete-mem-1"));
+  await userEvent.click(screen.getByTestId("memory-delete-mem-1-confirm"));
+
+  await waitFor(() =>
+    expect(
+      apiMock.mock.calls.some(
+        ([path, init]) => path === "/memories/mem-1" && init?.method === "DELETE",
+      ),
+    ).toBe(true),
+  );
+});
+
+test("a single click on Delete-all only arms the confirm step — it does not delete", async () => {
+  mockLoad(STATUS_DISABLED, EVIDENCE_EMPTY, MEMORY_WITH_CANDIDATE);
+  render(<SettingsPage />);
+  await waitFor(() => expect(screen.getByTestId("settings-memory-delete-all")).toBeInTheDocument());
+  await userEvent.click(screen.getByTestId("settings-memory-delete-all"));
+
+  const armed = screen.getByTestId("settings-memory-delete-all-armed");
+  expect(armed).toHaveTextContent(/can't be undone/i);
+  expect(
+    apiMock.mock.calls.some(([path, init]) => path === "/memories" && init?.method === "DELETE"),
+  ).toBe(false);
 });
 
 test("pausing inference writes the preference off without deleting memory", async () => {

@@ -74,6 +74,36 @@ function executionModeNotice(proposal: ActionProposal): { title: string; body: s
   };
 }
 
+// Stage 11B (condition 7, uncertain-outcome guidance): five things a
+// human needs to act correctly on an unconfirmed external write — what's
+// unknown, why LifeFlow won't retry on its own, exactly what to go check
+// (action-type-specific, since "check with the provider" alone was found
+// to be too vague for an owner to act on), what's safe to do meanwhile,
+// and how reconciliation/retry actually happens today. Only
+// `create_gmail_draft` and `create_calendar_event` can ever reach
+// `uncertain` — `create_task` is a purely internal write with no external
+// provider call (verified against `action_executors.py`); the fallback
+// branch is defensive only, never reachable in practice.
+function uncertainOutcomeGuidance(actionType: ActionProposal["action_type"]): string {
+  const where =
+    actionType === "create_gmail_draft"
+      ? "your Gmail Drafts folder"
+      : actionType === "create_calendar_event"
+        ? "your Google Calendar"
+        : "directly with the provider";
+  return (
+    `We could not confirm this action completed — the outcome is unknown, not failed. ` +
+    `LifeFlow has not retried it automatically, because retrying an unconfirmed write could ` +
+    `create a duplicate. What to verify: check ${where} yourself to see whether it actually ` +
+    `happened. What's safe next: do nothing else with this proposal until you've checked — ` +
+    `approving or executing a new proposal for the same thing before then could create a ` +
+    `duplicate. Reconciliation: LifeFlow does not yet offer an in-product way to confirm or ` +
+    `retry this one. If you've checked and it did not happen but is still needed, reject this ` +
+    `proposal — a future generated brief may include a fresh one if the underlying need still ` +
+    `stands.`
+  );
+}
+
 function executionResultHeading(proposal: ActionProposal): string {
   const execution = proposal.execution;
   if (!execution) return "";
@@ -466,8 +496,7 @@ export function ActionProposalPanel({
           {proposal.execution.effective_status === "uncertain" ? (
             <div className="mt-2">
               <Notice tone="warning" role="status" testId="execution-uncertain-warning">
-                We could not confirm this action completed. It has not been retried automatically —
-                check directly with the provider before assuming either outcome.
+                {uncertainOutcomeGuidance(proposal.action_type)}
               </Notice>
             </div>
           ) : null}

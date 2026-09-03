@@ -340,6 +340,10 @@ test("a temporarily-unavailable Google sync shows non-alarming, safe-to-retry gu
   expect(notice).toHaveAttribute("role", "status");
   expect(notice).toHaveTextContent(/temporarily unavailable/i);
   expect(notice).toHaveTextContent(/safe to try syncing again/i);
+  // Stage 11B (condition 6): what's unavailable is scoped explicitly, and
+  // no action is required.
+  expect(notice).toHaveTextContent(/only syncing with google is affected/i);
+  expect(notice).toHaveTextContent(/no action is needed/i);
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 });
 
@@ -366,6 +370,7 @@ test("a permanent Google sync failure explicitly says retrying will not help", a
   expect(notice).toHaveAttribute("role", "alert");
   expect(notice).toHaveTextContent(/will not help/i);
   expect(notice).toHaveTextContent(/reconnect/i);
+  expect(notice).toHaveTextContent(/only syncing with google is affected/i);
   expect(screen.queryByTestId("sync-degraded-notice")).not.toBeInTheDocument();
 });
 
@@ -511,7 +516,16 @@ test("Gmail messages that could not be fetched are disclosed as a genuine failur
 
   await waitFor(() => expect(screen.getByTestId("sync-result")).toBeInTheDocument());
   expect(screen.getByTestId("gmail-incomplete-notice")).toHaveTextContent(
-    "1 Gmail message could not be read fully.",
+    "1 Gmail message could not be read fully",
+  );
+  // Stage 11B (condition 6): the rest of the sync is unaffected, no action
+  // needed, and it will not silently retry on its own — stated explicitly.
+  expect(screen.getByTestId("gmail-incomplete-notice")).toHaveTextContent(
+    "rest of this sync completed normally and is unaffected",
+  );
+  expect(screen.getByTestId("gmail-incomplete-notice")).toHaveTextContent("No action is needed");
+  expect(screen.getByTestId("gmail-incomplete-notice")).toHaveTextContent(
+    "will not be retried automatically",
   );
   expect(screen.queryByTestId("gmail-excluded-notice")).not.toBeInTheDocument();
 });
@@ -526,8 +540,12 @@ test("calendar events that could not be parsed are disclosed distinctly", async 
 
   await waitFor(() => expect(screen.getByTestId("sync-result")).toBeInTheDocument());
   expect(screen.getByTestId("calendar-incomplete-notice")).toHaveTextContent(
-    "1 calendar event could not be read fully.",
+    "1 calendar event could not be read fully",
   );
+  expect(screen.getByTestId("calendar-incomplete-notice")).toHaveTextContent(
+    "rest of this sync completed normally and is unaffected",
+  );
+  expect(screen.getByTestId("calendar-incomplete-notice")).toHaveTextContent("No action is needed");
   expect(screen.queryByTestId("gmail-excluded-notice")).not.toBeInTheDocument();
 });
 
@@ -549,7 +567,39 @@ test("a disconnected account offers Connect Google again, not a dead Sync button
   expect(screen.getByRole("link", { name: "Connect Google" })).toBeInTheDocument();
 });
 
-test("disconnecting reloads the summary and shows the now-disconnected, data-retained state", async () => {
+// Stage 11B (condition 5, deletion-choice clarity): disconnect now requires
+// an explicit two-step confirm — a single click must never fire the API call.
+test("a single click on Disconnect only arms the confirm step — it does not disconnect", async () => {
+  mockApi({ summary: summaryWith([googleConnection()]) });
+  render(<ConnectionsPage />);
+  await userEvent.setup().click(await screen.findByTestId("disconnect-google"));
+
+  const armed = screen.getByTestId("disconnect-google-armed");
+  expect(armed).toHaveTextContent(/reversible/i);
+  expect(armed).toHaveTextContent(/reconnect/i);
+  expect(apiMock).not.toHaveBeenCalledWith(
+    "/connected-accounts/google/disconnect",
+    expect.anything(),
+  );
+  expect(screen.getByTestId("google-connection-status")).toHaveTextContent("active");
+});
+
+test("cancelling the disconnect confirm returns to the initial, unarmed state", async () => {
+  mockApi({ summary: summaryWith([googleConnection()]) });
+  render(<ConnectionsPage />);
+  const user = userEvent.setup();
+  await user.click(await screen.findByTestId("disconnect-google"));
+  await user.click(screen.getByTestId("disconnect-google-cancel"));
+
+  expect(screen.queryByTestId("disconnect-google-armed")).not.toBeInTheDocument();
+  expect(screen.getByTestId("disconnect-google")).toBeInTheDocument();
+  expect(apiMock).not.toHaveBeenCalledWith(
+    "/connected-accounts/google/disconnect",
+    expect.anything(),
+  );
+});
+
+test("confirming disconnect reloads the summary and shows the now-disconnected, data-retained state", async () => {
   let disconnected = false;
   mockApi({
     summary: () =>
@@ -570,13 +620,29 @@ test("disconnecting reloads the summary and shows the now-disconnected, data-ret
   });
 
   render(<ConnectionsPage />);
-  await userEvent.setup().click(await screen.findByTestId("disconnect-google"));
+  const user = userEvent.setup();
+  await user.click(await screen.findByTestId("disconnect-google"));
+  await user.click(screen.getByTestId("disconnect-google-confirm"));
 
   await waitFor(() =>
     expect(screen.getByTestId("google-connection-status")).toHaveTextContent("disconnected"),
   );
   // Inventory counts (imported + derived) are unchanged by disconnect.
   expect(screen.getByTestId("inventory-source_items")).toHaveTextContent("42");
+});
+
+// Stage 11B (condition 5): the four options are distinguishable in one place.
+test("the deletion-options summary states removes/keeps/reversible for all four controls", async () => {
+  mockApi({ summary: summaryWith([googleConnection()]) });
+  render(<ConnectionsPage />);
+  const summary = await screen.findByTestId("deletion-options-summary");
+  expect(summary).toHaveTextContent("Disconnect Google");
+  expect(summary).toHaveTextContent("Delete imported data");
+  expect(summary).toHaveTextContent("Delete learned preferences");
+  expect(summary).toHaveTextContent("Delete account");
+  expect(summary).toHaveTextContent("Yes — reconnect any time");
+  // Three of the four are explicitly marked non-reversible.
+  expect(summary.textContent?.match(/cannot be undone/gi)?.length).toBe(3);
 });
 
 test("a fully clean sync shows no notices", async () => {

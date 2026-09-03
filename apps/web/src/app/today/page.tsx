@@ -15,9 +15,9 @@ type LoadState = "loading" | "generating" | "ready" | "no-brief" | "unauthentica
 
 const STATUS_MESSAGES: Record<string, string> = {
   partial:
-    "Some information could be incomplete: a source was unavailable or evidence could not be resolved. Details below.",
+    "Some information could be incomplete: a source was unavailable or evidence could not be resolved (details below). The rest of this brief completed normally and is safe to act on. No action is needed — a later regeneration may resolve the gap.",
   degraded:
-    "Optional model assistance was unavailable. This brief was composed entirely from deterministic rules — every fact is still evidence-backed.",
+    "Optional model assistance was unavailable. This brief was composed entirely from deterministic rules — every fact is still evidence-backed and safe to act on. No action is needed.",
   empty: "There is nothing to report yet. Import sources and generate again.",
 };
 

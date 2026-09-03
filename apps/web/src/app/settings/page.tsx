@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { AppShell, PageHeader } from "@/components/ui/AppShell";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { ConfirmButton } from "@/components/ui/ConfirmButton";
 import { Checkbox, Field, FormSection, TextInput, TimeInput } from "@/components/ui/Form";
 import { Notice } from "@/components/ui/Notice";
 import { api, ApiError } from "@/lib/api";
@@ -576,14 +577,14 @@ export default function SettingsPage() {
                           </Button>
                         </>
                       )}
-                      <Button
-                        type="button"
+                      <ConfirmButton
+                        testId={`memory-delete-${item.id}`}
                         variant="danger"
-                        data-testid={`memory-delete-${item.id}`}
-                        onClick={() => deleteMemory(item)}
-                      >
-                        Delete
-                      </Button>
+                        label="Delete"
+                        confirmLabel="Confirm delete"
+                        explanation="This can't be undone — the preference will need to be learned again from your future actions. It does not touch Gmail, Calendar, or imported data."
+                        onConfirm={() => deleteMemory(item)}
+                      />
                     </div>
                   )}
                 </li>
@@ -592,15 +593,14 @@ export default function SettingsPage() {
           )}
 
           {memories.length > 0 ? (
-            <Button
-              type="button"
+            <ConfirmButton
+              testId="settings-memory-delete-all"
               variant="danger"
-              className="self-start"
-              data-testid="settings-memory-delete-all"
-              onClick={deleteAllMemories}
-            >
-              Delete all inferred memory
-            </Button>
+              label="Delete all inferred memory"
+              confirmLabel="Confirm delete all"
+              explanation={`This deletes all ${memories.length} learned preference${memories.length === 1 ? "" : "s"} and can't be undone — LifeFlow will have to learn them again from your future actions. It does not touch Gmail, Calendar, or imported data.`}
+              onConfirm={deleteAllMemories}
+            />
           ) : null}
 
           {memoryMessage ? (
