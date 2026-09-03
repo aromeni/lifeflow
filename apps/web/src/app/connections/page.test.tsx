@@ -519,13 +519,17 @@ test("Gmail messages that could not be fetched are disclosed as a genuine failur
     "1 Gmail message could not be read fully",
   );
   // Stage 11B (condition 6): the rest of the sync is unaffected, no action
-  // needed, and it will not silently retry on its own — stated explicitly.
+  // needed. Deliberately makes no claim about whether a future sync's
+  // internal retry mechanism revisits this specific message (an
+  // integrity-review finding: a rare full resync legitimately could,
+  // per D38 — the copy only promises what's actually true regardless:
+  // nothing for the user to do).
   expect(screen.getByTestId("gmail-incomplete-notice")).toHaveTextContent(
     "rest of this sync completed normally and is unaffected",
   );
   expect(screen.getByTestId("gmail-incomplete-notice")).toHaveTextContent("No action is needed");
   expect(screen.getByTestId("gmail-incomplete-notice")).toHaveTextContent(
-    "will not be retried automatically",
+    "this isn't something you need to retry yourself",
   );
   expect(screen.queryByTestId("gmail-excluded-notice")).not.toBeInTheDocument();
 });
