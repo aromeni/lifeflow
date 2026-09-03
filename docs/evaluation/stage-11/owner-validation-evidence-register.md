@@ -62,6 +62,7 @@ Test-account credentials and any raw evidence containing account-specific detail
 | 7 — 10-Day Owner-Only Soak | [phase-7/](owner-validation/phase-7/) | CONDITIONAL PASS (two items addressed by Phase 8) |
 | 8 — Closure and Stage 11A Exit | [phase-8/](owner-validation/phase-8/) | PASS |
 | 9 — GM-12 Fresh-Trigger Follow-Up | [phase-9/](owner-validation/phase-9/) | PASS (closes one of Phase 8's four exit conditions) |
+| 10 — Closing the Remaining Three Exit Conditions | [phase-10/](owner-validation/phase-10/) | PASS (closes the remaining three of Phase 8's four exit conditions) |
 
 Automated-suite results, security-scan summaries, and failure/recovery
 outcomes are recorded within each phase's own evidence pack rather than
