@@ -1,6 +1,6 @@
 # Stage 11A — Owner-Validation Exit Decision
 
-**Status:** Filled in — Stage 11A execution through Phase 10, plus Stage 11B (pre-recruitment UX hardening); all seven conditions now closed, verdict reassessment recorded below, pending the project owner's explicit decision · **Date:** 2026-09-03 (originally recorded 2026-08-19, template created 2026-07-30)
+**Status:** Filled in — Stage 11A execution through Phase 10, plus Stage 11B (pre-recruitment UX hardening); all seven conditions now closed. **The project owner has explicitly accepted Claude's READY recommendation** — the Decision below is now `READY FOR INDEPENDENT ETHICS AND RECRUITMENT PREPARATION`. This does not authorise recruitment; see "What this decision does not do" · **Date:** 2026-09-03 (originally recorded 2026-08-19, template created 2026-07-30; CONDITIONAL READINESS 2026-08-19–2026-09-03, superseded by owner decision 2026-09-03 — see "Decision history" below)
 
 Companion: [owner-validation-success-criteria.md](owner-validation-success-criteria.md) · [owner-validation-evidence-register.md](owner-validation-evidence-register.md) · [recruitment-authorisation-checklist.md](recruitment-authorisation-checklist.md)
 
@@ -12,12 +12,14 @@ Companion: [owner-validation-success-criteria.md](owner-validation-success-crite
 
 Requires all of:
 
-- [ ] All mandatory thresholds in [owner-validation-success-criteria.md](owner-validation-success-criteria.md) met.
-- [ ] No unresolved P0 or P1 finding in the owner-validation issue log.
-- [ ] The soak period (§C, 14–30 days) completed, if it was reached.
-- [ ] All failure/recovery exercises (§D) completed.
-- [ ] Any test-account cleanup (§B) verified — no residual test-account data.
-- [ ] The product is stable enough that a participant would not be acting as a defect-finder for problems Stage 11A should have already caught.
+- [x] All mandatory thresholds in [owner-validation-success-criteria.md](owner-validation-success-criteria.md) met.
+- [x] No unresolved P0 or P1 finding in the owner-validation issue log.
+- [x] The soak period (§C, 14–30 days) completed, if it was reached.
+- [x] All failure/recovery exercises (§D) completed.
+- [x] Any test-account cleanup (§B) verified — no residual test-account data.
+- [x] The product is stable enough that a participant would not be acting as a defect-finder for problems Stage 11A should have already caught.
+
+(Checked 2026-09-03, on the project owner's decision — see "Verdict reassessment" and "Decision history" below for the evidence behind each box.)
 
 ### CONDITIONAL READINESS
 
@@ -43,7 +45,18 @@ A NOT READY outcome is valid and must not be reframed as partial success.
 
 ## Decision record
 
-**Decision:** **CONDITIONAL READINESS**
+**Decision:** **READY FOR INDEPENDENT ETHICS AND RECRUITMENT PREPARATION**
+(set 2026-09-03, on the project owner's explicit acceptance of Claude's
+recommendation — see "Owner decision" below).
+
+**Decision history (not rewritten — kept for the record):** this document
+recorded `CONDITIONAL READINESS` from 2026-08-19 (original decision, four
+conditions) through 2026-09-01 (re-affirmed under three new conditions,
+5–7) until 2026-09-03, when the project owner explicitly accepted the
+upgrade recommendation below. The full `CONDITIONAL READINESS` rationale,
+including every condition it named and how each closed, is preserved
+unchanged in the "Rationale" and "Conditions" sections that follow —
+nothing below has been rewritten to read as if it were always `READY`.
 
 **Rationale:**
 
@@ -250,6 +263,28 @@ left as `CONDITIONAL READINESS` until the project owner explicitly
 directs otherwise, consistent with how every prior verdict change in this
 engagement has been made.
 
+## Owner decision — READY accepted (2026-09-03)
+
+The project owner explicitly accepted the recommendation above in full:
+
+> "ACCEPT READY RECOMMENDATION. Set the Stage 11 owner-validation exit
+> decision to: READY FOR INDEPENDENT ETHICS AND RECRUITMENT PREPARATION."
+
+The owner's instruction was explicit that this decision does **not**:
+authorise participant recruitment; modify
+[recruitment-authorisation-checklist.md](recruitment-authorisation-checklist.md);
+begin participant sessions; begin Stage 12; authorise any Google
+reconnection; or authorise provider reads or writes. The separate
+recruitment/ethics gate remains authoritative — see "What this decision
+does not do" above, which already stated this before the owner's decision
+and remains unchanged by it.
+
+The `Decision:` field above has been updated accordingly. All seven named
+exit conditions (1–7, across Stage 11A and Stage 11B) are closed; none
+were reopened or reinterpreted to produce this result — see "Original
+conditions" and "Conditions 5–7" below for the unchanged historical
+record of each.
+
 **Evidence citations:** see
 [owner-validation-evidence-register.md](owner-validation-evidence-register.md)
 for the full phase-by-phase evidence-pack index this decision is built on.
@@ -269,7 +304,8 @@ owner's explicit Stage 11B authorisation, conditions 5–7 were closed
 following implementation and a real owner re-verification walkthrough of
 each; the verdict reassessment above was produced per that same
 authorisation's instruction to "reassess the Stage 11 exit verdict against
-the existing exit-template criteria." The `Decision:` field itself is left
-unchanged pending the project owner's explicit direction.
+the existing exit-template criteria." Later the same day, the project
+owner explicitly accepted the READY recommendation in full — see "Owner
+decision" above — and the `Decision:` field was updated accordingly.
 
-**Date:** 2026-08-19 (condition 1 closed 2026-08-23; conditions 3 and 4 closed 2026-08-24; condition 2 closed 2026-08-31; conditions 5–7 set 2026-09-01, closed 2026-09-03)
+**Date:** 2026-08-19 (condition 1 closed 2026-08-23; conditions 3 and 4 closed 2026-08-24; condition 2 closed 2026-08-31; conditions 5–7 set 2026-09-01, closed 2026-09-03; verdict set to READY 2026-09-03)

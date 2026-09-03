@@ -103,10 +103,19 @@ with in their own browser and which was cleaned up afterward.
 `owner-validation-exit-template.md` was updated accordingly, including a
 verdict reassessment against the READY checklist: with all seven
 conditions (across Stage 11A and Stage 11B) now closed, every READY box
-is met. Claude's recommendation is recorded as **READY FOR INDEPENDENT
-ETHICS AND RECRUITMENT PREPARATION** — but the `Decision:` field itself
-is left unchanged (`CONDITIONAL READINESS`) pending the project owner's
-explicit direction, per this engagement's standing practice.
+is met. Claude recommended **READY FOR INDEPENDENT ETHICS AND
+RECRUITMENT PREPARATION**.
+
+**Owner decision (2026-09-03): ACCEPT READY RECOMMENDATION.** The project
+owner explicitly accepted the recommendation; `owner-validation-exit-template.md`'s
+`Decision:` field now reads READY FOR INDEPENDENT ETHICS AND RECRUITMENT
+PREPARATION. Confirmed explicitly by the owner: this does not authorise
+recruitment, modify `recruitment-authorisation-checklist.md`, begin
+participant sessions, begin Stage 12, authorise any Google reconnection,
+or authorise provider reads or writes. An independent integrity review of
+all three remediations, the owner-walkthrough evidence, and the full
+verification gate was then run before any merge — see
+[owner-validation/phase-11b/integrity-review.md](../evaluation/stage-11/owner-validation/phase-11b/integrity-review.md).
 
 ## Evidence pack
 
